@@ -1,13 +1,13 @@
-package com.astro.postgres;
+package com.astro.api;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class AstroPostgresApiApplication {
+public class AstroApiApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(AstroPostgresApiApplication.class, args);
+		SpringApplication.run(AstroApiApplication.class, args);
 	}
 
 }
