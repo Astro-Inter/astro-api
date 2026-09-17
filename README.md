@@ -1,135 +1,162 @@
-# ASTRO Core API
+# ASTRO API
 
-
-API REST responsável pela gestão de conformidade com Normas Regulamentadoras (NRs) do sistema **ASTRO** — empresas, unidades, cargos, funcionários, NRs, treinamentos, certificados e eventos.
+API REST responsável pelo backend do **ASTRO**, centralizando as regras de negócio e o acesso aos dados relacionados à gestão de conformidade com Normas Regulamentadoras (NRs).
 
 ## Sobre o ASTRO
 
-O ASTRO é um sistema inteligente de gestão de conformidade com NRs, criado para reduzir o esforço manual do RH e da área de Segurança e Saúde do Trabalho (SST). Ele identifica quais NRs se aplicam a cada empresa, controla treinamentos obrigatórios, monitora validade de certificados e alerta antes de problemas com fiscalização.
+O ASTRO é um sistema inteligente de gestão de conformidade com NRs, criado para reduzir o esforço manual do RH e da área de Segurança e Saúde do Trabalho (SST). Ele auxilia no acompanhamento das NRs aplicáveis, eventos, conformidades e demais processos relacionados à gestão de SST.
 
 O sistema atende três interfaces:
+
 - App mobile do Gestor
 - App web do Gestor
 - App mobile do Funcionário
+
+Todas as interfaces consomem uma única API backend.
+
 ## Stack técnica
 
-- **Java 17+**
-- **Spring Boot** (Spring MVC)
+- **Java 21**
+- **Spring Boot**
+- **Spring MVC**
 - **Spring Data JPA**
+- **Spring Data MongoDB**
+- **Spring Data Redis**
 - **PostgreSQL**
-- **Spring Security** (JWT)
-- **Swagger / OpenAPI** (springdoc-openapi)
+- **MongoDB**
+- **Redis**
+- **Spring Security**
+- **Firebase Authentication**
+- **Firebase Admin SDK**
+- **Swagger / OpenAPI** (`springdoc-openapi`)
 - **Maven**
+
 ## Arquitetura
 
-O projeto segue **Modular MVC**: em vez de organizar por camada técnica, cada módulo de domínio carrega seu próprio mini-MVC (model, repository, dto, service, controller). 
-```
-br.com.astro.core
+O projeto segue **Modular MVC**: em vez de organizar toda a aplicação por camada técnica, cada módulo de domínio possui suas próprias camadas, como model, repository, DTO, mapper, service e controller.
+
+A aplicação utiliza PostgreSQL, MongoDB e Redis dentro de uma única API.
+
+```text
+com.astro.api
+│
+├── config
 │
 ├── common
-│   ├── config          → SecurityConfig, SwaggerConfig
-│   └── exception        → GlobalExceptionHandler, exceções customizadas
+│   ├── exception
+│   ├── handler
+│   ├── response
+│   └── validation
 │
-├── workspace            → Empresa, Workspace, Unidade
-│   ├── model            → entidades JPA (Empresa, Workspace, Unidade)
-│   ├── repository       → interfaces Spring Data JPA
-│   ├── dto              → request/response
-│   ├── service          → regras de negócio
-│   └── controller       → endpoints REST
+├── auth
+│   ├── security
+│   └── service
 │
-├── cargo                 → Cargo
+├── workspace
 │   ├── model
 │   ├── repository
 │   ├── dto
+│   │   ├── request
+│   │   └── response
+│   ├── mapper
 │   ├── service
 │   └── controller
 │
-├── funcionario           → Funcionário
-│   ├── model
-│   ├── repository
-│   ├── dto
-│   ├── service
-│   └── controller
-│
-├── nr                     → Norma Regulamentadora (NR)
-│   ├── model
-│   ├── repository
-│   ├── dto
-│   ├── service
-│   └── controller
-│
-├── treinamento            → Curso, Certificado
-│   ├── model
-│   ├── repository
-│   ├── dto
-│   ├── service
-│   └── controller
-│
-├── evento                 → Evento (calendário)
-│   ├── model
-│   ├── repository
-│   ├── dto
-│   ├── service
-│   └── controller
-│
-└── conformidade           → status/pendências de conformidade
-    ├── model
-    ├── repository
-    ├── dto
-    ├── service
-    └── controller
+├── unidade
+├── cargo
+├── usuario
+├── evento
+├── conformidade
+├── formulario
+├── chat
+└── notificacao
 ```
+
+O módulo `workspace` representa o padrão estrutural utilizado pelos módulos de domínio. Cada domínio possui suas próprias camadas conforme suas necessidades:
+
+```text
+dominio
+├── model          → modelos e entidades do domínio
+├── repository     → acesso aos dados
+├── dto
+│   ├── request    → dados recebidos pela API
+│   └── response   → dados retornados pela API
+├── mapper         → conversão entre modelos e DTOs
+├── service        → regras de negócio
+└── controller     → endpoints REST
+```
+
+Nem todos os módulos precisam possuir todas essas pastas. A estrutura é criada conforme as responsabilidades de cada domínio forem implementadas.
 
 ### Módulos de domínio
 
-| Módulo | Entidades | Responsabilidade |
-|---|---|---|
-| `workspace` | Empresa, Workspace, Unidade | Cadastro da empresa, geração de chave de acesso, subdivisões, etc |
-| `cargo` | Cargo | Cargos por unidade, sugestão automática de NRs aplicáveis, etc |
-| `funcionario` | Funcionário | Cadastro (manual ou via planilha), vínculo com cargo, etc |
-| `nr` | NormaRegulamentadora | Catálogo de NRs, configuração por cargo/workspace, etc |
-| `treinamento` | Curso, Certificado | Treinamentos concluídos ou pendentes, etc |
-| `evento` | Evento | Itens de calendário (treinamentos agendados, vencimentos), etc |
-| `conformidade` | PerfilFuncionario | Liga funcionário às NRs que precisa cumprir e acompanha status/pendências, etc |
+| Módulo | Responsabilidade |
+|---|---|
+| `workspace` | Gerenciamento do ambiente organizacional da empresa |
+| `unidade` | Gerenciamento das unidades da empresa e seus endereços |
+| `cargo` | Gerenciamento dos cargos da empresa |
+| `usuario` | Gerenciamento dos usuários, incluindo Funcionários e Gestores |
+| `evento` | Gerenciamento de Eventos, Turmas, participantes, conclusões e evidências |
+| `conformidade` | Acompanhamento da situação individual dos usuários em relação às NRs aplicáveis |
+| `formulario` | Gerenciamento de formulários |
+| `chat` | Comunicação entre Gestores e Funcionários |
+| `notificacao` | Gerenciamento de notificações e alertas |
 
 ## Como rodar localmente
 
 ### Pré-requisitos
-- JDK 17+
+
+- JDK 21
 - Maven 3.9+
-- PostgreSQL 15+ (local ou instância remota)
+- PostgreSQL
+- MongoDB
+- Redis
+
 ### Configuração
 
-1. Clone o repositório
+1. Clone o repositório:
+
 ```bash
-   git clone <url-do-repo>
-   cd astro-core-api
+git clone <url-do-repo>
+cd astro-api
 ```
 
-2. Configure as variáveis de ambiente (veja [Variáveis de ambiente](#variáveis-de-ambiente))
-3. Rode a aplicação
+2. Configure as variáveis de ambiente necessárias.
+
+3. Rode a aplicação:
+
 ```bash
-   ./mvnw spring-boot:run
+./mvnw spring-boot:run
 ```
 
-4. A API sobe em `http://localhost:8080`
-5. Documentação Swagger disponível em `http://localhost:8080/swagger-ui.html`
-### Variáveis de ambiente
+4. A API sobe em:
+
+```text
+http://localhost:8080
+```
+
+5. Documentação Swagger disponível em:
+
+```text
+http://localhost:8080/swagger-ui.html
+```
+
+## Variáveis de ambiente
 
 | Variável | Descrição | Exemplo |
 |---|---|---|
-| `DB_URL` | URL de conexão com o Postgres | `jdbc:postgresql://localhost:5432/astro` |
+| `DB_URL` | URL de conexão com PostgreSQL | `jdbc:postgresql://localhost:5432/astro` |
 | `DB_USERNAME` | Usuário do banco | `astro_user` |
 | `DB_PASSWORD` | Senha do banco | `********` |
-| `JWT_SECRET` | Chave usada para assinar os tokens JWT | `********` |
-| `JWT_EXPIRATION` | Tempo de expiração do token (ms) | `3600000` |
-| `CORS_ALLOWED_ORIGINS` | Origens permitidas (apps mobile/web) | `http://localhost:5173` |
+| `MONGODB_URI` | URL de conexão com MongoDB | `mongodb://localhost:27017/astro` |
+| `REDIS_HOST` | Host do Redis | `localhost` |
+| `REDIS_PORT` | Porta do Redis | `6379` |
+| `CORS_ALLOWED_ORIGINS` | Origens permitidas para acesso à API | `http://localhost:5173` |
 
 ## Endpoints
 
-_Em construção — a documentação completa dos endpoints fica disponível via Swagger assim que os módulos forem implementados._
+*Em construção — a documentação completa dos endpoints fica disponível via Swagger conforme os módulos forem implementados.*
 
 ## Time
 
-Ver `Responsabilidades Astro` para divisão completa de áreas e responsáveis do projeto.
- 
+Consulte **`Responsabilidades Astro`** para a divisão completa das áreas e responsáveis pelo projeto.

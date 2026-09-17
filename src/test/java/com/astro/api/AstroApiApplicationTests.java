@@ -1,10 +1,10 @@
-package com.astro.postgres;
+package com.astro.api;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class AstroPostgresApiApplicationTests {
+class AstroApiApplicationTests {
 
 	@Test
 	void contextLoads() {
