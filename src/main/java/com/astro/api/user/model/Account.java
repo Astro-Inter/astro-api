@@ -1,18 +1,12 @@
 package com.astro.api.user.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.Audited;
-import jakarta.persistence.Id;
 
 @Getter
 @Setter
-@Entity
-@Audited.Table(name = "conta")
+@MappedSuperclass
 public class Account {
 
     @Id
