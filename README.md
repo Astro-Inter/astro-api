@@ -145,13 +145,13 @@ http://localhost:8080/swagger-ui.html
 
 | Variável | Descrição | Exemplo |
 |---|---|---|
-| `DB_URL` | URL de conexão com PostgreSQL | `jdbc:postgresql://localhost:5432/astro` |
-| `DB_USERNAME` | Usuário do banco | `astro_user` |
-| `DB_PASSWORD` | Senha do banco | `********` |
-| `MONGODB_URI` | URL de conexão com MongoDB | `mongodb://localhost:27017/astro` |
-| `REDIS_HOST` | Host do Redis | `localhost` |
-| `REDIS_PORT` | Porta do Redis | `6379` |
-| `CORS_ALLOWED_ORIGINS` | Origens permitidas para acesso à API | `http://localhost:5173` |
+| `POSTGRES_HOST` | Host do PostgreSQL | `localhost` |
+| `POSTGRES_PORT` | Porta do PostgreSQL | `5432` |
+| `POSTGRES_USER` | Usuário do banco | `astro_user` |
+| `POSTGRES_PASSWORD` | Senha do banco | `********` |
+| `POSTGRES_NAME` | Nome do banco de dados | `astro` |
+| `FIREBASE_PROJECT_ID` | ID do projeto no Firebase | `astro-app` |
+| `FIREBASE_CREDENTIALS_BASE64` | Credenciais do Firebase codificadas em Base64 | `********` |
 
 ## Endpoints
 
