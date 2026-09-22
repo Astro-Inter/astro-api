@@ -14,6 +14,11 @@ import java.time.Instant;
 @Table(name = "usuario")
 public class User extends Account {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id_usuario")
+    private Long id;
+
     @Column(name = "cpf", unique = true)
     private String cpf;
 

@@ -9,10 +9,6 @@ import lombok.Setter;
 @MappedSuperclass
 public class Account {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
     @Column(name = "nome")
     private String name;
 
