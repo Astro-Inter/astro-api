@@ -45,8 +45,7 @@ com.astro.api
 ├── common
 │   ├── exception
 │   ├── handler
-│   ├── response
-│   └── validation
+│   └── response
 │
 ├── auth
 │   ├── security
