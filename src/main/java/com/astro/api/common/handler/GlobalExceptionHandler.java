@@ -3,7 +3,7 @@ package com.astro.api.common.handler;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ConflictException;
 import com.astro.api.common.exception.ResourceNotFoundException;
-import com.astro.api.common.response.ApiResponse;
+import com.astro.api.common.response.ApiResult;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -20,10 +20,10 @@ public class GlobalExceptionHandler {
 
     // Recurso não encontrado. Ex: usuário inexistente.
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ApiResponse<Void>> handleResourceNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
+    public ResponseEntity<ApiResult<Void>> handleResourceNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.error(
+                .body(ApiResult.error(
                         ex.getMessage(),
                         List.of(ex.getMessage()),
                         request.getRequestURI()
@@ -32,10 +32,10 @@ public class GlobalExceptionHandler {
 
     // Violação de regra de negócio. Ex: gestor participando do próprio evento.
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException ex, HttpServletRequest request) {
+    public ResponseEntity<ApiResult<Void>> handleBusinessException(BusinessException ex, HttpServletRequest request) {
         return ResponseEntity
                 .badRequest()
-                .body(ApiResponse.error(
+                .body(ApiResult.error(
                         ex.getMessage(),
                         List.of(ex.getMessage()),
                         request.getRequestURI()
@@ -44,10 +44,10 @@ public class GlobalExceptionHandler {
 
     // Conflito com dados existentes. Ex: e-mail já cadastrado.
     @ExceptionHandler(ConflictException.class)
-    public ResponseEntity<ApiResponse<Void>> handleConflict(ConflictException ex, HttpServletRequest request) {
+    public ResponseEntity<ApiResult<Void>> handleConflict(ConflictException ex, HttpServletRequest request) {
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
-                .body(ApiResponse.error(
+                .body(ApiResult.error(
                         ex.getMessage(),
                         List.of(ex.getMessage()),
                         request.getRequestURI()
@@ -56,7 +56,7 @@ public class GlobalExceptionHandler {
 
     // Falha na validação. Ex: campo @NotBlank vazio.
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiResponse<Void>> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
+    public ResponseEntity<ApiResult<Void>> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
         List<String> errors = ex.getBindingResult()
                 .getFieldErrors()
                 .stream()
@@ -67,7 +67,7 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .badRequest()
-                .body(ApiResponse.error(
+                .body(ApiResult.error(
                         "Erro de validação",
                         errors,
                         request.getRequestURI()
@@ -76,10 +76,10 @@ public class GlobalExceptionHandler {
 
     // Requisição ilegível. Ex: JSON malformado ou enum inválido.
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ApiResponse<Void>> handleNotReadable(HttpMessageNotReadableException ex, HttpServletRequest request) {
+    public ResponseEntity<ApiResult<Void>> handleNotReadable(HttpMessageNotReadableException ex, HttpServletRequest request) {
         return ResponseEntity
                 .badRequest()
-                .body(ApiResponse.error(
+                .body(ApiResult.error(
                         "Corpo da requisição inválido",
                         List.of("Verifique o formato dos dados enviados"),
                         request.getRequestURI()
@@ -88,10 +88,10 @@ public class GlobalExceptionHandler {
 
     // Violação no banco. Ex: UNIQUE ou FK.
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest request) {
+    public ResponseEntity<ApiResult<Void>> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest request) {
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
-                .body(ApiResponse.error(
+                .body(ApiResult.error(
                         "Conflito de integridade dos dados",
                         List.of("A operação viola uma restrição dos dados"),
                         request.getRequestURI()
@@ -100,10 +100,10 @@ public class GlobalExceptionHandler {
 
     // Erro inesperado. Ex: falha não tratada pela aplicação.
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<Void>> handleGeneric(Exception ex, HttpServletRequest request) {
+    public ResponseEntity<ApiResult<Void>> handleGeneric(Exception ex, HttpServletRequest request) {
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error(
+                .body(ApiResult.error(
                         "Erro interno do servidor",
                         List.of("Ocorreu um erro inesperado"),
                         request.getRequestURI()
