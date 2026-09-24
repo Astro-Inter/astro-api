@@ -10,7 +10,7 @@ O sistema atende três interfaces:
 
 - App mobile do Gestor
 - App web do Gestor
-- App mobile do Funcionário
+- App mobile do Colaborador
 
 Todas as interfaces consomem uma única API backend.
 
@@ -89,17 +89,17 @@ Nem todos os módulos precisam possuir todas essas pastas. A estrutura é criada
 
 ### Módulos de domínio
 
-| Módulo | Responsabilidade |
-|---|---|
-| `workspace` | Gerenciamento do ambiente organizacional da empresa |
-| `unidade` | Gerenciamento das unidades da empresa e seus endereços |
-| `cargo` | Gerenciamento dos cargos da empresa |
-| `usuario` | Gerenciamento dos usuários, incluindo Funcionários e Gestores |
-| `evento` | Gerenciamento de Eventos, Turmas, participantes, conclusões e evidências |
+| Módulo | Responsabilidade                                                                |
+|---|---------------------------------------------------------------------------------|
+| `workspace` | Gerenciamento do ambiente organizacional da empresa                             |
+| `unidade` | Gerenciamento das unidades da empresa e seus endereços                          |
+| `cargo` | Gerenciamento dos cargos da empresa                                             |
+| `usuario` | Gerenciamento dos usuários, incluindo Colaboradores e Gestores                  |
+| `evento` | Gerenciamento de Eventos, Turmas, participantes, conclusões e evidências        |
 | `conformidade` | Acompanhamento da situação individual dos usuários em relação às NRs aplicáveis |
-| `formulario` | Gerenciamento de formulários |
-| `chat` | Comunicação entre Gestores e Funcionários |
-| `notificacao` | Gerenciamento de notificações e alertas |
+| `formulario` | Gerenciamento de formulários                                                    |
+| `chat` | Comunicação entre Gestores e Colaboradores                                      |
+| `notificacao` | Gerenciamento de notificações e alertas                                         |
 
 ## Como rodar localmente
 
