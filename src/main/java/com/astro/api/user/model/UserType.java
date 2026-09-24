@@ -1,5 +1,5 @@
 package com.astro.api.user.model;
 
 public enum UserType {
-    GESTOR, GESTOR_WORKSPACE, FUNCIONARIO
+    GESTOR, GESTOR_WORKSPACE, COLABORADOR
 }
