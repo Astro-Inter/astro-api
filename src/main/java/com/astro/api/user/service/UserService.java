@@ -2,6 +2,7 @@ package com.astro.api.user.service;
 
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.user.dto.request.EmailVerificationRequestDto;
+import com.astro.api.user.dto.request.UserActivationRequestDto;
 import com.astro.api.user.dto.response.IdentificatedUserResponseDto;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
@@ -30,5 +31,13 @@ public class UserService {
                 user.getType(),
                 user.getStatus()
         );
+    }
+
+    public void activateCollaborator(UserActivationRequestDto dto) {
+        User user = userRepository.findByEmail(dto.email())
+                .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
+
+        user.setFirebaseUid(dto.firebaseUid());
+        userRepository.save(user);
     }
 }

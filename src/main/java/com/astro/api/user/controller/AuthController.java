@@ -2,6 +2,7 @@ package com.astro.api.user.controller;
 
 import com.astro.api.common.response.ApiResult;
 import com.astro.api.user.dto.request.EmailVerificationRequestDto;
+import com.astro.api.user.dto.request.UserActivationRequestDto;
 import com.astro.api.user.dto.response.IdentificatedUserResponseDto;
 import com.astro.api.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -38,5 +39,17 @@ public class AuthController {
                         request.getRequestURI()
                 )
         );
+    }
+
+    @PostMapping("activate")
+    @Operation(summary = "Ativa um colaborador", description = "Atualiza o UID do Firebase do colaborador identificado pelo e-mail. A trigger do banco atualiza o status para ATIVO.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Colaborador ativado com sucesso"),
+            @ApiResponse(responseCode = "404", description = "Colaborador não encontrado")
+    })
+    public ResponseEntity<Void> activateCollaborator(@RequestBody @Valid UserActivationRequestDto dto) {
+        userService.activateCollaborator(dto);
+
+        return ResponseEntity.noContent().build();
     }
 }

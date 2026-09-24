@@ -1,9 +1,11 @@
 package com.astro.api.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.handler.GlobalExceptionHandler;
 import com.astro.api.user.controller.AuthController;
 import com.astro.api.user.dto.request.EmailVerificationRequestDto;
+import com.astro.api.user.dto.request.UserActivationRequestDto;
 import com.astro.api.user.dto.response.IdentificatedUserResponseDto;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
@@ -20,6 +22,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -27,10 +30,12 @@ class AuthControllerTest {
 
     private UserService userService;
     private MockMvc mockMvc;
+    private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
         userService = mock(UserService.class);
+        objectMapper = new ObjectMapper();
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new AuthController(userService))
                 .setControllerAdvice(new GlobalExceptionHandler())
@@ -115,6 +120,35 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.message").value("Erro de validação"))
                 .andExpect(jsonPath("$.errors[0]", containsString("email:")))
                 .andExpect(jsonPath("$.path").value("/verify-email"));
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    void shouldActivateCollaborator() throws Exception {
+        UserActivationRequestDto requestDto = new UserActivationRequestDto("colaborador@astro.com", "firebase-uid");
+
+        mockMvc.perform(post("/activate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDto)))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        verify(userService).activateCollaborator(requestDto);
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenFirebaseUidIsBlank() throws Exception {
+        UserActivationRequestDto requestDto = new UserActivationRequestDto("colaborador@astro.com", "");
+
+        mockMvc.perform(post("/activate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Erro de validação"))
+                .andExpect(jsonPath("$.errors[0]", containsString("firebaseUid:")))
+                .andExpect(jsonPath("$.path").value("/activate"));
 
         verifyNoInteractions(userService);
     }
