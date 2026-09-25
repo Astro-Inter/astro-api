@@ -6,6 +6,7 @@ import com.astro.api.common.handler.GlobalExceptionHandler;
 import com.astro.api.user.controller.AuthController;
 import com.astro.api.user.dto.request.EmailVerificationRequestDto;
 import com.astro.api.user.dto.request.UserActivationRequestDto;
+import com.astro.api.user.dto.request.AccessKeyVerificationRequestDto;
 import com.astro.api.user.dto.response.IdentificatedUserResponseDto;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
@@ -149,6 +150,50 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.message").value("Erro de validação"))
                 .andExpect(jsonPath("$.errors[0]", containsString("firebaseUid:")))
                 .andExpect(jsonPath("$.path").value("/activate"));
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    void shouldReturnNoContentWhenAccessKeyIsValid() throws Exception {
+        AccessKeyVerificationRequestDto requestDto = new AccessKeyVerificationRequestDto("colaborador@astro.com", "123456");
+
+        when(userService.verifyAccessKey(requestDto)).thenReturn(true);
+
+        mockMvc.perform(post("/verify-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDto)))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        verify(userService).verifyAccessKey(requestDto);
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenAccessKeyIsInvalid() throws Exception {
+        AccessKeyVerificationRequestDto requestDto = new AccessKeyVerificationRequestDto("colaborador@astro.com", "123456");
+
+        when(userService.verifyAccessKey(requestDto)).thenReturn(false);
+
+        mockMvc.perform(post("/verify-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDto)))
+                .andExpect(status().isForbidden())
+                .andExpect(content().string(""));
+
+        verify(userService).verifyAccessKey(requestDto);
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenAccessKeyDoesNotHaveSixDigits() throws Exception {
+        AccessKeyVerificationRequestDto requestDto = new AccessKeyVerificationRequestDto("colaborador@astro.com", "12345");
+
+        mockMvc.perform(post("/verify-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(requestDto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errors[0]", containsString("accessKey:")));
 
         verifyNoInteractions(userService);
     }

@@ -12,11 +12,15 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     // Recurso não encontrado. Ex: usuário inexistente.
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -101,6 +105,8 @@ public class GlobalExceptionHandler {
     // Erro inesperado. Ex: falha não tratada pela aplicação.
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResult<Void>> handleGeneric(Exception ex, HttpServletRequest request) {
+        LOGGER.error("Erro interno ao processar a requisição para {}", request.getRequestURI(), ex);
+
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResult.error(

@@ -3,6 +3,7 @@ package com.astro.api.service;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.user.dto.request.EmailVerificationRequestDto;
 import com.astro.api.user.dto.request.UserActivationRequestDto;
+import com.astro.api.user.dto.request.AccessKeyVerificationRequestDto;
 import com.astro.api.user.dto.response.IdentificatedUserResponseDto;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
@@ -11,6 +12,8 @@ import com.astro.api.user.repository.UserRepository;
 import com.astro.api.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 
 import java.util.Optional;
 
@@ -20,17 +23,22 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class UserServiceTest {
 
     private UserRepository userRepository;
+    private StringRedisTemplate redisTemplate;
+    private ValueOperations<String, String> valueOperations;
     private UserService userService;
 
     @BeforeEach
     void setUp() {
         userRepository = mock(UserRepository.class);
-        userService = new UserService(userRepository);
+        redisTemplate = mock(StringRedisTemplate.class);
+        valueOperations = mock(ValueOperations.class);
+        userService = new UserService(userRepository, redisTemplate);
     }
 
     @Test
@@ -86,7 +94,7 @@ class UserServiceTest {
                 () -> userService.findTypeAndStatusByEmail(dto)
         );
 
-        assertEquals("Usuário não encontrado", exception.getMessage());
+        assertEquals("Este e-mail não está cadastrado no Astro.", exception.getMessage());
         verify(userRepository).findByEmail(dto.email());
     }
 
@@ -123,5 +131,50 @@ class UserServiceTest {
         assertEquals("Colaborador não encontrado", exception.getMessage());
         verify(userRepository).findByEmail(dto.email());
         verifyNoMoreInteractions(userRepository);
+    }
+
+    @Test
+    void shouldReturnTrueWhenAccessKeyMatchesRedisValue() {
+        AccessKeyVerificationRequestDto dto = new AccessKeyVerificationRequestDto("colaborador@astro.com", "123456");
+        String redisKey = "processamento:email:colaborador:access_key:colaborador@astro.com";
+
+        when(userRepository.findAccountTypeByEmail(dto.email())).thenReturn("colaborador");
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get(redisKey)).thenReturn("123456");
+
+        boolean isValid = userService.verifyAccessKey(dto);
+
+        assertEquals(true, isValid);
+        verify(userRepository).findAccountTypeByEmail(dto.email());
+        verify(redisTemplate).opsForValue();
+        verify(valueOperations).get(redisKey);
+    }
+
+    @Test
+    void shouldReturnFalseWhenAccessKeyDoesNotMatchRedisValue() {
+        AccessKeyVerificationRequestDto dto = new AccessKeyVerificationRequestDto("workspace@astro.com", "123456");
+        String redisKey = "processamento:email:workspace:access_key:workspace@astro.com";
+
+        when(userRepository.findAccountTypeByEmail(dto.email())).thenReturn("workspace");
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get(redisKey)).thenReturn("654321");
+
+        boolean isValid = userService.verifyAccessKey(dto);
+
+        assertEquals(false, isValid);
+        verify(valueOperations).get(redisKey);
+    }
+
+    @Test
+    void shouldReturnFalseWhenAccountTypeIsInvalid() {
+        AccessKeyVerificationRequestDto dto = new AccessKeyVerificationRequestDto("inexistente@astro.com", "123456");
+
+        when(userRepository.findAccountTypeByEmail(dto.email())).thenReturn(null);
+
+        boolean isValid = userService.verifyAccessKey(dto);
+
+        assertEquals(false, isValid);
+        verify(userRepository).findAccountTypeByEmail(dto.email());
+        verifyNoInteractions(redisTemplate);
     }
 }
