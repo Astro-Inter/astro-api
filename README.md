@@ -142,14 +142,18 @@ http://localhost:8080/swagger-ui.html
 
 ## Variáveis de ambiente
 
-| Variável | Descrição | Exemplo |
-|---|---|---|
-| `POSTGRES_HOST` | Host do PostgreSQL | `localhost` |
-| `POSTGRES_PORT` | Porta do PostgreSQL | `5432` |
-| `POSTGRES_USER` | Usuário do banco | `astro_user` |
-| `POSTGRES_PASSWORD` | Senha do banco | `********` |
-| `POSTGRES_NAME` | Nome do banco de dados | `astro` |
-| `FIREBASE_PROJECT_ID` | ID do projeto no Firebase | `astro-app` |
+| Variável | Descrição                                     | Exemplo |
+|---|-----------------------------------------------|---|
+| `POSTGRES_HOST` | Host do PostgreSQL                            | `localhost` |
+| `POSTGRES_PORT` | Porta do PostgreSQL                           | `5432` |
+| `POSTGRES_USER` | Usuário do banco SQL                          | `astro_user` |
+| `POSTGRES_PASSWORD` | Senha do banco SQL                            | `********` |
+| `POSTGRES_NAME` | Nome do banco de dados SQL                    | `astro` |
+| `REDIS_HOST` | Host do Redis                                 | `localhost` |
+| `REDIS_PORT` | Porta do Redis                                | `6379` |
+| `REDIS_USERNAME` | Usuário do Redis                              | `default` |
+| `REDIS_PASSWORD` | Senha do Redis                                | `********` |
+| `FIREBASE_PROJECT_ID` | ID do projeto no Firebase                     | `astro-app` |
 | `FIREBASE_CREDENTIALS_BASE64` | Credenciais do Firebase codificadas em Base64 | `********` |
 
 ## Endpoints
