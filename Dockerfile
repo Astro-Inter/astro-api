@@ -7,4 +7,5 @@ RUN mvn -B -DskipTests package
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /app/target/astro-api-0.0.1-SNAPSHOT.jar app.jar
+USER 10001:10001
 CMD ["sh", "-c", "exec java -Dserver.port=${PORT:-10000} -jar app.jar"]
