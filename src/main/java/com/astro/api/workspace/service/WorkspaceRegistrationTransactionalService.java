@@ -8,6 +8,7 @@ import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.UserRepository;
+import com.astro.api.user.service.UserBatchService;
 import com.astro.api.workspace.dto.request.CreateWorkspaceRequest;
 import com.astro.api.workspace.dto.response.RegisterWorkspaceResponse;
 import com.astro.api.workspace.event.PreRegisteredCollaboratorsCreatedEvent;
@@ -32,11 +33,12 @@ public class WorkspaceRegistrationTransactionalService {
     private final ApplicationEventPublisher eventPublisher;
     private final WorkspaceMapper workspaceMapper;
     private final CargoService cargoService;
+    private final UserBatchService userBatchService;
 
     public WorkspaceRegistrationTransactionalService(WorkspaceRepository workspaceRepository, UserRepository userRepository,
                                                      UnitService unitService, SpreadsheetImportService spreadsheetImportService,
                                                      ApplicationEventPublisher eventPublisher, WorkspaceMapper workspaceMapper,
-                                                     CargoService cargoService) {
+                                                     CargoService cargoService, UserBatchService userBatchService) {
         this.workspaceRepository = workspaceRepository;
         this.userRepository = userRepository;
         this.unitService = unitService;
@@ -44,6 +46,7 @@ public class WorkspaceRegistrationTransactionalService {
         this.eventPublisher = eventPublisher;
         this.workspaceMapper = workspaceMapper;
         this.cargoService = cargoService;
+        this.userBatchService = userBatchService;
     }
 
     @Transactional
@@ -70,8 +73,9 @@ public class WorkspaceRegistrationTransactionalService {
 
         SpreadsheetImportService.ImportProcessingResult result = spreadsheetImportService.validateAndBuild(
                 rows, workspace, units, managerRow, cargosByName);
-        List<User> savedUsers = result.validUsers().isEmpty() ? List.of() : userRepository.saveAll(result.validUsers());
-        eventPublisher.publishEvent(new PreRegisteredCollaboratorsCreatedEvent(savedUsers.stream().map(User::getEmail).toList()));
+        userBatchService.saveAllPreRegistered(result.validUsers());
+        eventPublisher.publishEvent(new PreRegisteredCollaboratorsCreatedEvent(
+                result.validUsers().stream().map(User::getEmail).toList()));
         return new RegisterWorkspaceResponse(workspace.id, result.errors());
     }
 }
