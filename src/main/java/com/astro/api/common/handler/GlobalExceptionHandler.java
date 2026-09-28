@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.slf4j.Logger;
@@ -90,9 +91,20 @@ public class GlobalExceptionHandler {
                 ));
     }
 
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiResult<Void>> handleMissingMultipartPart(MissingServletRequestPartException ex, HttpServletRequest request) {
+        return ResponseEntity.badRequest().body(ApiResult.error(
+                "Parte obrigatória da requisição ausente",
+                List.of("A parte '" + ex.getRequestPartName() + "' é obrigatória"),
+                request.getRequestURI()
+        ));
+    }
+
     // Violação no banco. Ex: UNIQUE ou FK.
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResult<Void>> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest request) {
+        LOGGER.warn("Conflito de integridade ao processar {}: {}", request.getRequestURI(),
+                ex.getMostSpecificCause().getMessage());
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
                 .body(ApiResult.error(
