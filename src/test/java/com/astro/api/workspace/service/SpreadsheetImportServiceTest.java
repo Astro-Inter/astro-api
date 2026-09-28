@@ -27,9 +27,10 @@ class SpreadsheetImportServiceTest {
                 new SpreadsheetImportService.SpreadsheetRow(4, "Ana 2", "52998224725", "ana@astro.com", "Matriz", "Dev", "REMOTO")
         );
         Unit unit = new Unit(); unit.name = "Matriz";
+        Cargo cargo = new Cargo(); cargo.setActive(true);
 
         SpreadsheetImportService.ImportProcessingResult result = service.validateAndBuild(
-                rows, new Workspace(), List.of(unit), rows.getFirst(), Map.of("dev", new Cargo()));
+                rows, new Workspace(), List.of(unit), rows.getFirst(), Map.of("dev", cargo));
 
         assertEquals(1, result.validUsers().size());
         assertEquals(1, result.errors().size());
