@@ -156,6 +156,21 @@ http://localhost:8080/swagger-ui.html
 | `FIREBASE_PROJECT_ID` | ID do projeto no Firebase                     | `astro-app` |
 | `FIREBASE_CREDENTIALS_BASE64` | Credenciais do Firebase codificadas em Base64 | `********` |
 
+## Observabilidade
+
+A API envia logs da aplicação ao Grafana Cloud por OpenTelemetry (OTLP/HTTP) quando as duas variáveis abaixo estão preenchidas. Os logs continuam aparecendo no console. Sem elas, a exportação é desativada e a aplicação funciona somente com o logging local.
+
+| Variável | Descrição |
+|---|---|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | URL base do endpoint OTLP do Grafana Cloud, sem `/v1/logs` (por exemplo, `https://.../otlp`). |
+| `OTEL_EXPORTER_OTLP_HEADERS` | Cabeçalho de autenticação no formato OTLP, por exemplo `Authorization=Basic%20<credencial-base64>`. |
+
+Copie as chaves vazias de `.env.example` para o `.env` local e preencha somente no seu ambiente. O valor do cabeçalho deve ser codificado para URL; não coloque aspas nem espaços ao redor de `=`. A exportação acrescenta `/v1/logs` à URL base e identifica o serviço como `astro-api`.
+
+Em produção, forneça as duas variáveis como secrets do serviço que executa o container. Os workflows deste repositório apenas testam e publicam a imagem; não executam a API e, por isso, não precisam receber as credenciais do Grafana. Se a API passar a rodar diretamente no GitHub Actions, crie os secrets `GRAFANA_OTLP_ENDPOINT` e `GRAFANA_OTLP_HEADERS` e mapeie-os para `OTEL_EXPORTER_OTLP_ENDPOINT` e `OTEL_EXPORTER_OTLP_HEADERS` no passo que a executa.
+
+Para testar, inicie a API normalmente com o `.env` preenchido e produza um log de aplicação. No Grafana Cloud, abra **Explore → Logs** e filtre por `service_name="astro-api"` no período recente. Também é possível iniciar sem essas variáveis e verificar que os logs continuam no console. Não registre credenciais ou outros dados sensíveis em mensagens de log.
+
 ## Endpoints
 
 *Em construção — a documentação completa dos endpoints fica disponível via Swagger conforme os módulos forem implementados.*
