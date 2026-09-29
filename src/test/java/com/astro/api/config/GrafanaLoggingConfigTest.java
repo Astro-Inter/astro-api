@@ -84,14 +84,18 @@ class GrafanaLoggingConfigTest {
                             var appender = new OpenTelemetryAppender();
                             appender.setContext(loggerContext);
                             appender.setOpenTelemetry(context.getBean(OpenTelemetry.class));
+                            appender.setCaptureKeyValuePairAttributes(true);
                             appender.start();
                             Logger logger = loggerContext.getLogger("grafana-test");
                             logger.addAppender(appender);
-                            logger.info("Conexao OTLP validada localmente");
+                            logger.atInfo().addKeyValue("http_route", "/verify-email")
+                                    .addKeyValue("http_status", 200)
+                                    .log("Conexao OTLP validada localmente");
                             context.getBean(SdkLoggerProvider.class).forceFlush().join(5, TimeUnit.SECONDS);
                             assertThat(request.get(5, TimeUnit.SECONDS))
                                     .contains("POST /otlp/v1/logs", "Basic teste", "astro-api", "INFO",
-                                            "Conexao OTLP validada localmente");
+                                            "Conexao OTLP validada localmente", "http_route", "/verify-email",
+                                            "http_status");
                             appender.stop();
                         }
                         finally {
