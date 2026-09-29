@@ -173,6 +173,18 @@ Para testar, inicie a API normalmente com o `.env` preenchido e produza um log d
 
 ## Endpoints
 
+### Logs das requisições HTTP
+
+Cada chamada aos endpoints síncronos gera um registro ao terminar, inclusive quando a autenticação ou validação rejeita a chamada. O registro contém método, rota (o template do endpoint quando disponível), status HTTP, duração em milissegundos e um identificador gerado pela API, também retornado no cabeçalho `X-Request-ID`. Respostas 2xx/3xx usam INFO, 4xx usam WARN e 5xx usam ERROR. Corpos, cabeçalhos de autenticação e query strings não são incluídos nesse registro.
+
+No Grafana, selecione a fonte de logs e consulte no Explore:
+
+```logql
+{service_name="astro-api"} |= "HTTP request"
+```
+
+Para uma rota específica, acrescente `| http_route="/verify-email"`; para erros, use `| http_status >= 400`. Os campos `http_method`, `http_route`, `http_status`, `duration_ms`, `request_id` e `event` são enviados como atributos do log. O envio ocorre em lotes, portanto aguarde alguns segundos e atualize o intervalo recente. Esses registros acompanham as chamadas HTTP; métricas e traces distribuídos continuam desativados.
+
 *Em construção — a documentação completa dos endpoints fica disponível via Swagger conforme os módulos forem implementados.*
 
 ## Time
