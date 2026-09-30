@@ -1,0 +1,10 @@
+.git
+.github
+target
+.env
+.env.*
+!.env.example
+secrets.env
+*.pem
+*.key
+deploy
