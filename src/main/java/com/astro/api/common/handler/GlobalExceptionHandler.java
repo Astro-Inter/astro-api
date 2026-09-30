@@ -4,12 +4,17 @@ import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ConflictException;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.response.ApiResult;
+import com.mongodb.MongoTimeoutException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.jdbc.CannotGetJdbcConnectionException;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -17,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -98,6 +104,44 @@ public class GlobalExceptionHandler {
                 List.of("A parte '" + ex.getRequestPartName() + "' é obrigatória"),
                 request.getRequestURI()
         ));
+    }
+
+    // Método HTTP não permitido para a rota. Ex: POST enviado para endpoint que aceita apenas GET.
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResult<Void>> handleMethodNotAllowed(
+            HttpRequestMethodNotSupportedException ex,
+            HttpServletRequest request) {
+        String allowedMethods = ex.getSupportedHttpMethods().stream()
+                .map(method -> method.name())
+                .collect(Collectors.joining(", "));
+
+        return ResponseEntity
+                .status(HttpStatus.METHOD_NOT_ALLOWED)
+                .header("Allow", allowedMethods)
+                .body(ApiResult.error(
+                        "Método HTTP não permitido",
+                        List.of("Use um dos métodos permitidos: " + allowedMethods),
+                        request.getRequestURI()
+                ));
+    }
+
+    // Banco indisponível ou conexão esgotada: PostgreSQL, MongoDB ou Redis.
+    @ExceptionHandler({
+            CannotGetJdbcConnectionException.class,
+            DataAccessResourceFailureException.class,
+            RedisConnectionFailureException.class,
+            MongoTimeoutException.class
+    })
+    public ResponseEntity<ApiResult<Void>> handleDatabaseConnectionFailure(Exception ex, HttpServletRequest request) {
+        LOGGER.error("Falha de conexão com banco de dados ao processar {}", request.getRequestURI(), ex);
+
+        return ResponseEntity
+                .status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiResult.error(
+                        "Serviço de dados temporariamente indisponível",
+                        List.of("Não foi possível conectar ao banco de dados. Tente novamente em instantes"),
+                        request.getRequestURI()
+                ));
     }
 
     // Violação no banco. Ex: UNIQUE ou FK.

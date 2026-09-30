@@ -14,6 +14,7 @@ import com.astro.api.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -23,6 +24,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -196,5 +198,32 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.errors[0]", containsString("accessKey:")));
 
         verifyNoInteractions(userService);
+    }
+
+    @Test
+    void shouldReturnMethodNotAllowedWhenEndpointIsCalledWithWrongMethod() throws Exception {
+        mockMvc.perform(get("/verify-email"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Método HTTP não permitido"))
+                .andExpect(jsonPath("$.errors[0]").value("Use um dos métodos permitidos: POST"))
+                .andExpect(jsonPath("$.path").value("/verify-email"));
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    void shouldReturnServiceUnavailableForDatabaseConnectionFailure() {
+        GlobalExceptionHandler handler = new GlobalExceptionHandler();
+        var request = new org.springframework.mock.web.MockHttpServletRequest("POST", "/verify-email");
+
+        var response = handler.handleDatabaseConnectionFailure(
+                new DataAccessResourceFailureException("connection refused"), request);
+
+        org.junit.jupiter.api.Assertions.assertEquals(503, response.getStatusCode().value());
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "Serviço de dados temporariamente indisponível", response.getBody().message());
+        org.junit.jupiter.api.Assertions.assertEquals("/verify-email", response.getBody().path());
     }
 }
