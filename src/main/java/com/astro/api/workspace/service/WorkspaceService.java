@@ -4,6 +4,7 @@ import com.astro.api.auth.service.FirebaseIdentityService;
 import com.astro.api.common.exception.ConflictException;
 import com.astro.api.workspace.dto.request.CreateWorkspaceRequest;
 import com.astro.api.workspace.dto.response.RegisterWorkspaceResponse;
+import com.astro.api.workspace.exception.SpreadsheetImportException;
 import com.astro.api.workspace.repository.WorkspaceRepository;
 import com.astro.api.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -34,9 +35,14 @@ public class WorkspaceService {
         validateStructuralConflicts(request);
         List<SpreadsheetImportService.SpreadsheetRow> rows = spreadsheetImportService.read(file);
         SpreadsheetImportService.SpreadsheetRow managerRow = spreadsheetImportService.findManagerRow(rows, request.email());
+        SpreadsheetImportService.ImportProcessingResult importResult = spreadsheetImportService
+                .validateForRegistration(rows, request.units(), managerRow);
+        if (!importResult.errors().isEmpty()) {
+            throw new SpreadsheetImportException(importResult.errors());
+        }
         String firebaseUid = firebaseIdentityService.createUser(request.email().trim(), request.password(), managerRow.name().trim());
         try {
-            return transactionalService.register(request, firebaseUid, rows, managerRow);
+            return transactionalService.register(request, firebaseUid, rows, managerRow, importResult);
         } catch (RuntimeException exception) {
             firebaseIdentityService.compensateCreatedUser(firebaseUid);
             throw exception;

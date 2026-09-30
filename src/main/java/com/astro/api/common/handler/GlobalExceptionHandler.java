@@ -4,6 +4,8 @@ import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ConflictException;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.response.ApiResult;
+import com.astro.api.workspace.dto.response.RegisterWorkspaceResponse;
+import com.astro.api.workspace.exception.SpreadsheetImportException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -57,6 +59,15 @@ public class GlobalExceptionHandler {
                         List.of(ex.getMessage()),
                         request.getRequestURI()
                 ));
+    }
+
+    @ExceptionHandler(SpreadsheetImportException.class)
+    public ResponseEntity<ApiResult<RegisterWorkspaceResponse>> handleSpreadsheetImport(
+            SpreadsheetImportException ex, HttpServletRequest request) {
+        RegisterWorkspaceResponse data = new RegisterWorkspaceResponse(null, ex.getImportErrors());
+        return ResponseEntity
+                .status(HttpStatus.UNPROCESSABLE_CONTENT)
+                .body(new ApiResult<>(false, ex.getMessage(), data, null, request.getRequestURI()));
     }
 
     // Falha na validação. Ex: campo @NotBlank vazio.

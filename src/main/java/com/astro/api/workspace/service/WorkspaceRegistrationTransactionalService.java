@@ -52,7 +52,8 @@ public class WorkspaceRegistrationTransactionalService {
     @Transactional
     public RegisterWorkspaceResponse register(CreateWorkspaceRequest request, String firebaseUid,
                                               List<SpreadsheetImportService.SpreadsheetRow> rows,
-                                              SpreadsheetImportService.SpreadsheetRow managerRow) {
+                                              SpreadsheetImportService.SpreadsheetRow managerRow,
+                                              SpreadsheetImportService.ImportProcessingResult importResult) {
         Workspace workspace = workspaceRepository.save(workspaceMapper.toEntity(request.workspace()));
 
         List<Unit> units = unitService.createForWorkspace(workspace, request.units());
@@ -71,11 +72,10 @@ public class WorkspaceRegistrationTransactionalService {
         manager.setCreatedAt(Instant.now());
         userRepository.save(manager);
 
-        SpreadsheetImportService.ImportProcessingResult result = spreadsheetImportService.validateAndBuild(
-                rows, workspace, units, managerRow, cargosByName);
-        userBatchService.saveAllPreRegistered(result.validUsers());
+        spreadsheetImportService.bindPersistedDependencies(importResult.validUsers(), units, cargosByName);
+        userBatchService.saveAllPreRegistered(importResult.validUsers());
         eventPublisher.publishEvent(new PreRegisteredCollaboratorsCreatedEvent(
-                result.validUsers().stream().map(User::getEmail).toList()));
-        return new RegisterWorkspaceResponse(workspace.id, result.errors());
+                importResult.validUsers().stream().map(User::getEmail).toList()));
+        return new RegisterWorkspaceResponse(workspace.id, List.of());
     }
 }

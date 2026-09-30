@@ -2,6 +2,7 @@ package com.astro.api.workspace.service;
 
 import com.astro.api.cargo.model.Cargo;
 import com.astro.api.common.exception.BusinessException;
+import com.astro.api.unit.dto.request.UnitRequest;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
@@ -9,7 +10,6 @@ import com.astro.api.user.model.UserType;
 import com.astro.api.user.model.WorkModel;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.workspace.dto.response.ImportErrorResponse;
-import com.astro.api.workspace.model.Workspace;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
@@ -110,7 +110,35 @@ public class SpreadsheetImportService {
         return cargosByName.get(normalized(managerRow.cargo()));
     }
 
-    public ImportProcessingResult validateAndBuild(List<SpreadsheetRow> rows, Workspace workspace, List<Unit> units,
+    public ImportProcessingResult validateForRegistration(List<SpreadsheetRow> rows, List<UnitRequest> unitRequests,
+                                                           SpreadsheetRow managerRow) {
+        List<Unit> units = unitRequests.stream().map(request -> {
+            Unit unit = new Unit();
+            unit.name = request.name();
+            return unit;
+        }).toList();
+        Map<String, Cargo> cargosByName = new HashMap<>();
+        rows.stream().map(SpreadsheetRow::cargo).filter(this::notBlank).forEach(name -> {
+            Cargo cargo = new Cargo();
+            cargo.setName(name.trim());
+            cargo.setActive(true);
+            cargosByName.putIfAbsent(normalized(name), cargo);
+        });
+        findManagerUnit(managerRow, units);
+        findManagerCargo(managerRow, cargosByName);
+        return validateAndBuild(rows, units, managerRow, cargosByName);
+    }
+
+    public void bindPersistedDependencies(List<User> users, List<Unit> units, Map<String, Cargo> cargosByName) {
+        Map<String, Unit> unitsByName = new HashMap<>();
+        units.forEach(unit -> unitsByName.put(normalized(unit.name), unit));
+        users.forEach(user -> {
+            user.setUnit(unitsByName.get(normalized(user.getUnit().name)));
+            user.setCargo(cargosByName.get(normalized(user.getCargo().getName())));
+        });
+    }
+
+    public ImportProcessingResult validateAndBuild(List<SpreadsheetRow> rows, List<Unit> units,
                                                     SpreadsheetRow managerRow, Map<String, Cargo> cargosByName) {
         List<SpreadsheetRow> collaboratorRows = rows.stream().filter(row -> row != managerRow).toList();
         Set<String> emails = collaboratorRows.stream().map(SpreadsheetRow::email).filter(this::notBlank).map(this::email).collect(Collectors.toSet());

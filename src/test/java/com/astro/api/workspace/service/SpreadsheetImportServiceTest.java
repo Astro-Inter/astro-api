@@ -3,7 +3,6 @@ package com.astro.api.workspace.service;
 import com.astro.api.cargo.model.Cargo;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.user.repository.UserRepository;
-import com.astro.api.workspace.model.Workspace;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -30,7 +29,7 @@ class SpreadsheetImportServiceTest {
         Cargo cargo = new Cargo(); cargo.setActive(true);
 
         SpreadsheetImportService.ImportProcessingResult result = service.validateAndBuild(
-                rows, new Workspace(), List.of(unit), rows.getFirst(), Map.of("dev", cargo));
+                rows, List.of(unit), rows.getFirst(), Map.of("dev", cargo));
 
         assertEquals(1, result.validUsers().size());
         assertEquals(1, result.errors().size());

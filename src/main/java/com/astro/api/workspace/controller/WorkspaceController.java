@@ -34,8 +34,9 @@ public class WorkspaceController {
     @PostMapping(value = "/register-workspace", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Conclui o cadastro inicial de um workspace", description = "Endpoint público. Envie a parte JSON `data` e a planilha XLS/XLSX obrigatória em `file`.")
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Workspace criado; linhas inválidas são retornadas no resultado"),
+            @ApiResponse(responseCode = "201", description = "Workspace criado com todos os colaboradores da planilha"),
             @ApiResponse(responseCode = "400", description = "Multipart ou dados inválidos"),
+            @ApiResponse(responseCode = "422", description = "Planilha possui erros; nenhum dado foi persistido"),
             @ApiResponse(responseCode = "409", description = "Conflito estrutural")
     })
     public ResponseEntity<ApiResult<RegisterWorkspaceResponse>> register(
