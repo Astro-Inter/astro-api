@@ -1,5 +1,7 @@
 package com.astro.api.user.model;
 
+import com.astro.api.cargo.model.Cargo;
+import com.astro.api.unit.model.Unit;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -37,5 +39,11 @@ public class User extends Account {
     @Column(name = "criado_em")
     private Instant createdAt;
 
-    // adicionar relacionamento com cargo e unidade
+    @ManyToOne
+    @JoinColumn(name = "unidade_id")
+    private Unit unit;
+
+    @ManyToOne
+    @JoinColumn(name = "cargo_id")
+    private Cargo cargo;
 }

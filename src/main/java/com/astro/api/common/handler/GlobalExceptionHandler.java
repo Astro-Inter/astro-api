@@ -4,12 +4,15 @@ import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ConflictException;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.response.ApiResult;
+import com.astro.api.workspace.dto.response.RegisterWorkspaceResponse;
+import com.astro.api.workspace.exception.SpreadsheetImportException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.slf4j.Logger;
@@ -58,6 +61,15 @@ public class GlobalExceptionHandler {
                 ));
     }
 
+    @ExceptionHandler(SpreadsheetImportException.class)
+    public ResponseEntity<ApiResult<RegisterWorkspaceResponse>> handleSpreadsheetImport(
+            SpreadsheetImportException ex, HttpServletRequest request) {
+        RegisterWorkspaceResponse data = new RegisterWorkspaceResponse(null, ex.getImportErrors());
+        return ResponseEntity
+                .status(HttpStatus.UNPROCESSABLE_CONTENT)
+                .body(new ApiResult<>(false, ex.getMessage(), data, null, request.getRequestURI()));
+    }
+
     // Falha na validação. Ex: campo @NotBlank vazio.
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResult<Void>> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
@@ -90,9 +102,20 @@ public class GlobalExceptionHandler {
                 ));
     }
 
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiResult<Void>> handleMissingMultipartPart(MissingServletRequestPartException ex, HttpServletRequest request) {
+        return ResponseEntity.badRequest().body(ApiResult.error(
+                "Parte obrigatória da requisição ausente",
+                List.of("A parte '" + ex.getRequestPartName() + "' é obrigatória"),
+                request.getRequestURI()
+        ));
+    }
+
     // Violação no banco. Ex: UNIQUE ou FK.
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResult<Void>> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest request) {
+        LOGGER.warn("Conflito de integridade ao processar {}: {}", request.getRequestURI(),
+                ex.getMostSpecificCause().getMessage());
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
                 .body(ApiResult.error(
