@@ -39,6 +39,7 @@ public class SecurityConfig {
                     "/verify-email",
                     "/activate",
                     "/verify-key",
+                    "/add-manager-email",
                     "/register-workspace"
                 ).permitAll()
                  .anyRequest().authenticated()

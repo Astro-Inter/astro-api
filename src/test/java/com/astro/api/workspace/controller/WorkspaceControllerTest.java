@@ -35,7 +35,7 @@ class WorkspaceControllerTest {
 
     @Test
     void shouldEnqueueManagerEmail() throws Exception {
-        mockMvc.perform(post("/queue-manager-email")
+        mockMvc.perform(post("/add-manager-email")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"gestor@astro.com\"}"))
                 .andExpect(status().isNoContent())
@@ -46,7 +46,7 @@ class WorkspaceControllerTest {
 
     @Test
     void shouldRejectInvalidManagerEmail() throws Exception {
-        mockMvc.perform(post("/queue-manager-email")
+        mockMvc.perform(post("/add-manager-email")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"email-invalido\"}"))
                 .andExpect(status().isBadRequest())

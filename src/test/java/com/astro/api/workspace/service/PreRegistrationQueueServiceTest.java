@@ -22,4 +22,17 @@ class PreRegistrationQueueServiceTest {
         verify(listOperations).rightPushAll("processamento:email:colaborador", List.of("ana@astro.com", "bia@astro.com"));
         verifyNoMoreInteractions(listOperations);
     }
+
+    @Test
+    void sendsManagerEmailToManagerQueue() {
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        @SuppressWarnings("unchecked") ListOperations<String, String> listOperations = mock(ListOperations.class);
+        when(redis.opsForList()).thenReturn(listOperations);
+        PreRegistrationQueueService service = new PreRegistrationQueueService(redis);
+
+        service.enqueueManagerEmail("gestor@astro.com");
+
+        verify(listOperations).rightPush("processamento:email:workspace", "gestor@astro.com");
+        verifyNoMoreInteractions(listOperations);
+    }
 }

@@ -12,6 +12,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class PreRegistrationQueueService {
     private static final Logger LOGGER = LoggerFactory.getLogger(PreRegistrationQueueService.class);
     private static final String COLLABORATOR_EMAIL_QUEUE = "processamento:email:colaborador";
+    private static final String WORKSPACE_EMAIL_QUEUE = "processamento:email:workspace";
     private final StringRedisTemplate redisTemplate;
 
     public PreRegistrationQueueService(StringRedisTemplate redisTemplate) {
@@ -26,5 +27,9 @@ public class PreRegistrationQueueService {
         } catch (RuntimeException exception) {
             LOGGER.error("Falha ao enfileirar {} e-mails de colaboradores após commit", event.emails().size(), exception);
         }
+    }
+
+    public void enqueueManagerEmail(String email) {
+        redisTemplate.opsForList().rightPush(WORKSPACE_EMAIL_QUEUE, email);
     }
 }
