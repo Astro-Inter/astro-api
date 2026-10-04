@@ -62,6 +62,7 @@ class ProfileServiceTest {
         assertEquals("PRESENCIAL", profile.modalidade());
         assertEquals("bruno@astro.com", profile.email());
         assertEquals(List.of(new UserProfileResponse.NrProfileResponse(
+                35,
                 LocalDate.of(2027, 10, 3),
                 "Trabalho em altura",
                 "Proteger trabalhadores contra quedas",
