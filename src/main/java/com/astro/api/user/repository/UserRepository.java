@@ -23,4 +23,22 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query(value = "SELECT fn_retornar_tipo_conta(:email)", nativeQuery = true)
     String findAccountTypeByEmail(@Param("email") String email);
+
+    @Query(value = """
+            SELECT cargo_nr.nr_id AS nrId,
+                   (
+                       SELECT conformidade.data_validade
+                       FROM conformidade
+                       WHERE conformidade.usuario_id = :userId
+                         AND conformidade.nr_id = cargo_nr.nr_id
+                       ORDER BY conformidade.id_conformidade DESC
+                       LIMIT 1
+                   ) AS validity
+            FROM cargo_nr
+            WHERE cargo_nr.cargo_id = :cargoId
+            ORDER BY cargo_nr.nr_id
+            """, nativeQuery = true)
+    List<UserNrValidityProjection> findNrValiditiesByCargoIdAndUserId(
+            @Param("cargoId") Long cargoId,
+            @Param("userId") Long userId);
 }
