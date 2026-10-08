@@ -10,9 +10,11 @@ import com.astro.api.user.dto.response.IdentificatedUserResponseDto;
 import com.astro.api.user.dto.response.UserProfileResponse;
 import com.astro.api.user.mapper.UserMapper;
 import com.astro.api.user.model.User;
+import com.astro.api.user.model.UserProfilePhoto;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.user.repository.UserNrValidityProjection;
+import com.astro.api.user.repository.UserProfilePhotoRepository;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -28,16 +30,19 @@ public class UserService {
     private final UserRepository userRepository;
     private final StringRedisTemplate redisTemplate;
     private final NrDocumentRepository nrDocumentRepository;
+    private final UserProfilePhotoRepository userProfilePhotoRepository;
     private final UserMapper userMapper;
 
     public UserService(
             UserRepository userRepository,
             StringRedisTemplate redisTemplate,
             NrDocumentRepository nrDocumentRepository,
+            UserProfilePhotoRepository userProfilePhotoRepository,
             UserMapper userMapper) {
         this.userRepository = userRepository;
         this.redisTemplate = redisTemplate;
         this.nrDocumentRepository = nrDocumentRepository;
+        this.userProfilePhotoRepository = userProfilePhotoRepository;
         this.userMapper = userMapper;
     }
 
@@ -86,7 +91,10 @@ public class UserService {
         User user = userRepository.findByFirebaseUid(firebaseUid)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
-        return userMapper.toProfile(user, findNrs(user));
+        String profilePhotoPath = userProfilePhotoRepository.findById(user.getId())
+                .map(UserProfilePhoto::getObjectPath)
+                .orElse(null);
+        return userMapper.toProfile(user, profilePhotoPath, findNrs(user));
     }
 
     private List<UserProfileResponse.NrProfileResponse> findNrs(User user) {

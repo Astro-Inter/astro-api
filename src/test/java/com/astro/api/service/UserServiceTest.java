@@ -11,6 +11,7 @@ import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.UserRepository;
+import com.astro.api.user.repository.UserProfilePhotoRepository;
 import com.astro.api.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,7 @@ class UserServiceTest {
     private StringRedisTemplate redisTemplate;
     private ValueOperations<String, String> valueOperations;
     private NrDocumentRepository nrDocumentRepository;
+    private UserProfilePhotoRepository userProfilePhotoRepository;
     private UserMapper userMapper;
     private UserService userService;
 
@@ -43,8 +45,9 @@ class UserServiceTest {
         redisTemplate = mock(StringRedisTemplate.class);
         valueOperations = mock(ValueOperations.class);
         nrDocumentRepository = mock(NrDocumentRepository.class);
+        userProfilePhotoRepository = mock(UserProfilePhotoRepository.class);
         userMapper = mock(UserMapper.class);
-        userService = new UserService(userRepository, redisTemplate, nrDocumentRepository, userMapper);
+        userService = new UserService(userRepository, redisTemplate, nrDocumentRepository, userProfilePhotoRepository, userMapper);
     }
 
     @Test

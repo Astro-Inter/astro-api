@@ -11,13 +11,17 @@ import java.util.List;
 @Component
 public class UserMapper {
 
-    public UserProfileResponse toProfile(User user, List<UserProfileResponse.NrProfileResponse> nrs) {
+    public UserProfileResponse toProfile(
+            User user,
+            String profilePhotoPath,
+            List<UserProfileResponse.NrProfileResponse> nrs) {
         return new UserProfileResponse(
                 user.getName(),
                 user.getCargo() == null ? null : user.getCargo().getName(),
                 user.getUnit() == null ? null : user.getUnit().name,
                 user.getWorkModel() == null ? null : user.getWorkModel().name(),
                 user.getEmail(),
+                profilePhotoPath,
                 nrs
         );
     }
