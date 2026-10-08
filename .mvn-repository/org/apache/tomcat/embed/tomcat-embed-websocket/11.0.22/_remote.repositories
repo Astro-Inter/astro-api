@@ -1,0 +1,4 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Thu Oct 08 10:45:23 BRT 2026
+tomcat-embed-websocket-11.0.22.jar>central=
+tomcat-embed-websocket-11.0.22.pom>central=
