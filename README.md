@@ -149,6 +149,7 @@ http://localhost:8080/swagger-ui.html
 | `POSTGRES_USER` | Usuário do banco SQL                          | `astro_user` |
 | `POSTGRES_PASSWORD` | Senha do banco SQL                            | `********` |
 | `POSTGRES_NAME` | Nome do banco de dados SQL                    | `astro` |
+| `POSTGRES_MAX_POOL_SIZE` | Máximo de conexões PostgreSQL por instância (padrão `3`) | `3` |
 | `REDIS_HOST` | Host do Redis                                 | `localhost` |
 | `REDIS_PORT` | Porta do Redis                                | `6379` |
 | `REDIS_USERNAME` | Usuário do Redis                              | `default` |
