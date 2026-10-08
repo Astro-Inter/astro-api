@@ -1,6 +1,6 @@
 package com.astro.api.event.model;
 
-public enum ModoConclusao {
+public enum CompletionMode {
     COLABORADOR,
     GESTOR
 }

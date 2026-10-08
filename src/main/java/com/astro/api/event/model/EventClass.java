@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @NoArgsConstructor
-public class Turma {
+public class EventClass {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id_turma")
@@ -20,14 +20,14 @@ public class Turma {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "evento_id", nullable = false)
-    private Evento evento;
+    private Event event;
 
     @Column(name = "nome", nullable = false)
-    private String nome;
+    private String name;
 
     @Column(name = "data_inicial", nullable = false)
-    private LocalDateTime dataInicial;
+    private LocalDateTime startDate;
 
     @Column(name = "data_termino", nullable = false)
-    private LocalDateTime dataTermino;
+    private LocalDateTime endDate;
 }

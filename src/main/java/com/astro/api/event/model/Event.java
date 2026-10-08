@@ -14,46 +14,46 @@ import java.time.Instant;
 @Getter
 @Setter
 @NoArgsConstructor
-public class Evento {
+public class Event {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id_evento")
     private Long id;
 
     @Column(name = "titulo", nullable = false)
-    private String titulo;
+    private String title;
 
     @Column(name = "descricao")
-    private String descricao;
+    private String description;
 
     @Column(name = "nr_id")
     private Integer nrId;
 
     @Column(name = "link_externo")
-    private String linkExterno;
+    private String externalLink;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "modo_conclusao", nullable = false)
-    private ModoConclusao modoConclusao;
+    private CompletionMode completionMode;
 
     @Column(name = "evidencia_obrigatoria", nullable = false)
-    private boolean evidenciaObrigatoria;
+    private boolean mandatoryEvidence;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private StatusEvento status;
+    private EventStatus status;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "gestor_id", nullable = false)
-    private User gestor;
+    private User manager;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "workspace_id", nullable = false)
     private Workspace workspace;
 
     @Column(name = "data_cancelamento")
-    private Instant dataCancelamento;
+    private Instant cancellationDate;
 
     @Column(name = "motivo_cancelamento")
-    private String motivoCancelamento;
+    private String cancellationReason;
 }

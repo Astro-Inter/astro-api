@@ -1,6 +1,6 @@
 package com.astro.api.event.model;
 
-public enum StatusEvento {
+public enum EventStatus {
     ATIVO,
     CONCLUIDO,
     CANCELADO
