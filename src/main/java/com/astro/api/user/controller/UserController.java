@@ -3,14 +3,18 @@ package com.astro.api.user.controller;
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.response.ApiResult;
 import com.astro.api.user.dto.response.UserProfileResponse;
+import com.astro.api.user.dto.request.ProfilePhotoRequest;
 import com.astro.api.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -34,5 +38,20 @@ public class UserController {
             HttpServletRequest request) {
         UserProfileResponse profile = userService.findProfileByFirebaseUid(authenticatedUser.firebaseUid());
         return ResponseEntity.ok(ApiResult.success("Perfil retornado com sucesso", profile, request.getRequestURI()));
+    }
+
+    @PutMapping("/user/me/profile-photo")
+    @Operation(summary = "Atualiza a foto de perfil do usuário autenticado")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Foto de perfil atualizada com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Caminho da foto inválido"),
+            @ApiResponse(responseCode = "401", description = "Token ausente ou inválido"),
+            @ApiResponse(responseCode = "404", description = "Usuário não encontrado")
+    })
+    public ResponseEntity<Void> updateProfilePhoto(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            @RequestBody @Valid ProfilePhotoRequest request) {
+        userService.updateProfilePhoto(authenticatedUser.firebaseUid(), request);
+        return ResponseEntity.noContent().build();
     }
 }

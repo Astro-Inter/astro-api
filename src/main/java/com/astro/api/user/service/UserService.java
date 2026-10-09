@@ -6,6 +6,7 @@ import com.astro.api.conformidade.repository.NrDocumentRepository;
 import com.astro.api.user.dto.request.EmailVerificationRequestDto;
 import com.astro.api.user.dto.request.UserActivationRequestDto;
 import com.astro.api.user.dto.request.AccessKeyVerificationRequestDto;
+import com.astro.api.user.dto.request.ProfilePhotoRequest;
 import com.astro.api.user.dto.response.IdentificatedUserResponseDto;
 import com.astro.api.user.dto.response.UserProfileResponse;
 import com.astro.api.user.mapper.UserMapper;
@@ -95,6 +96,17 @@ public class UserService {
                 .map(UserProfilePhoto::getObjectPath)
                 .orElse(null);
         return userMapper.toProfile(user, profilePhotoPath, findNrs(user));
+    }
+
+    public void updateProfilePhoto(String firebaseUid, ProfilePhotoRequest request) {
+        User user = userRepository.findByFirebaseUid(firebaseUid)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+
+        UserProfilePhoto profilePhoto = userProfilePhotoRepository.findById(user.getId())
+                .orElseGet(UserProfilePhoto::new);
+        profilePhoto.setUserId(user.getId());
+        profilePhoto.setObjectPath(request.objectPath());
+        userProfilePhotoRepository.save(profilePhoto);
     }
 
     private List<UserProfileResponse.NrProfileResponse> findNrs(User user) {
