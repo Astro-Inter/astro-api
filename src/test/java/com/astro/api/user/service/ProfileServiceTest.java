@@ -8,7 +8,9 @@ import com.astro.api.unit.model.Unit;
 import com.astro.api.user.dto.response.UserProfileResponse;
 import com.astro.api.user.mapper.UserMapper;
 import com.astro.api.user.model.User;
+import com.astro.api.user.model.UserProfilePhoto;
 import com.astro.api.user.model.WorkModel;
+import com.astro.api.user.repository.UserProfilePhotoRepository;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.user.repository.UserNrValidityProjection;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,14 +32,16 @@ class ProfileServiceTest {
 
     private UserRepository userRepository;
     private NrDocumentRepository nrDocumentRepository;
+    private UserProfilePhotoRepository userProfilePhotoRepository;
     private UserService userService;
 
     @BeforeEach
     void setUp() {
         userRepository = mock(UserRepository.class);
         nrDocumentRepository = mock(NrDocumentRepository.class);
+        userProfilePhotoRepository = mock(UserProfilePhotoRepository.class);
         userService = new UserService(userRepository, mock(org.springframework.data.redis.core.StringRedisTemplate.class),
-                nrDocumentRepository, new UserMapper());
+                nrDocumentRepository, userProfilePhotoRepository, new UserMapper());
     }
 
     @Test
@@ -50,6 +54,9 @@ class ProfileServiceTest {
         nr.setApplicability("Atividades acima de dois metros");
 
         when(userRepository.findByFirebaseUid("firebase-uid")).thenReturn(Optional.of(user));
+        UserProfilePhoto profilePhoto = new UserProfilePhoto();
+        profilePhoto.setObjectPath("usuarios/20/foto-perfil.jpg");
+        when(userProfilePhotoRepository.findById(20L)).thenReturn(Optional.of(profilePhoto));
         when(userRepository.findNrValiditiesByCargoIdAndUserId(10L, 20L))
                 .thenReturn(List.of(projection(35, LocalDate.of(2027, 10, 3))));
         when(nrDocumentRepository.findAllById(any())).thenReturn(List.of(nr));
@@ -61,6 +68,7 @@ class ProfileServiceTest {
         assertEquals("Osasco", profile.unidade());
         assertEquals("PRESENCIAL", profile.modalidade());
         assertEquals("bruno@astro.com", profile.email());
+        assertEquals("usuarios/20/foto-perfil.jpg", profile.profilePhotoPath());
         assertEquals(List.of(new UserProfileResponse.NrProfileResponse(
                 35,
                 LocalDate.of(2027, 10, 3),

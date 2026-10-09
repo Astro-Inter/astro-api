@@ -35,3 +35,5 @@ build/
 .env
 __pycache__/
 *.pyc
+
+.mvn-repository/
