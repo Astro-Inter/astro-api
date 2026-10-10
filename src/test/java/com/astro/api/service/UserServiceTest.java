@@ -1,6 +1,7 @@
 package com.astro.api.service;
 
 import com.astro.api.common.exception.ResourceNotFoundException;
+import com.astro.api.common.storage.R2StorageService;
 import com.astro.api.conformidade.repository.NrDocumentRepository;
 import com.astro.api.user.mapper.UserMapper;
 import com.astro.api.user.dto.request.EmailVerificationRequestDto;
@@ -47,7 +48,8 @@ class UserServiceTest {
         nrDocumentRepository = mock(NrDocumentRepository.class);
         userProfilePhotoRepository = mock(UserProfilePhotoRepository.class);
         userMapper = mock(UserMapper.class);
-        userService = new UserService(userRepository, redisTemplate, nrDocumentRepository, userProfilePhotoRepository, userMapper);
+        userService = new UserService(userRepository, redisTemplate, nrDocumentRepository, userProfilePhotoRepository, userMapper,
+                mock(R2StorageService.class));
     }
 
     @Test

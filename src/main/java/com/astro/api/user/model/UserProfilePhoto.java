@@ -16,9 +16,9 @@ import lombok.Setter;
 public class UserProfilePhoto {
 
     @Id
-    @Column(name = "usuario_id")
+    @Column(name = "usuario_id", nullable = false)
     private Long userId;
 
-    @Column(name = "caminho_objeto", length = 2048)
+    @Column(name = "caminho_objeto", length = 2048, nullable = false, unique = true)
     private String objectPath;
 }

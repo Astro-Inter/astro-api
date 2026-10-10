@@ -1,12 +1,12 @@
 package com.astro.api.user.service;
 
 import com.astro.api.common.exception.ResourceNotFoundException;
+import com.astro.api.common.storage.R2StorageService;
 import com.astro.api.conformidade.model.NrDocument;
 import com.astro.api.conformidade.repository.NrDocumentRepository;
 import com.astro.api.user.dto.request.EmailVerificationRequestDto;
 import com.astro.api.user.dto.request.UserActivationRequestDto;
 import com.astro.api.user.dto.request.AccessKeyVerificationRequestDto;
-import com.astro.api.user.dto.request.ProfilePhotoRequest;
 import com.astro.api.user.dto.response.IdentificatedUserResponseDto;
 import com.astro.api.user.dto.response.UserProfileResponse;
 import com.astro.api.user.mapper.UserMapper;
@@ -18,6 +18,7 @@ import com.astro.api.user.repository.UserNrValidityProjection;
 import com.astro.api.user.repository.UserProfilePhotoRepository;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Locale;
@@ -33,18 +34,21 @@ public class UserService {
     private final NrDocumentRepository nrDocumentRepository;
     private final UserProfilePhotoRepository userProfilePhotoRepository;
     private final UserMapper userMapper;
+    private final R2StorageService r2StorageService;
 
     public UserService(
             UserRepository userRepository,
             StringRedisTemplate redisTemplate,
             NrDocumentRepository nrDocumentRepository,
             UserProfilePhotoRepository userProfilePhotoRepository,
-            UserMapper userMapper) {
+            UserMapper userMapper,
+            R2StorageService r2StorageService) {
         this.userRepository = userRepository;
         this.redisTemplate = redisTemplate;
         this.nrDocumentRepository = nrDocumentRepository;
         this.userProfilePhotoRepository = userProfilePhotoRepository;
         this.userMapper = userMapper;
+        this.r2StorageService = r2StorageService;
     }
 
     public Optional<UserStatus> findStatusByFirebaseUid(String firebaseUid) {
@@ -95,18 +99,34 @@ public class UserService {
         String profilePhotoPath = userProfilePhotoRepository.findById(user.getId())
                 .map(UserProfilePhoto::getObjectPath)
                 .orElse(null);
-        return userMapper.toProfile(user, profilePhotoPath, findNrs(user));
+        String profilePhotoUrl = r2StorageService.getDownloadUrl(profilePhotoPath);
+        return userMapper.toProfile(user, profilePhotoUrl, findNrs(user));
     }
 
-    public void updateProfilePhoto(String firebaseUid, ProfilePhotoRequest request) {
+    public void updateProfilePhoto(String firebaseUid, MultipartFile file) {
         User user = userRepository.findByFirebaseUid(firebaseUid)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         UserProfilePhoto profilePhoto = userProfilePhotoRepository.findById(user.getId())
                 .orElseGet(UserProfilePhoto::new);
+        String previousObjectPath = profilePhoto.getObjectPath();
+        String objectPath = r2StorageService.uploadProfilePhoto(user.getId(), file);
         profilePhoto.setUserId(user.getId());
-        profilePhoto.setObjectPath(request.objectPath());
-        userProfilePhotoRepository.save(profilePhoto);
+        profilePhoto.setObjectPath(objectPath);
+        try {
+            userProfilePhotoRepository.saveAndFlush(profilePhoto);
+        } catch (RuntimeException exception) {
+            try {
+                r2StorageService.deleteObject(objectPath);
+            } catch (RuntimeException cleanupException) {
+                exception.addSuppressed(cleanupException);
+            }
+            throw exception;
+        }
+        if (previousObjectPath != null && !previousObjectPath.isBlank()
+                && !previousObjectPath.equals(objectPath)) {
+            r2StorageService.deleteObject(previousObjectPath);
+        }
     }
 
     private List<UserProfileResponse.NrProfileResponse> findNrs(User user) {

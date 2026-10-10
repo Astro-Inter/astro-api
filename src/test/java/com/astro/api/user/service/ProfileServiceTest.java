@@ -2,6 +2,7 @@ package com.astro.api.user.service;
 
 import com.astro.api.cargo.model.Cargo;
 import com.astro.api.common.exception.ResourceNotFoundException;
+import com.astro.api.common.storage.R2StorageService;
 import com.astro.api.conformidade.model.NrDocument;
 import com.astro.api.conformidade.repository.NrDocumentRepository;
 import com.astro.api.unit.model.Unit;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -34,14 +36,16 @@ class ProfileServiceTest {
     private NrDocumentRepository nrDocumentRepository;
     private UserProfilePhotoRepository userProfilePhotoRepository;
     private UserService userService;
+    private R2StorageService r2StorageService;
 
     @BeforeEach
     void setUp() {
         userRepository = mock(UserRepository.class);
         nrDocumentRepository = mock(NrDocumentRepository.class);
         userProfilePhotoRepository = mock(UserProfilePhotoRepository.class);
+        r2StorageService = mock(R2StorageService.class);
         userService = new UserService(userRepository, mock(org.springframework.data.redis.core.StringRedisTemplate.class),
-                nrDocumentRepository, userProfilePhotoRepository, new UserMapper());
+                nrDocumentRepository, userProfilePhotoRepository, new UserMapper(), r2StorageService);
     }
 
     @Test
@@ -57,6 +61,8 @@ class ProfileServiceTest {
         UserProfilePhoto profilePhoto = new UserProfilePhoto();
         profilePhoto.setObjectPath("usuarios/20/foto-perfil.jpg");
         when(userProfilePhotoRepository.findById(20L)).thenReturn(Optional.of(profilePhoto));
+        when(r2StorageService.getDownloadUrl("usuarios/20/foto-perfil.jpg"))
+                .thenReturn("https://r2.example.com/astro/usuarios/20/foto-perfil.jpg?X-Amz-Signature=signature");
         when(userRepository.findNrValiditiesByCargoIdAndUserId(10L, 20L))
                 .thenReturn(List.of(projection(35, LocalDate.of(2027, 10, 3))));
         when(nrDocumentRepository.findAllById(any())).thenReturn(List.of(nr));
@@ -68,7 +74,9 @@ class ProfileServiceTest {
         assertEquals("Osasco", profile.unidade());
         assertEquals("PRESENCIAL", profile.modalidade());
         assertEquals("bruno@astro.com", profile.email());
-        assertEquals("usuarios/20/foto-perfil.jpg", profile.profilePhotoPath());
+        assertEquals("https://r2.example.com/astro/usuarios/20/foto-perfil.jpg?X-Amz-Signature=signature",
+                profile.profilePhotoUrl());
+        verify(r2StorageService).getDownloadUrl("usuarios/20/foto-perfil.jpg");
         assertEquals(List.of(new UserProfileResponse.NrProfileResponse(
                 35,
                 LocalDate.of(2027, 10, 3),
@@ -88,6 +96,7 @@ class ProfileServiceTest {
         UserProfileResponse profile = userService.findProfileByFirebaseUid("firebase-uid");
 
         assertEquals(List.of(), profile.nrs());
+        assertNull(profile.profilePhotoUrl());
         verifyNoInteractions(nrDocumentRepository);
     }
 
@@ -100,7 +109,7 @@ class ProfileServiceTest {
 
         assertEquals("Usuário não encontrado", exception.getMessage());
         verify(userRepository).findByFirebaseUid("admin-uid");
-        verifyNoInteractions(nrDocumentRepository);
+        verifyNoInteractions(nrDocumentRepository, userProfilePhotoRepository, r2StorageService);
     }
 
     private User userWithCargo() {
