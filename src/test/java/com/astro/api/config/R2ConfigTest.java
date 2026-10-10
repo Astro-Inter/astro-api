@@ -36,6 +36,7 @@ class R2ConfigTest {
                 context.refresh();
                 R2Properties properties = context.getBean(R2Properties.class);
                 properties.validate();
+                assertEquals(Duration.ofDays(1), properties.presignedUrlDuration());
                 assertEquals(explicitBucket ? "custom-photos" : "avatars", properties.bucket());
             }
         }

@@ -24,7 +24,7 @@ class R2StorageServiceTest {
 
     @Test
     void shouldSignGetForStoredKeyWithConfiguredBucketAndExpiration() {
-        R2Properties properties = properties(Duration.ofMinutes(15));
+        R2Properties properties = properties(Duration.ofDays(1));
         try (S3Presigner realPresigner = new R2Config().r2Presigner(properties)) {
             S3Presigner presigner = mock(S3Presigner.class);
             ObjectProvider<S3Presigner> provider = provider(presigner);
@@ -43,12 +43,12 @@ class R2StorageServiceTest {
 
             assertEquals("photos", captured.get().getObjectRequest().bucket());
             assertEquals("usuarios/20/foto com acento-é+1.jpg", captured.get().getObjectRequest().key());
-            assertEquals(Duration.ofMinutes(15), captured.get().signatureDuration());
+            assertEquals(Duration.ofDays(1), captured.get().signatureDuration());
             assertEquals("https", url.getScheme());
             assertEquals("account.r2.cloudflarestorage.com", url.getHost());
             assertEquals("/photos/usuarios/20/foto com acento-é+1.jpg", url.getPath());
             assertTrue(url.getRawPath().contains("%20"));
-            assertTrue(url.getQuery().contains("X-Amz-Expires=900"));
+            assertTrue(url.getQuery().contains("X-Amz-Expires=86400"));
             assertTrue(url.getQuery().contains("X-Amz-Signature="));
             assertTrue(url.getQuery().contains("/auto/s3/aws4_request"));
         }

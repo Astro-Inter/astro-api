@@ -194,7 +194,7 @@ no painel do serviço, sem aspas envolvendo os valores:
 | Cloudflare R2 | `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_AVATARS` (ou `R2_BUCKET`). A credencial deve permitir leitura, escrita e exclusão no bucket de avatares. |
 
 `POSTGRES_MAX_POOL_SIZE` é opcional e usa `3` por instância.
-`R2_PRESIGNED_URL_DURATION` é opcional e usa `15m`.
+`R2_PRESIGNED_URL_DURATION` é opcional e usa `1d` (24 horas).
 `R2_BUCKET_EVIDENCIAS` permanece no exemplo para outros fluxos; este endpoint
 usa exclusivamente o bucket de avatares.
 `OTEL_EXPORTER_OTLP_ENDPOINT` e `OTEL_EXPORTER_OTLP_HEADERS` são opcionais;
@@ -250,7 +250,7 @@ Configure as variáveis abaixo no ambiente da API (ou no `.env` local):
 | `R2_BUCKET` | Nome do bucket que contém as fotos. Se ausente, usa `R2_BUCKET_AVATARS`. |
 | `R2_ACCESS_KEY_ID` | Access Key ID de uma credencial S3 do R2 com permissões de leitura, escrita e exclusão no bucket. |
 | `R2_SECRET_ACCESS_KEY` | Secret Access Key correspondente, fornecida como secret. |
-| `R2_PRESIGNED_URL_DURATION` | Validade da URL, padrão `15m`; aceita de `1s` a `7d`. |
+| `R2_PRESIGNED_URL_DURATION` | Validade da URL, padrão `1d` (24 horas); aceita de `1s` a `7d`. |
 
 A assinatura é gerada na API sem baixar a imagem nem verificar a existência do
 objeto. O mobile faz o download diretamente do R2; uma chave inexistente resulta
