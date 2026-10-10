@@ -13,7 +13,7 @@ public class UserMapper {
 
     public UserProfileResponse toProfile(
             User user,
-            String profilePhotoPath,
+            String profilePhotoUrl,
             List<UserProfileResponse.NrProfileResponse> nrs) {
         return new UserProfileResponse(
                 user.getName(),
@@ -21,7 +21,7 @@ public class UserMapper {
                 user.getUnit() == null ? null : user.getUnit().name,
                 user.getWorkModel() == null ? null : user.getWorkModel().name(),
                 user.getEmail(),
-                profilePhotoPath,
+                profilePhotoUrl,
                 nrs
         );
     }

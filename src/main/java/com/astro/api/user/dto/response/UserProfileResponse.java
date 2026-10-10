@@ -9,7 +9,7 @@ public record UserProfileResponse(
         String unidade,
         String modalidade,
         String email,
-        String profilePhotoPath,
+        String profilePhotoUrl,
         List<NrProfileResponse> nrs
 ) {
     public record NrProfileResponse(

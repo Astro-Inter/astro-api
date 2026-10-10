@@ -174,6 +174,93 @@ Para testar, inicie a API normalmente com o `.env` preenchido e produza um log d
 
 ## Endpoints
 
+### Deploy no Render
+
+Crie um **Web Service** com runtime **Docker**, usando o `Dockerfile` da raiz.
+O Render executa o `CMD` da imagem; não é necessário configurar um comando
+de inicialização separado. A API escuta em `0.0.0.0` na porta `PORT` fornecida
+pelo Render (padrão `10000`). Use a verificação TCP padrão se não configurar
+um endpoint público de saúde; `/user/me` exige autenticação.
+
+O `.env` local é excluído da imagem. Cadastre as variáveis em **Environment**
+no painel do serviço, sem aspas envolvendo os valores:
+
+| Serviço | Variáveis necessárias |
+|---|---|
+| PostgreSQL | `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_NAME`, `POSTGRES_USER`, `POSTGRES_PASSWORD`. |
+| MongoDB | `MONGODB_URI` (URI completa iniciando com `mongodb://` ou `mongodb+srv://`) e `MONGODB_DATABASE`. |
+| Redis | `REDIS_HOST`, `REDIS_PORT`; `REDIS_USERNAME` e `REDIS_PASSWORD` conforme a autenticação do provedor. |
+| Firebase | `FIREBASE_PROJECT_ID` e `FIREBASE_CREDENTIALS_BASE64` (JSON da conta de serviço codificado em Base64). |
+| Cloudflare R2 | `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_AVATARS` (ou `R2_BUCKET`). A credencial deve permitir leitura, escrita e exclusão no bucket de avatares. |
+
+`POSTGRES_MAX_POOL_SIZE` é opcional e usa `3` por instância.
+`R2_PRESIGNED_URL_DURATION` é opcional e usa `1d` (24 horas).
+`R2_BUCKET_EVIDENCIAS` permanece no exemplo para outros fluxos; este endpoint
+usa exclusivamente o bucket de avatares.
+`OTEL_EXPORTER_OTLP_ENDPOINT` e `OTEL_EXPORTER_OTLP_HEADERS` são opcionais;
+preencha ambos apenas se for habilitar a exportação de logs ao Grafana.
+
+Autorize os endereços de saída do serviço Render nas regras de acesso dos bancos
+e nas restrições de IP da credencial R2, se aplicáveis. No MongoDB Atlas,
+configure os endereços em **Network Access**.
+
+A imagem usa Java 21 com heap máximo de 60% da memória disponível, reservando
+o restante para memória nativa, threads e metadados. `JAVA_TOOL_OPTIONS` pode
+ser sobrescrita no Render para ajustar esse valor. Isso não garante capacidade
+sob carga: monitore a memória total e a latência, especialmente durante uploads
+simultâneos de fotos de até 5 MB. As imagens persistem no R2 e as referências,
+no PostgreSQL.
+
+Referências: [Docker no Render](https://render.com/docs/docker),
+[verificações de saúde](https://render.com/docs/health-checks) e
+[integração MongoDB Atlas/Render](https://www.mongodb.com/docs/atlas/reference/partner-integrations/render/).
+
+### Foto de perfil no Cloudflare R2
+
+`PUT /user/me/profile-photo` recebe `multipart/form-data`, com a imagem no campo
+`file` (JPEG, PNG ou WebP de até 5 MB). A API identifica o formato pelo cabeçalho
+do arquivo, gera a chave `usuarios/<usuario_id>/<uuid>.<extensão>`, envia ao R2 e
+salva `usuario_id` e `caminho_objeto` na tabela `usuario_foto_perfil`. Uma nova foto
+substitui a referência na mesma linha (`usuario_id` é a chave primária), e o
+objeto anterior é excluído do R2 após salvar a nova referência. O endpoint retorna
+`204` após concluir o upload, a gravação e a exclusão da foto anterior.
+Se o banco falhar, a API tenta remover o objeto recém-enviado e preserva a foto
+anterior. R2 e PostgreSQL não compartilham uma transação: uma falha na exclusão
+da foto anterior retorna erro, mas a nova referência já está salva; o objeto
+anterior pode exigir limpeza posterior.
+
+Exemplo de envio pelo mobile ou outro cliente HTTP:
+
+```bash
+curl -X PUT 'http://localhost:8080/user/me/profile-photo' \
+  -H 'Authorization: Bearer <token-firebase>' \
+  -F 'file=@foto.jpg'
+```
+
+`GET /user/me` retorna `profilePhotoUrl`,
+uma URL assinada para leitura desse objeto. O mobile
+deve usar `profilePhotoUrl` como fonte da imagem e consultar `/user/me` novamente
+quando a URL expirar. Sem foto cadastrada, `profilePhotoUrl` é `null`.
+
+Configure as variáveis abaixo no ambiente da API (ou no `.env` local):
+
+| Variável | Descrição |
+|---|---|
+| `R2_ENDPOINT` | Endpoint S3 do R2, por exemplo `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`. |
+| `R2_BUCKET` | Nome do bucket que contém as fotos. Se ausente, usa `R2_BUCKET_AVATARS`. |
+| `R2_ACCESS_KEY_ID` | Access Key ID de uma credencial S3 do R2 com permissões de leitura, escrita e exclusão no bucket. |
+| `R2_SECRET_ACCESS_KEY` | Secret Access Key correspondente, fornecida como secret. |
+| `R2_PRESIGNED_URL_DURATION` | Validade da URL, padrão `1d` (24 horas); aceita de `1s` a `7d`. |
+
+A assinatura é gerada na API sem baixar a imagem nem verificar a existência do
+objeto. O mobile faz o download diretamente do R2; uma chave inexistente resulta
+em erro ao carregar a imagem. O bucket pode permanecer privado. As credenciais
+ficam na API, e a URL permite leitura a quem a possuir até expirar. A integração
+é inicializada ao solicitar uma foto; perfis sem foto não exigem configuração R2.
+Com foto cadastrada e configuração ausente ou inválida, a consulta falha.
+
+Referência: [URLs assinadas no Cloudflare R2](https://developers.cloudflare.com/r2/api/s3/presigned-urls/).
+
 ### Logs das requisições HTTP
 
 Cada chamada aos endpoints síncronos gera um registro ao terminar, inclusive quando a autenticação ou validação rejeita a chamada. O registro contém método, rota (o template do endpoint quando disponível), status HTTP, duração em milissegundos e um identificador gerado pela API, também retornado no cabeçalho `X-Request-ID`. Respostas 2xx/3xx usam INFO, 4xx usam WARN e 5xx usam ERROR. Corpos, cabeçalhos de autenticação e query strings não são incluídos nesse registro.
