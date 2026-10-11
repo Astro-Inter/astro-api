@@ -278,3 +278,24 @@ Para uma rota específica, acrescente `| http_route="/verify-email"`; para erros
 ## Time
 
 Consulte **`Responsabilidades Astro`** para a divisão completa das áreas e responsáveis pelo projeto.
+
+### Verificação de código por e-mail
+
+`POST /verify-key` mantém o JSON com `email` e `accessKey` (seis dígitos).
+O parâmetro opcional `tipoConta` aceita valores em maiúsculas:
+
+- Omitido, vazio ou `COLABORADOR`: exige usuário do tipo `COLABORADOR` com status `PRE_CADASTRADO`.
+- `GESTOR_WORKSPACE`: verifica o código no Redis sem exigir usuário cadastrado no PostgreSQL.
+- `GESTOR` ou valor desconhecido: retorna `400`.
+
+Código correto retorna `204`, sem corpo; código incorreto ou ausente e colaborador não elegível retornam `403`.
+O parâmetro seleciona o fluxo de verificação e não atribui um perfil ao usuário.
+
+Configure `WORKSPACE_ACCESS_TOKEN_PREFIX` e `ACCESS_TOKEN_PREFIX` na API com os mesmos valores do worker de e-mail,
+na mesma instância Redis. As chaves são o prefixo correspondente seguido do e-mail com `trim` e minúsculas.
+Não use ID de usuário como sufixo com o contrato atual do worker local.
+
+No web, a verificação do gestor deve chamar `/verify-key?tipoConta=GESTOR_WORKSPACE`.
+Ao comparar rotas para tratar erros, considere apenas `path.split('?')[0]`.
+Disponibilize a API antes de atualizar o web e valide com um código gerado pelo worker implantado.
+A configuração e o contrato da versão implantada precisam ser conferidos antes da publicação.

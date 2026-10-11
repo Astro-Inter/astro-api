@@ -13,6 +13,8 @@ import com.astro.api.user.model.UserType;
 import com.astro.api.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -158,7 +160,7 @@ class AuthControllerTest {
     void shouldReturnNoContentWhenAccessKeyIsValid() throws Exception {
         AccessKeyVerificationRequestDto requestDto = new AccessKeyVerificationRequestDto("colaborador@astro.com", "123456");
 
-        when(userService.verifyAccessKey(requestDto)).thenReturn(true);
+        when(userService.verifyAccessKey(requestDto, UserType.COLABORADOR)).thenReturn(true);
 
         mockMvc.perform(post("/verify-key")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -166,14 +168,14 @@ class AuthControllerTest {
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""));
 
-        verify(userService).verifyAccessKey(requestDto);
+        verify(userService).verifyAccessKey(requestDto, UserType.COLABORADOR);
     }
 
     @Test
     void shouldReturnForbiddenWhenAccessKeyIsInvalid() throws Exception {
         AccessKeyVerificationRequestDto requestDto = new AccessKeyVerificationRequestDto("colaborador@astro.com", "123456");
 
-        when(userService.verifyAccessKey(requestDto)).thenReturn(false);
+        when(userService.verifyAccessKey(requestDto, UserType.COLABORADOR)).thenReturn(false);
 
         mockMvc.perform(post("/verify-key")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -181,7 +183,7 @@ class AuthControllerTest {
                 .andExpect(status().isForbidden())
                 .andExpect(content().string(""));
 
-        verify(userService).verifyAccessKey(requestDto);
+        verify(userService).verifyAccessKey(requestDto, UserType.COLABORADOR);
     }
 
     @Test
@@ -197,4 +199,51 @@ class AuthControllerTest {
 
         verifyNoInteractions(userService);
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "COLABORADOR", "GESTOR_WORKSPACE"})
+    void shouldForwardExplicitOrEmptyAccountType(String tipoConta) throws Exception {
+        UserType expected = tipoConta.isEmpty() ? UserType.COLABORADOR : UserType.valueOf(tipoConta);
+        AccessKeyVerificationRequestDto dto = new AccessKeyVerificationRequestDto("user@astro.com", "123456");
+        when(userService.verifyAccessKey(dto, expected)).thenReturn(true);
+
+        mockMvc.perform(post("/verify-key").param("tipoConta", tipoConta)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+        verify(userService).verifyAccessKey(dto, expected);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"GESTOR", "DESCONHECIDO", "gestor_workspace"})
+    void shouldRejectUnsupportedAccountType(String tipoConta) throws Exception {
+        mockMvc.perform(post("/verify-key").param("tipoConta", tipoConta)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"user@astro.com\",\"accessKey\":\"123456\"}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenWorkspaceCodeIsInvalid() throws Exception {
+        AccessKeyVerificationRequestDto dto = new AccessKeyVerificationRequestDto("gestor@astro.com", "123456");
+        when(userService.verifyAccessKey(dto, UserType.GESTOR_WORKSPACE)).thenReturn(false);
+        mockMvc.perform(post("/verify-key").param("tipoConta", "GESTOR_WORKSPACE")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isForbidden())
+                .andExpect(content().string(""));
+        verify(userService).verifyAccessKey(dto, UserType.GESTOR_WORKSPACE);
+    }
+
+    @Test
+    void shouldRejectInvalidEmailInVerification() throws Exception {
+        mockMvc.perform(post("/verify-key").param("tipoConta", "GESTOR_WORKSPACE")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"invalid\",\"accessKey\":\"123456\"}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(userService);
+    }
+
 }
