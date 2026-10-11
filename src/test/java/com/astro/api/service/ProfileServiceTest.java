@@ -1,4 +1,4 @@
-package com.astro.api.user.service;
+package com.astro.api.service;
 
 import com.astro.api.cargo.model.Cargo;
 import com.astro.api.common.exception.ResourceNotFoundException;
@@ -14,6 +14,7 @@ import com.astro.api.user.model.WorkModel;
 import com.astro.api.user.repository.UserProfilePhotoRepository;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.user.repository.UserNrValidityProjection;
+import com.astro.api.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

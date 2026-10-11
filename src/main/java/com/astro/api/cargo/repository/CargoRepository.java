@@ -14,4 +14,7 @@ public interface CargoRepository extends JpaRepository<Cargo, Long> {
     @Query("select c from Cargo c where c.workspace = :workspace and lower(c.name) in :names")
     List<Cargo> findByWorkspaceAndNormalizedNames(@Param("workspace") Workspace workspace,
                                                    @Param("names") Collection<String> names);
+
+    @Query(value = "select cargo_id from cargo_nr where nr_id = :nrId and cargo_id in (:cargoIds)", nativeQuery = true)
+    List<Long> findIdsAssociatedWithNr(@Param("nrId") Integer nrId, @Param("cargoIds") Collection<Long> cargoIds);
 }

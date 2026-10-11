@@ -4,11 +4,14 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.Getter;
 
 @Entity
-@Table(name = "nr_catalog")
+@Table(name = "nr_catalogo")
+@Getter
 public class NrCatalog {
     @Id
+    @Column(name = "codigo_nr")
     private int codeNr;
 
     @Column(name = "titulo", nullable = false)

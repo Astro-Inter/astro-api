@@ -2,6 +2,7 @@ package com.astro.api.user.repository;
 
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
+import com.astro.api.workspace.model.Workspace;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,6 +21,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByEmailInIgnoreCase(Collection<String> emails);
 
     List<User> findByCpfIn(Collection<String> cpfs);
+
+    List<User> findByUnit_WorkspaceAndStatus(Workspace workspace, UserStatus status);
 
     @Query(value = "SELECT fn_retornar_tipo_conta(:email)", nativeQuery = true)
     String findAccountTypeByEmail(@Param("email") String email);
