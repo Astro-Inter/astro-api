@@ -30,6 +30,14 @@ public class GlobalExceptionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiResult<Void>> handleAccessDenied(
+            org.springframework.security.access.AccessDeniedException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResult.error(
+                "Não autorizado", List.of("Você não tem permissão para executar esta operação"),
+                request.getRequestURI()));
+    }
+
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiResult<Void>> handleUploadTooLarge(
             MaxUploadSizeExceededException ex, HttpServletRequest request) {
