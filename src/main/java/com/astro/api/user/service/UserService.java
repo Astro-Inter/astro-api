@@ -13,9 +13,11 @@ import com.astro.api.user.mapper.UserMapper;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserProfilePhoto;
 import com.astro.api.user.model.UserStatus;
+import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.user.repository.UserNrValidityProjection;
 import com.astro.api.user.repository.UserProfilePhotoRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -29,6 +31,12 @@ import java.util.stream.Collectors;
 
 @Service
 public class UserService {
+    @Value("${WORKSPACE_ACCESS_TOKEN_PREFIX}")
+    private String workspaceAccessTokenPrefix;
+
+    @Value("${ACCESS_TOKEN_PREFIX}")
+    private String collaboratorAccessTokenPrefix;
+
     private final UserRepository userRepository;
     private final StringRedisTemplate redisTemplate;
     private final NrDocumentRepository nrDocumentRepository;
@@ -73,20 +81,22 @@ public class UserService {
         userRepository.save(user);
     }
 
-    public boolean verifyAccessKey(AccessKeyVerificationRequestDto dto) {
-        String accountType = userRepository.findAccountTypeByEmail(dto.email());
+    public boolean verifyAccessKey(AccessKeyVerificationRequestDto dto, UserType tipoConta) {
+        String email = dto.email().trim().toLowerCase(Locale.ROOT);
+        String redisKey;
 
-        if (accountType == null) {
+        if (tipoConta == UserType.GESTOR_WORKSPACE) {
+            redisKey = workspaceAccessTokenPrefix + email;
+        } else if (tipoConta == UserType.COLABORADOR) {
+            User user = userRepository.findByEmailIgnoreCase(email).orElse(null);
+            if (user == null || user.getType() != UserType.COLABORADOR
+                    || user.getStatus() != UserStatus.PRE_CADASTRADO) {
+                return false;
+            }
+            redisKey = collaboratorAccessTokenPrefix + email;
+        } else {
             return false;
         }
-
-        accountType = accountType.toLowerCase(Locale.ROOT);
-
-        if (!"workspace".equals(accountType) && !"colaborador".equals(accountType)) {
-            return false;
-        }
-
-        String redisKey = "processamento:email:%s:access_key:%s".formatted(accountType, dto.email());
         String storedAccessKey = redisTemplate.opsForValue().get(redisKey);
 
         return dto.accessKey().equals(storedAccessKey);
