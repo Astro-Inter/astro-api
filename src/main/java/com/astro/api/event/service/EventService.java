@@ -7,6 +7,7 @@ import com.astro.api.conformidade.repository.NrCatalogRepository;
 import com.astro.api.event.dto.request.CancelEventRequest;
 import com.astro.api.event.dto.request.CreateEventClassRequest;
 import com.astro.api.event.dto.request.CreateEventRequest;
+import com.astro.api.event.dto.request.UpdateEventClassRequest;
 import com.astro.api.event.dto.request.UpdateEventRequest;
 import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventCalendarResponse;
@@ -21,7 +22,6 @@ import com.astro.api.event.repository.EventClassRepository;
 import com.astro.api.event.repository.EventRepository;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
-import com.astro.api.user.model.WorkModel;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.workspace.model.Workspace;
 import org.springframework.stereotype.Service;
@@ -79,7 +79,7 @@ public class EventService {
         Map<Long, User> participants = findAndValidateParticipants(
                 participantIds, workspace, manager, request.nrId());
 
-        Event event = createEvent(request, manager, workspace);
+        Event event = createEvent(request, manager);
         List<EventClass> eventClasses = createEventClasses(event, request.eventClasses());
         List<EventClassParticipant> classParticipants = createClassParticipants(
                 eventClasses, request.eventClasses(), participants);
@@ -92,31 +92,29 @@ public class EventService {
             LocalDateTime startDate,
             LocalDateTime endDate,
             String firebaseUid) {
+        validatePeriod(startDate, endDate);
         Workspace workspace = getWorkspace(findAuthenticatedManager(firebaseUid));
-        return eventRepository.findByWorkspace(workspace).stream()
-                .flatMap(event -> findClassesAndUpdateStatus(event).stream()
-                        .filter(eventClass -> isInPeriod(eventClass, startDate, endDate))
-                        .map(eventClass -> toCalendarResponse(event, eventClass)))
+        List<Event> events = eventRepository.findByManager_Unit_Workspace(workspace);
+        if (events.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, Event> eventsById = events.stream()
+                .collect(Collectors.toMap(Event::getId, Function.identity()));
+        return eventClassRepository.findByEventInOrderByStartDate(events).stream()
+                .filter(eventClass -> isInPeriod(eventClass, startDate, endDate))
+                .map(eventClass -> toCalendarResponse(
+                        eventsById.get(eventClass.getEvent().getId()),
+                        eventClass))
                 .toList();
     }
 
-    public List<EventCandidateResponse> findEligibleCandidates(
-            Integer nrId,
-            Long unitId,
-            Long roleId,
-            WorkModel modality,
-            String firebaseUid) {
+    public List<EventCandidateResponse> findEligibleCandidates(Integer nrId, String firebaseUid) {
         User manager = findAuthenticatedManager(firebaseUid);
         Workspace workspace = getWorkspace(manager);
         List<User> eligibleUsers = userRepository
                 .findByUnit_WorkspaceAndStatus(workspace, UserStatus.ATIVO)
                 .stream()
                 .filter(user -> !user.getId().equals(manager.getId()))
-                .filter(user -> unitId == null || (user.getUnit() != null
-                        && unitId.equals(user.getUnit().id)))
-                .filter(user -> roleId == null || (user.getCargo() != null
-                        && roleId.equals(user.getCargo().getId())))
-                .filter(user -> modality == null || modality == user.getWorkModel())
                 .toList();
         if (nrId != null) {
             validateNrExists(nrId);
@@ -134,38 +132,55 @@ public class EventService {
         User manager = findAuthenticatedManager(firebaseUid);
         Event event = findEventInWorkspace(eventId, getWorkspace(manager));
         ensureManagerAndEditable(event, manager);
-        validateClassesForCreation(request.eventClasses());
-        validateNrExists(request.nrId());
-
         List<EventClass> existingClasses = eventClassRepository.findByEventOrderByStartDate(event);
-        ensureClassesNotStarted(existingClasses);
-        Set<Long> participantIds = request.eventClasses().stream()
-                .flatMap(eventClass -> eventClass.participantIds().stream())
-                .collect(Collectors.toSet());
-        Map<Long, User> participants = findAndValidateParticipants(
-                participantIds,
-                event.getWorkspace(),
+        List<EventClassParticipant> existingClassParticipants = eventClassParticipantRepository
+                .findByEventClassIn(existingClasses);
+        List<UpdatedEventClass> updatedClasses = prepareUpdatedClasses(
+                event,
+                existingClasses,
+                existingClassParticipants,
+                request.eventClasses());
+        Set<Long> editableParticipantIds = validateUpdatedClasses(updatedClasses);
+        Map<Long, User> editableParticipants = findAndValidateEditableParticipants(
+                editableParticipantIds,
                 manager,
-                request.nrId());
+                event.getNrId());
 
         event.setTitle(request.title().trim());
         event.setDescription(request.description());
-        event.setNrId(request.nrId());
         event.setExternalLink(request.externalLink());
-        event.setCompletionMode(request.completionMode());
-        event.setMandatoryEvidence(request.mandatoryEvidence());
         eventRepository.save(event);
-        eventClassParticipantRepository.deleteAll(
-                eventClassParticipantRepository.findByEventClassIn(existingClasses));
-        eventClassRepository.deleteAll(existingClasses);
 
-        List<EventClass> eventClasses = createEventClasses(event, request.eventClasses());
-        List<EventClassParticipant> classParticipants = createClassParticipants(
-                eventClasses,
-                request.eventClasses(),
-                participants);
+        List<EventClass> removedClasses = findRemovedClasses(existingClasses, updatedClasses);
+        removedClasses.forEach(this::ensureEventClassEditable);
+
+        List<UpdatedEventClass> editableClasses = updatedClasses.stream()
+                .filter(UpdatedEventClass::editable)
+                .toList();
+        List<EventClass> classesToPersist = editableClasses.stream()
+                .map(UpdatedEventClass::eventClass)
+                .toList();
+        List<EventClass> savedClasses = eventClassRepository.saveAll(classesToPersist);
+        List<EventClassParticipant> participantsToDelete = existingClassParticipants.stream()
+                .filter(classParticipant -> classesToPersist.contains(classParticipant.getEventClass())
+                        || removedClasses.contains(classParticipant.getEventClass()))
+                .toList();
+        eventClassParticipantRepository.deleteAll(participantsToDelete);
+        eventClassRepository.deleteAll(removedClasses);
+        List<EventClassParticipant> classParticipants = createUpdatedClassParticipants(
+                savedClasses,
+                editableClasses,
+                editableParticipants);
         eventClassParticipantRepository.saveAll(classParticipants);
-        return toResponse(event, eventClasses, classParticipants);
+        List<EventClassParticipant> responseParticipants = new ArrayList<>(existingClassParticipants);
+        responseParticipants.removeAll(participantsToDelete);
+        responseParticipants.addAll(classParticipants);
+        List<EventClass> responseClasses = updatedClasses.stream()
+                .map(UpdatedEventClass::eventClass)
+                .sorted((firstClass, secondClass) -> firstClass.getStartDate()
+                        .compareTo(secondClass.getStartDate()))
+                .toList();
+        return toResponse(event, responseClasses, responseParticipants);
     }
 
     @Transactional
@@ -187,7 +202,7 @@ public class EventService {
         }
     }
 
-    private Event createEvent(CreateEventRequest request, User manager, Workspace workspace) {
+    private Event createEvent(CreateEventRequest request, User manager) {
         Event event = new Event();
         event.setTitle(request.title().trim());
         event.setDescription(request.description());
@@ -197,7 +212,6 @@ public class EventService {
         event.setMandatoryEvidence(request.mandatoryEvidence());
         event.setStatus(EventStatus.ATIVO);
         event.setManager(manager);
-        event.setWorkspace(workspace);
         return eventRepository.save(event);
     }
 
@@ -220,6 +234,130 @@ public class EventService {
             for (Long participantId : classRequests.get(classIndex).participantIds()) {
                 classParticipants.add(createClassParticipant(
                         eventClass, participants.get(participantId)));
+            }
+        }
+        return classParticipants;
+    }
+
+    private List<UpdatedEventClass> prepareUpdatedClasses(
+            Event event,
+            List<EventClass> existingClasses,
+            List<EventClassParticipant> existingClassParticipants,
+            List<UpdateEventClassRequest> classRequests) {
+        Map<Long, EventClass> existingClassesById = existingClasses.stream()
+                .collect(Collectors.toMap(EventClass::getId, Function.identity()));
+        Map<Long, Set<Long>> existingParticipantIdsByClassId = existingClassParticipants.stream()
+                .collect(Collectors.groupingBy(
+                        classParticipant -> classParticipant.getEventClass().getId(),
+                        Collectors.mapping(
+                                classParticipant -> classParticipant.getUser().getId(),
+                                Collectors.toSet())));
+        Set<Long> requestedClassIds = new HashSet<>();
+        List<UpdatedEventClass> updatedClasses = new ArrayList<>();
+        for (UpdateEventClassRequest classRequest : classRequests) {
+            EventClass eventClass = classRequest.id() == null
+                    ? newEventClass(event)
+                    : getExistingEventClass(classRequest.id(), existingClassesById, requestedClassIds);
+            validateDates(classRequest.startDate(), classRequest.endDate());
+            if (eventClass.getId() != null && !isEventClassEditable(eventClass)) {
+                ensureStartedClassIsUnchanged(
+                        eventClass,
+                        classRequest,
+                        existingParticipantIdsByClassId.getOrDefault(eventClass.getId(), Set.of()));
+                updatedClasses.add(new UpdatedEventClass(eventClass, classRequest, false));
+                continue;
+            }
+            eventClass.setName(classRequest.name().trim());
+            eventClass.setStartDate(classRequest.startDate());
+            eventClass.setEndDate(classRequest.endDate());
+            updatedClasses.add(new UpdatedEventClass(eventClass, classRequest, true));
+        }
+        return updatedClasses;
+    }
+
+    private EventClass getExistingEventClass(
+            Long eventClassId,
+            Map<Long, EventClass> existingClassesById,
+            Set<Long> requestedClassIds) {
+        if (!requestedClassIds.add(eventClassId)) {
+            throw new BusinessException("Turma repetida na atualização do evento");
+        }
+        EventClass eventClass = existingClassesById.get(eventClassId);
+        if (eventClass == null) {
+            throw new ResourceNotFoundException("Turma não encontrada");
+        }
+        return eventClass;
+    }
+
+    private void ensureStartedClassIsUnchanged(
+            EventClass eventClass,
+            UpdateEventClassRequest request,
+            Set<Long> existingParticipantIds) {
+        Set<Long> requestedParticipantIds = new HashSet<>(request.participantIds());
+        boolean hasChanged = !eventClass.getName().equals(request.name().trim())
+                || !eventClass.getStartDate().equals(request.startDate())
+                || !eventClass.getEndDate().equals(request.endDate())
+                || !existingParticipantIds.equals(requestedParticipantIds);
+        if (hasChanged) {
+            throw new BusinessException("Turma já iniciada");
+        }
+    }
+
+    private List<EventClass> findRemovedClasses(
+            List<EventClass> existingClasses,
+            List<UpdatedEventClass> updatedClasses) {
+        Set<Long> requestedClassIds = updatedClasses.stream()
+                .map(UpdatedEventClass::eventClass)
+                .map(EventClass::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        return existingClasses.stream()
+                .filter(eventClass -> !requestedClassIds.contains(eventClass.getId()))
+                .toList();
+    }
+
+    private Set<Long> validateUpdatedClasses(List<UpdatedEventClass> updatedClasses) {
+        Set<Long> allParticipantIds = new HashSet<>();
+        Set<Long> editableParticipantIds = new HashSet<>();
+        for (UpdatedEventClass updatedClass : updatedClasses) {
+            List<Long> classParticipantIds = updatedClass.request().participantIds();
+            Set<Long> uniqueClassParticipantIds = new HashSet<>(classParticipantIds);
+            validateUniqueParticipants(classParticipantIds, uniqueClassParticipantIds);
+            if (!allParticipantIds.addAll(uniqueClassParticipantIds)) {
+                throw new BusinessException("Participante repetido em duas turmas do evento");
+            }
+            if (updatedClass.editable()) {
+                editableParticipantIds.addAll(uniqueClassParticipantIds);
+            }
+        }
+        return editableParticipantIds;
+    }
+
+    private Map<Long, User> findAndValidateEditableParticipants(
+            Set<Long> participantIds,
+            User manager,
+            Integer nrId) {
+        if (participantIds.isEmpty()) {
+            return Map.of();
+        }
+        return findAndValidateParticipants(
+                participantIds,
+                getWorkspace(manager),
+                manager,
+                nrId);
+    }
+
+    private List<EventClassParticipant> createUpdatedClassParticipants(
+            List<EventClass> savedClasses,
+            List<UpdatedEventClass> updatedClasses,
+            Map<Long, User> participants) {
+        List<EventClassParticipant> classParticipants = new ArrayList<>();
+        for (int classIndex = 0; classIndex < savedClasses.size(); classIndex++) {
+            EventClass eventClass = savedClasses.get(classIndex);
+            for (Long participantId : updatedClasses.get(classIndex).request().participantIds()) {
+                classParticipants.add(createClassParticipant(
+                        eventClass,
+                        participants.get(participantId)));
             }
         }
         return classParticipants;
@@ -319,7 +457,7 @@ public class EventService {
     }
 
     private Event findEventInWorkspace(Long eventId, Workspace workspace) {
-        return eventRepository.findByIdAndWorkspace(eventId, workspace)
+        return eventRepository.findByIdAndManager_Unit_Workspace(eventId, workspace)
                 .orElseThrow(() -> new ResourceNotFoundException("Evento não encontrado"));
     }
 
@@ -331,7 +469,6 @@ public class EventService {
     }
 
     private void ensureEditable(Event event) {
-        updateStatusIfNecessary(event, eventClassRepository.findByEventOrderByStartDate(event));
         if (event.getStatus() == EventStatus.CANCELADO) {
             throw new BusinessException("Evento cancelado não pode ser alterado");
         }
@@ -340,12 +477,14 @@ public class EventService {
         }
     }
 
-    private void ensureClassesNotStarted(List<EventClass> eventClasses) {
-        boolean hasStartedClass = eventClasses.stream()
-                .anyMatch(eventClass -> !LocalDateTime.now().isBefore(eventClass.getStartDate()));
-        if (hasStartedClass) {
-            throw new BusinessException("Evento possui turma já iniciada");
+    private void ensureEventClassEditable(EventClass eventClass) {
+        if (!isEventClassEditable(eventClass)) {
+            throw new BusinessException("Turma já iniciada");
         }
+    }
+
+    private boolean isEventClassEditable(EventClass eventClass) {
+        return LocalDateTime.now().isBefore(eventClass.getStartDate());
     }
 
     private void validateDates(LocalDateTime startDate, LocalDateTime endDate) {
@@ -355,11 +494,16 @@ public class EventService {
     }
 
     private EventClass createEventClass(Event event, CreateEventClassRequest request) {
-        EventClass eventClass = new EventClass();
-        eventClass.setEvent(event);
+        EventClass eventClass = newEventClass(event);
         eventClass.setName(request.name().trim());
         eventClass.setStartDate(request.startDate());
         eventClass.setEndDate(request.endDate());
+        return eventClass;
+    }
+
+    private EventClass newEventClass(Event event) {
+        EventClass eventClass = new EventClass();
+        eventClass.setEvent(event);
         return eventClass;
     }
 
@@ -370,26 +514,6 @@ public class EventService {
         return classParticipant;
     }
 
-    private List<EventClass> findClassesAndUpdateStatus(Event event) {
-        List<EventClass> eventClasses = eventClassRepository.findByEventOrderByStartDate(event);
-        updateStatusIfNecessary(event, eventClasses);
-        return eventClasses;
-    }
-
-    private void updateStatusIfNecessary(Event event, List<EventClass> eventClasses) {
-        if (event.getStatus() != EventStatus.ATIVO || eventClasses.isEmpty()) {
-            return;
-        }
-        LocalDateTime latestEndDate = eventClasses.stream()
-                .map(EventClass::getEndDate)
-                .max(LocalDateTime::compareTo)
-                .orElseThrow();
-        if (LocalDateTime.now().isAfter(latestEndDate)) {
-            event.setStatus(EventStatus.CONCLUIDO);
-            eventRepository.save(event);
-        }
-    }
-
     private boolean isInPeriod(
             EventClass eventClass,
             LocalDateTime startDate,
@@ -398,10 +522,14 @@ public class EventService {
                 && (endDate == null || !eventClass.getStartDate().isAfter(endDate));
     }
 
+    private void validatePeriod(LocalDateTime startDate, LocalDateTime endDate) {
+        if (startDate != null && endDate != null && !endDate.isAfter(startDate)) {
+            throw new BusinessException("Data final deve ser posterior à data inicial");
+        }
+    }
+
     private EventCalendarResponse toCalendarResponse(Event event, EventClass eventClass) {
-        List<EventClassParticipant> classParticipants = eventClassParticipantRepository
-                .findByEventClass(eventClass);
-        return eventMapper.toCalendarResponse(event, eventClass, classParticipants);
+        return eventMapper.toCalendarResponse(event, eventClass);
     }
 
     private EventResponse toResponse(Event event, List<EventClass> eventClasses) {
@@ -416,4 +544,11 @@ public class EventService {
             List<EventClassParticipant> classParticipants) {
         return eventMapper.toResponse(event, eventClasses, classParticipants);
     }
+
+    private record UpdatedEventClass(
+            EventClass eventClass,
+            UpdateEventClassRequest request,
+            boolean editable) {
+    }
+
 }

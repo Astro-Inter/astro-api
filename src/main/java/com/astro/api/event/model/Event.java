@@ -1,7 +1,6 @@
 package com.astro.api.event.model;
 
 import com.astro.api.user.model.User;
-import com.astro.api.workspace.model.Workspace;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -46,10 +45,6 @@ public class Event {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "gestor_id", nullable = false)
     private User manager;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "workspace_id", nullable = false)
-    private Workspace workspace;
 
     @Column(name = "data_cancelamento")
     private Instant cancellationDate;

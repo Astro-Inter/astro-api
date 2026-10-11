@@ -54,19 +54,14 @@ public class EventMapper {
 
     public EventCalendarResponse toCalendarResponse(
             Event event,
-            EventClass eventClass,
-            List<EventClassParticipant> classParticipants) {
-        List<EventParticipantResponse> participants = classParticipants.stream()
-                .map(this::toParticipantResponse)
-                .toList();
+            EventClass eventClass) {
         return new EventCalendarResponse(
                 event.getId(),
                 event.getTitle(),
                 eventClass.getId(),
                 eventClass.getName(),
                 eventClass.getStartDate(),
-                eventClass.getEndDate(),
-                participants);
+                eventClass.getEndDate());
     }
 
     private EventParticipantResponse toParticipantResponse(EventClassParticipant classParticipant) {

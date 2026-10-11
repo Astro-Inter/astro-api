@@ -9,7 +9,6 @@ import com.astro.api.event.dto.response.EventCalendarResponse;
 import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.service.EventService;
-import com.astro.api.user.model.WorkModel;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -33,7 +32,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
-@RequestMapping("/eventos")
+@RequestMapping("/events")
 public class EventController {
     private final EventService eventService;
 
@@ -50,9 +49,9 @@ public class EventController {
             @ApiResponse(responseCode = "403", description = "Não autorizado")
     })
     public ResponseEntity<ApiResult<List<EventCalendarResponse>>> findAll(
-            @RequestParam(required = false)
+            @RequestParam
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
-            @RequestParam(required = false)
+            @RequestParam
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             HttpServletRequest request) {
@@ -64,7 +63,7 @@ public class EventController {
                 "Turmas retornadas com sucesso", calendarEvents, request.getRequestURI()));
     }
 
-    @GetMapping("/colaboradores-elegiveis")
+    @GetMapping("/eligible-candidates")
     @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
     @Operation(summary = "Lista colaboradores elegíveis para compor as turmas")
     @ApiResponses({
@@ -75,16 +74,10 @@ public class EventController {
     })
     public ResponseEntity<ApiResult<List<EventCandidateResponse>>> findEligibleCandidates(
             @RequestParam(required = false) Integer nrId,
-            @RequestParam(required = false) Long unitId,
-            @RequestParam(required = false) Long roleId,
-            @RequestParam(required = false) WorkModel modality,
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             HttpServletRequest request) {
         List<EventCandidateResponse> candidates = eventService.findEligibleCandidates(
                 nrId,
-                unitId,
-                roleId,
-                modality,
                 authenticatedUser.firebaseUid());
         return ResponseEntity.ok(ApiResult.success(
                 "Colaboradores retornados com sucesso", candidates, request.getRequestURI()));
@@ -110,7 +103,7 @@ public class EventController {
 
     @PatchMapping("/{eventId}")
     @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
-    @Operation(summary = "Atualiza um evento completo, incluindo turmas e participantes")
+    @Operation(summary = "Atualiza um evento e suas turmas futuras")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Evento atualizado com sucesso"),
             @ApiResponse(responseCode = "400", description = "Evento ou turma não pode ser alterado"),
@@ -127,7 +120,7 @@ public class EventController {
                 "Evento atualizado com sucesso", event, request.getRequestURI()));
     }
 
-    @PatchMapping("/{eventId}/cancelamento")
+    @PatchMapping("/{eventId}/cancellation")
     @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
     @Operation(summary = "Cancela definitivamente um evento")
     @ApiResponses({

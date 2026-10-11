@@ -170,22 +170,33 @@ class EventServiceTest {
     }
 
     @Test
-    void completesEventWhenLatestClassEnded() {
+    void doesNotChangeEventStatusWhenLatestClassEnded() {
         Event event = createEvent(EventStatus.ATIVO);
         EventClass eventClass = createEventClass(
                 event,
                 LocalDateTime.now().minusHours(2),
                 LocalDateTime.now().minusHours(1));
-        when(eventRepository.findByWorkspace(workspace)).thenReturn(List.of(event));
-        when(eventClassRepository.findByEventOrderByStartDate(event)).thenReturn(List.of(eventClass));
-        when(eventClassParticipantRepository.findByEventClass(eventClass)).thenReturn(List.of());
+        when(eventRepository.findByManager_Unit_Workspace(workspace)).thenReturn(List.of(event));
+        when(eventClassRepository.findByEventInOrderByStartDate(List.of(event)))
+                .thenReturn(List.of(eventClass));
 
         var response = service.findAll(null, null, "manager");
 
         assertEquals(1, response.size());
         assertEquals("Event", response.getFirst().eventTitle());
-        assertEquals(EventStatus.CONCLUIDO, event.getStatus());
-        verify(eventRepository).save(event);
+        assertEquals(EventStatus.ATIVO, event.getStatus());
+        verify(eventRepository, never()).save(event);
+    }
+
+    @Test
+    void rejectsCalendarPeriodWithEndDateBeforeStartDate() {
+        LocalDateTime startDate = LocalDateTime.now();
+
+        assertThrows(BusinessException.class, () -> service.findAll(
+                startDate,
+                startDate.minusHours(1),
+                "manager"));
+        verifyNoInteractions(eventRepository, eventClassRepository);
     }
 
     @Test
@@ -195,7 +206,8 @@ class EventServiceTest {
                 event,
                 LocalDateTime.now().plusDays(1),
                 LocalDateTime.now().plusDays(1).plusHours(1));
-        when(eventRepository.findByIdAndWorkspace(30L, workspace)).thenReturn(Optional.of(event));
+        when(eventRepository.findByIdAndManager_Unit_Workspace(30L, workspace))
+                .thenReturn(Optional.of(event));
         when(eventClassRepository.findByEventOrderByStartDate(event)).thenReturn(List.of(eventClass));
         when(eventClassParticipantRepository.findByEventClassIn(List.of(eventClass))).thenReturn(List.of());
 
@@ -243,7 +255,6 @@ class EventServiceTest {
     private Event createEvent(EventStatus status) {
         Event event = new Event();
         event.setId(30L);
-        event.setWorkspace(workspace);
         event.setManager(manager);
         event.setStatus(status);
         event.setTitle("Event");

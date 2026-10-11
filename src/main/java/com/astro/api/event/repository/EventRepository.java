@@ -10,7 +10,7 @@ import java.util.Optional;
 
 @Repository
 public interface EventRepository extends JpaRepository<Event, Long> {
-    Optional<Event> findByIdAndWorkspace(Long id, Workspace workspace);
+    Optional<Event> findByIdAndManager_Unit_Workspace(Long id, Workspace workspace);
 
-    List<Event> findByWorkspace(Workspace workspace);
+    List<Event> findByManager_Unit_Workspace(Workspace workspace);
 }
