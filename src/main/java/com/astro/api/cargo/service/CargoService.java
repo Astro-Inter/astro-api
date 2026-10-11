@@ -1,6 +1,8 @@
 package com.astro.api.cargo.service;
 
 import com.astro.api.auth.security.AuthenticatedUser;
+import com.astro.api.cargo.dto.request.CargoRequest;
+import com.astro.api.cargo.dto.request.UpdateCargoNrsRequest;
 import com.astro.api.cargo.dto.response.CargoNrOptionResponse;
 import com.astro.api.cargo.dto.response.CargoNrResponse;
 import com.astro.api.cargo.dto.response.CargoResponse;
@@ -13,10 +15,13 @@ import com.astro.api.workspace.model.Workspace;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.text.Normalizer;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -29,12 +34,59 @@ public class CargoService {
     private final CargoRepository cargoRepository;
     private final CargoManagementRepository managementRepository;
     private final NrDocumentRepository nrDocuments;
+    private final JsonMapper objectMapper;
 
     public CargoService(CargoRepository cargoRepository, CargoManagementRepository managementRepository,
-                        NrDocumentRepository nrDocuments) {
+                        NrDocumentRepository nrDocuments, JsonMapper objectMapper) {
         this.cargoRepository = cargoRepository;
         this.managementRepository = managementRepository;
         this.nrDocuments = nrDocuments;
+        this.objectMapper = objectMapper;
+    }
+
+    @Transactional
+    public void create(CargoRequest body, AuthenticatedUser user) {
+        checkIdentity(body.firebaseUid(), user);
+        checkName(body.nome());
+        managementRepository.create(body.firebaseUid(), body.nome().trim(), body.status().trim());
+    }
+
+    @Transactional
+    public boolean toggleStatus(String uid, Long cargoId, AuthenticatedUser user) {
+        checkIdentity(uid, user);
+        checkCargoId(cargoId);
+        return managementRepository.toggleStatus(uid, cargoId);
+    }
+
+    @Transactional
+    public CargoResponse update(Long cargoId, CargoRequest body, AuthenticatedUser user) {
+        checkIdentity(body.firebaseUid(), user);
+        checkCargoId(cargoId);
+        checkName(body.nome());
+        return managementRepository.update(body.firebaseUid(), cargoId, body.nome().trim(), body.status().trim());
+    }
+
+    @Transactional
+    public void updateNrs(Long cargoId, UpdateCargoNrsRequest body, AuthenticatedUser user) {
+        checkIdentity(body.firebaseUid(), user);
+        checkCargoId(cargoId);
+        Set<Integer> codes = new HashSet<>();
+        for (var nr : body.nrs()) {
+            if (!codes.add(nr.nr())) {
+                throw new BusinessException("A lista não pode repetir códigos de NR");
+            }
+        }
+        try {
+            managementRepository.updateNrs(body.firebaseUid(), cargoId, objectMapper.writeValueAsString(body.nrs()));
+        } catch (JacksonException ex) {
+            throw new IllegalStateException("Não foi possível serializar a lista de NRs", ex);
+        }
+    }
+
+    private void checkName(String name) {
+        if (name == null || name.trim().length() < 2 || name.trim().length() > 255) {
+            throw new BusinessException("O nome do cargo deve ter entre 2 e 255 caracteres");
+        }
     }
 
     @Transactional(readOnly = true)

@@ -11,9 +11,12 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -30,9 +33,16 @@ public class GlobalExceptionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    @ExceptionHandler({MissingServletRequestParameterException.class, MethodArgumentTypeMismatchException.class})
+    public ResponseEntity<ApiResult<Void>> handleInvalidParameter(Exception ex, HttpServletRequest request) {
+        return ResponseEntity.badRequest().body(ApiResult.error(
+                "Parâmetro da requisição inválido",
+                List.of("Verifique os parâmetros obrigatórios e seus tipos"), request.getRequestURI()));
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResult<Void>> handleAccessDenied(
-            org.springframework.security.access.AccessDeniedException ex, HttpServletRequest request) {
+            AccessDeniedException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResult.error(
                 "Não autorizado", List.of("Você não tem permissão para executar esta operação"),
                 request.getRequestURI()));

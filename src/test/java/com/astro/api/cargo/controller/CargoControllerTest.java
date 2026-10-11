@@ -8,6 +8,7 @@ import com.astro.api.common.handler.GlobalExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -68,5 +69,55 @@ class CargoControllerTest {
         when(service.findAll("outro", user)).thenThrow(new AccessDeniedException("UID inválido"));
         mvc.perform(get("/cargos").param("firebase_uid", "outro"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void exposesAllMutationRoutesAndTheFinalStatus() throws Exception {
+        String body = """
+                {"firebase_uid":"gestor","nome":"Gerente","status":"Ativo"}
+                """;
+        mvc.perform(post("/cargos").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated());
+        mvc.perform(put("/cargos/12").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+        when(service.toggleStatus("gestor", 12L, user)).thenReturn(false);
+        mvc.perform(patch("/cargos/12/status").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"firebase_uid\":\"gestor\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data").value(false));
+        mvc.perform(post("/cargos/12/nrs").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"firebase_uid\":\"gestor\",\"nrs\":[{\"nr\":17,\"ativo\":false}]}"))
+                .andExpect(status().isOk());
+        verify(service).create(any(), eq(user));
+        verify(service).update(eq(12L), any(), eq(user));
+        verify(service).updateNrs(eq(12L), any(), eq(user));
+    }
+
+    @Test
+    void rejectsInvalidStatusAndIncompleteNrChanges() throws Exception {
+        mvc.perform(post("/cargos").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"firebase_uid\":\"gestor\",\"nome\":\"Gerente\",\"status\":\"desconhecido\"}"))
+                .andExpect(status().isBadRequest());
+        for (String nrs : List.of("null", "[null]", "[{\"nr\":1}]", "[{\"nr\":0,\"ativo\":true}]")) {
+            mvc.perform(post("/cargos/12/nrs").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"firebase_uid\":\"gestor\",\"nrs\":" + nrs + "}"))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void permitsAnEmptyNrPatchWithoutReplacingExistingLinks() throws Exception {
+        mvc.perform(post("/cargos/12/nrs").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"firebase_uid\":\"gestor\",\"nrs\":[]}"))
+                .andExpect(status().isOk());
+        verify(service).updateNrs(eq(12L), any(), eq(user));
+    }
+
+    @Test
+    void rejectsMissingUidAndMalformedCargoIdAsBadRequests() throws Exception {
+        mvc.perform(get("/cargos")).andExpect(status().isBadRequest());
+        mvc.perform(get("/cargos/abc/nrs").param("firebase_uid", "gestor"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(service);
     }
 }
