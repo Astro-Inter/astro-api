@@ -16,6 +16,11 @@ import com.astro.api.user.repository.UserProfilePhotoRepository;
 import com.astro.api.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
@@ -50,6 +55,8 @@ class UserServiceTest {
         userMapper = mock(UserMapper.class);
         userService = new UserService(userRepository, redisTemplate, nrDocumentRepository, userProfilePhotoRepository, userMapper,
                 mock(R2StorageService.class));
+        ReflectionTestUtils.setField(userService, "workspaceAccessTokenPrefix", "workspace:");
+        ReflectionTestUtils.setField(userService, "collaboratorAccessTokenPrefix", "collaborator:");
     }
 
     @Test
@@ -144,48 +151,87 @@ class UserServiceTest {
         verifyNoMoreInteractions(userRepository);
     }
 
-    @Test
-    void shouldReturnTrueWhenAccessKeyMatchesRedisValue() {
-        AccessKeyVerificationRequestDto dto = new AccessKeyVerificationRequestDto("colaborador@astro.com", "123456");
-        String redisKey = "processamento:email:colaborador:access_key:colaborador@astro.com";
-
-        when(userRepository.findAccountTypeByEmail(dto.email())).thenReturn("colaborador");
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"123456", "654321"})
+    void shouldVerifyWorkspaceKeyWithoutQueryingUsers(String storedKey) {
+        AccessKeyVerificationRequestDto dto = new AccessKeyVerificationRequestDto("  GESTOR@Astro.com  ", "123456");
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get(redisKey)).thenReturn("123456");
+        when(valueOperations.get("workspace:gestor@astro.com")).thenReturn(storedKey);
 
-        boolean isValid = userService.verifyAccessKey(dto);
+        assertEquals("123456".equals(storedKey), userService.verifyAccessKey(dto, UserType.GESTOR_WORKSPACE));
+        verify(valueOperations).get("workspace:gestor@astro.com");
+        verifyNoInteractions(userRepository);
+    }
 
-        assertEquals(true, isValid);
-        verify(userRepository).findAccountTypeByEmail(dto.email());
-        verify(redisTemplate).opsForValue();
-        verify(valueOperations).get(redisKey);
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"123456", "654321"})
+    void shouldVerifyPreRegisteredCollaboratorKey(String storedKey) {
+        AccessKeyVerificationRequestDto dto = new AccessKeyVerificationRequestDto("  COLABORADOR@Astro.com  ", "123456");
+        User user = collaborator(UserStatus.PRE_CADASTRADO);
+        when(userRepository.findByEmailIgnoreCase("colaborador@astro.com")).thenReturn(Optional.of(user));
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get("collaborator:colaborador@astro.com")).thenReturn(storedKey);
+
+        assertEquals("123456".equals(storedKey), userService.verifyAccessKey(dto, UserType.COLABORADOR));
+        verify(userRepository).findByEmailIgnoreCase("colaborador@astro.com");
+        verifyNoMoreInteractions(userRepository);
+        verify(valueOperations).get("collaborator:colaborador@astro.com");
     }
 
     @Test
-    void shouldReturnFalseWhenAccessKeyDoesNotMatchRedisValue() {
-        AccessKeyVerificationRequestDto dto = new AccessKeyVerificationRequestDto("workspace@astro.com", "123456");
-        String redisKey = "processamento:email:workspace:access_key:workspace@astro.com";
-
-        when(userRepository.findAccountTypeByEmail(dto.email())).thenReturn("workspace");
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get(redisKey)).thenReturn("654321");
-
-        boolean isValid = userService.verifyAccessKey(dto);
-
-        assertEquals(false, isValid);
-        verify(valueOperations).get(redisKey);
-    }
-
-    @Test
-    void shouldReturnFalseWhenAccountTypeIsInvalid() {
+    void shouldRejectMissingCollaboratorBeforeReadingRedis() {
         AccessKeyVerificationRequestDto dto = new AccessKeyVerificationRequestDto("inexistente@astro.com", "123456");
+        when(userRepository.findByEmailIgnoreCase(dto.email())).thenReturn(Optional.empty());
 
-        when(userRepository.findAccountTypeByEmail(dto.email())).thenReturn(null);
-
-        boolean isValid = userService.verifyAccessKey(dto);
-
-        assertEquals(false, isValid);
-        verify(userRepository).findAccountTypeByEmail(dto.email());
+        assertFalse(userService.verifyAccessKey(dto, UserType.COLABORADOR));
         verifyNoInteractions(redisTemplate);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = UserType.class, names = {"GESTOR", "GESTOR_WORKSPACE"})
+    void shouldRejectOtherAccountTypesInCollaboratorFlow(UserType type) {
+        User user = collaborator(UserStatus.PRE_CADASTRADO);
+        user.setType(type);
+        when(userRepository.findByEmailIgnoreCase("user@astro.com")).thenReturn(Optional.of(user));
+
+        assertFalse(userService.verifyAccessKey(new AccessKeyVerificationRequestDto("user@astro.com", "123456"), UserType.COLABORADOR));
+        verifyNoInteractions(redisTemplate);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = UserStatus.class, names = {"ATIVO", "DESATIVADO"})
+    void shouldRejectCollaboratorOutsidePreRegistration(UserStatus status) {
+        when(userRepository.findByEmailIgnoreCase("user@astro.com")).thenReturn(Optional.of(collaborator(status)));
+
+        assertFalse(userService.verifyAccessKey(new AccessKeyVerificationRequestDto("user@astro.com", "123456"), UserType.COLABORADOR));
+        verifyNoInteractions(redisTemplate);
+    }
+
+    @Test
+    void shouldRejectManagerFlowWithoutReadingDatabaseOrRedis() {
+        assertFalse(userService.verifyAccessKey(new AccessKeyVerificationRequestDto("gestor@astro.com", "123456"), UserType.GESTOR));
+        verifyNoInteractions(userRepository, redisTemplate);
+    }
+
+    @Test
+    void shouldNotAcceptCodesFromTheOtherFlow() {
+        AccessKeyVerificationRequestDto dto = new AccessKeyVerificationRequestDto("user@astro.com", "654321");
+        when(userRepository.findByEmailIgnoreCase(dto.email())).thenReturn(Optional.of(collaborator(UserStatus.PRE_CADASTRADO)));
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get("workspace:user@astro.com")).thenReturn("654321");
+        when(valueOperations.get("collaborator:user@astro.com")).thenReturn("123456");
+
+        assertFalse(userService.verifyAccessKey(dto, UserType.COLABORADOR));
+        AccessKeyVerificationRequestDto collaboratorCode = new AccessKeyVerificationRequestDto(dto.email(), "123456");
+        assertFalse(userService.verifyAccessKey(collaboratorCode, UserType.GESTOR_WORKSPACE));
+    }
+
+    private User collaborator(UserStatus status) {
+        User user = new User();
+        user.setType(UserType.COLABORADOR);
+        user.setStatus(status);
+        return user;
     }
 }

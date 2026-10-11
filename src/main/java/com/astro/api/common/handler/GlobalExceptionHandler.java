@@ -16,12 +16,12 @@ import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +33,7 @@ public class GlobalExceptionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    @ExceptionHandler({MissingServletRequestParameterException.class, MethodArgumentTypeMismatchException.class})
+    @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ApiResult<Void>> handleInvalidParameter(Exception ex, HttpServletRequest request) {
         return ResponseEntity.badRequest().body(ApiResult.error(
                 "Parâmetro da requisição inválido",
@@ -111,6 +111,16 @@ public class GlobalExceptionHandler {
                         errors,
                         request.getRequestURI()
                 ));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResult<Void>> handleParameterTypeMismatch(
+            MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+        return ResponseEntity.badRequest().body(ApiResult.error(
+                "Parâmetro da requisição inválido",
+                List.of("Verifique o valor do parâmetro '" + ex.getName() + "'"),
+                request.getRequestURI()
+        ));
     }
 
     // Requisição ilegível. Ex: JSON malformado ou enum inválido.
