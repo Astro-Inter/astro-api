@@ -62,7 +62,7 @@ com.astro.api
 │   └── controller
 │
 ├── unidade
-├── cargo
+├── role
 ├── usuario
 ├── evento
 ├── conformidade
@@ -93,7 +93,7 @@ Nem todos os módulos precisam possuir todas essas pastas. A estrutura é criada
 |---|---------------------------------------------------------------------------------|
 | `workspace` | Gerenciamento do ambiente organizacional da empresa                             |
 | `unidade` | Gerenciamento das unidades da empresa e seus endereços                          |
-| `cargo` | Gerenciamento dos cargos da empresa                                             |
+| `role` | Gerenciamento dos cargos da empresa                                             |
 | `usuario` | Gerenciamento dos usuários, incluindo Colaboradores e Gestores                  |
 | `evento` | Gerenciamento de Eventos, Turmas, participantes, conclusões e evidências        |
 | `conformidade` | Acompanhamento da situação individual dos usuários em relação às NRs aplicáveis |

@@ -1,6 +1,6 @@
 package com.astro.api.service;
 
-import com.astro.api.cargo.model.Cargo;
+import com.astro.api.role.model.Role;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.storage.R2StorageService;
 import com.astro.api.conformidade.model.NrDocument;
@@ -114,7 +114,7 @@ class ProfileServiceTest {
     }
 
     private User userWithCargo() {
-        Cargo cargo = new Cargo();
+        Role cargo = new Role();
         cargo.setId(10L);
         cargo.setName("Engenheiro de Segurança");
 

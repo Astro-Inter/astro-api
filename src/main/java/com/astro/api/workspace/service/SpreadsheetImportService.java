@@ -1,6 +1,6 @@
 package com.astro.api.workspace.service;
 
-import com.astro.api.cargo.model.Cargo;
+import com.astro.api.role.model.Role;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.unit.dto.request.UnitRequest;
 import com.astro.api.unit.model.Unit;
@@ -93,7 +93,7 @@ public class SpreadsheetImportService {
         if (!notBlank(managerRow.unit())) {
             throw new BusinessException("Planilha: a unidade do gestor é obrigatória");
         }
-        if (!notBlank(managerRow.cargo())) {
+        if (!notBlank(managerRow.role())) {
             throw new BusinessException("Planilha: o cargo do gestor é obrigatório");
         }
         return managerRow;
@@ -106,8 +106,8 @@ public class SpreadsheetImportService {
                 .orElseThrow(() -> new BusinessException("Planilha: a unidade informada para o gestor não existe no workspace"));
     }
 
-    public Cargo findManagerCargo(SpreadsheetRow managerRow, Map<String, Cargo> cargosByName) {
-        return cargosByName.get(normalized(managerRow.cargo()));
+    public Role findManagerRole(SpreadsheetRow managerRow, Map<String, Role> rolesByName) {
+        return rolesByName.get(normalized(managerRow.role()));
     }
 
     public ImportProcessingResult validateForRegistration(List<SpreadsheetRow> rows, List<UnitRequest> unitRequests,
@@ -117,29 +117,29 @@ public class SpreadsheetImportService {
             unit.name = request.name();
             return unit;
         }).toList();
-        Map<String, Cargo> cargosByName = new HashMap<>();
-        rows.stream().map(SpreadsheetRow::cargo).filter(this::notBlank).forEach(name -> {
-            Cargo cargo = new Cargo();
-            cargo.setName(name.trim());
-            cargo.setActive(true);
-            cargosByName.putIfAbsent(normalized(name), cargo);
+        Map<String, Role> rolesByName = new HashMap<>();
+        rows.stream().map(SpreadsheetRow::role).filter(this::notBlank).forEach(name -> {
+            Role role = new Role();
+            role.setName(name.trim());
+            role.setActive(true);
+            rolesByName.putIfAbsent(normalized(name), role);
         });
         findManagerUnit(managerRow, units);
-        findManagerCargo(managerRow, cargosByName);
-        return validateAndBuild(rows, units, managerRow, cargosByName);
+        findManagerRole(managerRow, rolesByName);
+        return validateAndBuild(rows, units, managerRow, rolesByName);
     }
 
-    public void bindPersistedDependencies(List<User> users, List<Unit> units, Map<String, Cargo> cargosByName) {
+    public void bindPersistedDependencies(List<User> users, List<Unit> units, Map<String, Role> rolesByName) {
         Map<String, Unit> unitsByName = new HashMap<>();
         units.forEach(unit -> unitsByName.put(normalized(unit.name), unit));
         users.forEach(user -> {
             user.setUnit(unitsByName.get(normalized(user.getUnit().name)));
-            user.setCargo(cargosByName.get(normalized(user.getCargo().getName())));
+            user.setCargo(rolesByName.get(normalized(user.getCargo().getName())));
         });
     }
 
     public ImportProcessingResult validateAndBuild(List<SpreadsheetRow> rows, List<Unit> units,
-                                                    SpreadsheetRow managerRow, Map<String, Cargo> cargosByName) {
+                                                    SpreadsheetRow managerRow, Map<String, Role> rolesByName) {
         List<SpreadsheetRow> collaboratorRows = rows.stream().filter(row -> row != managerRow).toList();
         Set<String> emails = collaboratorRows.stream().map(SpreadsheetRow::email).filter(this::notBlank).map(this::email).collect(Collectors.toSet());
         Set<String> cpfs = collaboratorRows.stream().map(SpreadsheetRow::cpf).filter(this::notBlank).map(this::cpf).collect(Collectors.toSet());
@@ -171,14 +171,14 @@ public class SpreadsheetImportService {
             if (existingCpfs.contains(normalizedCpf)) { error(errors, row, "cpf", "CPF já cadastrado"); continue; }
             Unit unit = unitsByName.get(normalized(row.unit()));
             if (unit == null) { error(errors, row, "unidade", "Unidade não encontrada entre as unidades do workspace"); continue; }
-            Cargo cargo = cargosByName.get(normalized(row.cargo()));
-            if (cargo == null || !cargo.isActive()) { error(errors, row, "cargo", "Cargo inexistente ou inativo para o workspace"); continue; }
+            Role role = rolesByName.get(normalized(row.role()));
+            if (role == null || !role.isActive()) { error(errors, row, "cargo", "Cargo inexistente ou inativo para o workspace"); continue; }
             WorkModel workModel = workModel(row.workModel());
             if (workModel == null) { error(errors, row, "modalidade", "Modalidade inválida"); continue; }
             User user = new User();
             user.setName(row.name().trim()); user.setEmail(normalizedEmail); user.setCpf(normalizedCpf);
             user.setType(UserType.COLABORADOR); user.setStatus(UserStatus.PRE_CADASTRADO);
-            user.setWorkModel(workModel); user.setUnit(unit); user.setCargo(cargo); user.setCreatedAt(Instant.now());
+            user.setWorkModel(workModel); user.setUnit(unit); user.setCargo(role); user.setCreatedAt(Instant.now());
             validUsers.add(user);
         }
         return new ImportProcessingResult(validUsers, errors);
@@ -203,6 +203,6 @@ public class SpreadsheetImportService {
     }
     private int digit(String cpf, int length) { int sum = 0; for (int i = 0; i < length; i++) sum += (cpf.charAt(i) - '0') * (length + 1 - i); int result = (sum * 10) % 11; return result == 10 ? 0 : result; }
 
-    public record SpreadsheetRow(int number, String name, String cpf, String email, String unit, String cargo, String workModel) { }
+    public record SpreadsheetRow(int number, String name, String cpf, String email, String unit, String role, String workModel) { }
     public record ImportProcessingResult(List<User> validUsers, List<ImportErrorResponse> errors) { }
 }
