@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/cargos")
+@RequestMapping("/positions")
 @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
 public class CargoController {
     private final CargoService service;
@@ -47,27 +47,27 @@ public class CargoController {
                 "Cargo criado com sucesso", null, request.getRequestURI()));
     }
 
-    @PatchMapping("/{id_cargo}/status")
+    @PatchMapping("/{cargoId}/status")
     @Operation(summary = "Alterna o status do cargo entre ativo e inativo")
-    public ResponseEntity<ApiResult<Boolean>> toggleStatus(@PathVariable("id_cargo") Long cargoId,
+    public ResponseEntity<ApiResult<Boolean>> toggleStatus(@PathVariable("cargoId") Long cargoId,
             @Valid @RequestBody CargoStatusRequest body,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Status do cargo alterado com sucesso",
                 service.toggleStatus(body.firebaseUid(), cargoId, user), request.getRequestURI()));
     }
 
-    @PutMapping("/{id_cargo}")
+    @PutMapping("/{cargoId}")
     @Operation(summary = "Atualiza nome e status do cargo")
-    public ResponseEntity<ApiResult<CargoResponse>> update(@PathVariable("id_cargo") Long cargoId,
+    public ResponseEntity<ApiResult<CargoResponse>> update(@PathVariable("cargoId") Long cargoId,
             @Valid @RequestBody CargoRequest body,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Cargo atualizado com sucesso",
                 service.update(cargoId, body, user), request.getRequestURI()));
     }
 
-    @PostMapping("/{id_cargo}/nrs")
+    @PostMapping("/{cargoId}/nrs")
     @Operation(summary = "Vincula ou desvincula as NRs informadas do cargo")
-    public ResponseEntity<ApiResult<Void>> updateNrs(@PathVariable("id_cargo") Long cargoId,
+    public ResponseEntity<ApiResult<Void>> updateNrs(@PathVariable("cargoId") Long cargoId,
             @Valid @RequestBody UpdateCargoNrsRequest body,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         service.updateNrs(cargoId, body, user);
@@ -84,19 +84,19 @@ public class CargoController {
                 service.findAll(uid, user), request.getRequestURI()));
     }
 
-    @GetMapping("/{id_cargo}/nrs")
+    @GetMapping("/{cargoId}/nrs")
     @Operation(summary = "Consulta NRs vinculadas ao cargo")
     public ResponseEntity<ApiResult<List<CargoNrResponse>>> findNrs(
-            @PathVariable("id_cargo") Long cargoId, @RequestParam("firebase_uid") String uid,
+            @PathVariable("cargoId") Long cargoId, @RequestParam("firebase_uid") String uid,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("NRs do cargo retornadas com sucesso",
                 service.findNrs(uid, cargoId, user), request.getRequestURI()));
     }
 
-    @GetMapping("/{id_cargo}/nrs/opcoes")
+    @GetMapping("/{cargoId}/nrs/options")
     @Operation(summary = "Lista opções de NRs e indica os vínculos do cargo")
     public ResponseEntity<ApiResult<List<CargoNrOptionResponse>>> findNrOptions(
-            @PathVariable("id_cargo") Long cargoId, @RequestParam("firebase_uid") String uid,
+            @PathVariable("cargoId") Long cargoId, @RequestParam("firebase_uid") String uid,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Opções de NRs retornadas com sucesso",
                 service.findNrOptions(uid, cargoId, user), request.getRequestURI()));

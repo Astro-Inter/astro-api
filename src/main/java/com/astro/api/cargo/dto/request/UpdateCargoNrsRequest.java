@@ -7,7 +7,8 @@ import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
 public record UpdateCargoNrsRequest(
-        @JsonProperty("firebase_uid") @NotBlank String firebaseUid,
-        @NotNull List<@NotNull @Valid CargoNrRequest> nrs
+        @JsonProperty("firebase_uid") @NotBlank(message = "{cargo.firebaseUid.notBlank}") String firebaseUid,
+        @NotNull(message = "{cargo.nrs.notNull}")
+        List<@NotNull(message = "{cargo.nr.item.notNull}") @Valid CargoNrRequest> nrs
 ) {
 }

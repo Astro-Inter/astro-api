@@ -5,6 +5,11 @@ e repository. O serviço existente de importação de cargos foi preservado. As 
 PostgreSQL são chamadas pelo `CargoManagementRepository` via JDBC; o `CargoRepository`
 JPA continua atendendo importações e consultas já existentes.
 
+As rotas usam nomes em inglês, como os demais módulos da API: `/positions` para
+cargos e `/nrs/options` para as opções. Os campos JSON continuam seguindo os
+payloads da especificação. As mensagens das constraints das requests ficam em
+`src/main/resources/ValidationMessages.properties`.
+
 Todas as chamadas exigem `Authorization: Bearer <token Firebase>` e perfil `GESTOR`
 ou `GESTOR_WORKSPACE`. O `firebase_uid` enviado deve corresponder ao token. O banco
 valida gestor ativo e workspace. As respostas usam `ApiResult`, como os demais módulos;
@@ -12,13 +17,13 @@ os arrays, o cargo editado e o booleano de status ficam na propriedade `data`.
 
 | Task | Método e rota | Rotina / fonte |
 | --- | --- | --- |
-| SCRUM-482 | `GET /cargos?firebase_uid=...` | `fn_seleciona_cargos(TEXT)` |
-| SCRUM-483 | `GET /cargos/{id_cargo}/nrs?firebase_uid=...` | `fn_seleciona_cargo_nrs(TEXT, BIGINT)` |
-| SCRUM-484 | `GET /cargos/{id_cargo}/nrs/opcoes?firebase_uid=...` | Mongo + `fn_seleciona_cargo_nrs` |
-| SCRUM-485 | `POST /cargos` | `pr_inseri_cargo(TEXT, TEXT, TEXT)` |
-| SCRUM-486 | `PATCH /cargos/{id_cargo}/status` | `fn_altera_status_cargo(TEXT, BIGINT)` |
-| SCRUM-487 | `PUT /cargos/{id_cargo}` | `fn_altera_cargo(TEXT, BIGINT, TEXT, TEXT)` |
-| SCRUM-488 | `POST /cargos/{id_cargo}/nrs` | `pr_alterar_cargo_nrs(TEXT, BIGINT, JSONB)` |
+| SCRUM-482 | `GET /positions?firebase_uid=...` | `fn_seleciona_cargos(TEXT)` |
+| SCRUM-483 | `GET /positions/{cargoId}/nrs?firebase_uid=...` | `fn_seleciona_cargo_nrs(TEXT, BIGINT)` |
+| SCRUM-484 | `GET /positions/{cargoId}/nrs/options?firebase_uid=...` | Mongo + `fn_seleciona_cargo_nrs` |
+| SCRUM-485 | `POST /positions` | `pr_inseri_cargo(TEXT, TEXT, TEXT)` |
+| SCRUM-486 | `PATCH /positions/{cargoId}/status` | `fn_altera_status_cargo(TEXT, BIGINT)` |
+| SCRUM-487 | `PUT /positions/{cargoId}` | `fn_altera_cargo(TEXT, BIGINT, TEXT, TEXT)` |
+| SCRUM-488 | `POST /positions/{cargoId}/nrs` | `pr_alterar_cargo_nrs(TEXT, BIGINT, JSONB)` |
 
 ## Payloads
 
