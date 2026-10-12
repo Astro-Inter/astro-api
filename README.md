@@ -14,6 +14,9 @@ O sistema atende três interfaces:
 
 Todas as interfaces consomem uma única API backend.
 
+O contrato de `GET /home-workspace`, com os indicadores da Home WEB, está em
+[docs/home-workspace.md](docs/home-workspace.md).
+
 ## Stack técnica
 
 - **Java 21**
