@@ -6,9 +6,9 @@ import com.astro.api.common.exception.BusinessException;
 import com.astro.api.conformidade.model.NrDocument;
 import com.astro.api.unit.dto.request.UnitNrRequest;
 import com.astro.api.unit.dto.request.UpdateUnitNrsRequest;
-import com.astro.api.unit.dto.response.UnitNrResponse;
 import com.astro.api.unit.dto.response.UnitNrOptionResponse;
 import com.astro.api.unit.mapper.UnitMapper;
+import com.astro.api.unit.mapper.UnitResponseMapper;
 import com.astro.api.unit.repository.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
@@ -21,22 +21,23 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class UnitManagementServiceTest {
-    private final UnitManagementRepository repository = mock(UnitManagementRepository.class);
+    private final UnitRepository repository = mock(UnitRepository.class);
     private final UnitNrCatalogRepository catalog = mock(UnitNrCatalogRepository.class);
     private final JsonMapper objectMapper = JsonMapper.builder().build();
-    private final UnitService service = new UnitService(mock(UnitRepository.class), mock(UnitAddressRepository.class),
-            mock(UnitMapper.class), repository, catalog, objectMapper);
+    private final UnitService service = new UnitService(repository, mock(UnitAddressRepository.class),
+            mock(UnitMapper.class), new UnitResponseMapper(), catalog, objectMapper);
     private final AuthenticatedUser user = new AuthenticatedUser("manager", "manager@astro.com", Role.GESTOR);
 
     @Test
     void passesOnlyTheAuthenticatedUidForEveryOperation() {
-        when(repository.findAll("manager")).thenReturn(List.of());
+        when(repository.findAllByFirebaseUid("manager")).thenReturn(List.of());
+        when(repository.toggleStatus("manager", 12L)).thenReturn(true);
         when(repository.findNrs("manager", 12L)).thenReturn(List.of());
         service.findAll(user);
         service.toggleStatus(12L, user);
         service.findNrs(12L, user);
         service.updateNrs(12L, new UpdateUnitNrsRequest(List.of()), user);
-        verify(repository).findAll("manager");
+        verify(repository).findAllByFirebaseUid("manager");
         verify(repository).toggleStatus("manager", 12L);
         verify(repository).findNrs("manager", 12L);
         verify(repository).updateNrs("manager", 12L, "[]");
@@ -44,7 +45,10 @@ class UnitManagementServiceTest {
 
     @Test
     void combinesTheMongoCatalogWithPostgresAssociations() {
-        when(repository.findNrs("manager", 12L)).thenReturn(List.of(new UnitNrResponse(17, "Título PostgreSQL")));
+        UnitNrProjection associatedNr = mock(UnitNrProjection.class);
+        when(associatedNr.getNrCode()).thenReturn(17);
+        when(associatedNr.getDescription()).thenReturn("Título PostgreSQL");
+        when(repository.findNrs("manager", 12L)).thenReturn(List.of(associatedNr));
         when(catalog.findCompanyNrs()).thenReturn(List.of(nr(17, "Ergonomia"), nr(1, "Disposições gerais")));
         assertEquals(List.of(new UnitNrOptionResponse(1, "Disposições gerais", false),
                 new UnitNrOptionResponse(17, "Ergonomia", true)), service.findNrOptions(12L, user));

@@ -5,6 +5,12 @@ Os cinco endpoints usam `Authorization: Bearer <token Firebase>` e os perfis
 preenchido pelo filtro Firebase existente. Não envie `firebase_uid` no body ou na URL.
 O banco continua responsável por verificar o gestor ativo e seu workspace.
 
+O `UnitRepository` concentra as consultas e chamadas nativas JPA, retornando projections
+e valores do banco. O `UnitService` coordena as operações, valida as entradas e traduz
+os SQLSTATEs conhecidos para as exceções da API. O `UnitResponseMapper` converte as
+projections e documentos MongoDB em DTOs. A criação de entidades do fluxo de workspace
+continua usando o `UnitMapper` existente.
+
 As rotas estão em inglês, conforme a convenção solicitada. Os campos JSON exigidos
 pelo contrato e as colunas PostgreSQL estão mapeados explicitamente para identificadores
 Java em inglês. As respostas seguem `ApiResult`, com o resultado em `data`.
