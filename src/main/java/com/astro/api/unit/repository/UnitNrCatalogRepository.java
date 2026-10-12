@@ -16,8 +16,8 @@ public class UnitNrCatalogRepository {
         this.mongoTemplate = mongoTemplate;
     }
 
-    public List<NrDocument> findCollaboratorNrs() {
-        return mongoTemplate.find(Query.query(Criteria.where("usabilidade").is("Colaborador")),
+    public List<NrDocument> findCompanyNrs() {
+        return mongoTemplate.find(Query.query(Criteria.where("usabilidade").is("Empresa")),
                 NrDocument.class, "NRs");
     }
 }

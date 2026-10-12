@@ -68,7 +68,7 @@ public class UnitService {
     public List<UnitNrOptionResponse> findNrOptions(Long unitId, AuthenticatedUser user) {
         Set<Integer> associatedCodes = findNrs(unitId, user).stream()
                 .map(UnitNrResponse::nr).collect(Collectors.toSet());
-        return nrCatalogRepository.findCollaboratorNrs().stream()
+        return nrCatalogRepository.findCompanyNrs().stream()
                 .map(nr -> new UnitNrOptionResponse(nr.getId(), nr.getDescription(), associatedCodes.contains(nr.getId())))
                 .sorted(Comparator.comparing(UnitNrOptionResponse::nr))
                 .toList();
