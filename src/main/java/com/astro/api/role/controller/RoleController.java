@@ -1,13 +1,13 @@
-package com.astro.api.cargo.controller;
+package com.astro.api.role.controller;
 
 import com.astro.api.auth.security.AuthenticatedUser;
-import com.astro.api.cargo.dto.request.CargoRequest;
-import com.astro.api.cargo.dto.request.CargoStatusRequest;
-import com.astro.api.cargo.dto.request.UpdateCargoNrsRequest;
-import com.astro.api.cargo.dto.response.CargoNrOptionResponse;
-import com.astro.api.cargo.dto.response.CargoNrResponse;
-import com.astro.api.cargo.dto.response.CargoResponse;
-import com.astro.api.cargo.service.CargoService;
+import com.astro.api.role.dto.request.RoleRequest;
+import com.astro.api.role.dto.request.RoleStatusRequest;
+import com.astro.api.role.dto.request.UpdateRoleNrsRequest;
+import com.astro.api.role.dto.response.RoleNrOptionResponse;
+import com.astro.api.role.dto.response.RoleNrResponse;
+import com.astro.api.role.dto.response.RoleResponse;
+import com.astro.api.role.service.RoleService;
 import com.astro.api.common.response.ApiResult;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,76 +29,76 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/positions")
+@RequestMapping("/roles")
 @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
-public class CargoController {
-    private final CargoService service;
+public class RoleController {
+    private final RoleService service;
 
-    public CargoController(CargoService service) {
+    public RoleController(RoleService service) {
         this.service = service;
     }
 
     @PostMapping
     @Operation(summary = "Cria cargo no workspace do gestor")
-    public ResponseEntity<ApiResult<Void>> create(@Valid @RequestBody CargoRequest body,
+    public ResponseEntity<ApiResult<Void>> create(@Valid @RequestBody RoleRequest body,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         service.create(body, user);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResult.success(
                 "Cargo criado com sucesso", null, request.getRequestURI()));
     }
 
-    @PatchMapping("/{cargoId}/status")
+    @PatchMapping("/{roleId}/status")
     @Operation(summary = "Alterna o status do cargo entre ativo e inativo")
-    public ResponseEntity<ApiResult<Boolean>> toggleStatus(@PathVariable("cargoId") Long cargoId,
-            @Valid @RequestBody CargoStatusRequest body,
+    public ResponseEntity<ApiResult<Boolean>> toggleStatus(@PathVariable("roleId") Long roleId,
+            @Valid @RequestBody RoleStatusRequest body,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Status do cargo alterado com sucesso",
-                service.toggleStatus(body.firebaseUid(), cargoId, user), request.getRequestURI()));
+                service.toggleStatus(body.firebaseUid(), roleId, user), request.getRequestURI()));
     }
 
-    @PutMapping("/{cargoId}")
+    @PutMapping("/{roleId}")
     @Operation(summary = "Atualiza nome e status do cargo")
-    public ResponseEntity<ApiResult<CargoResponse>> update(@PathVariable("cargoId") Long cargoId,
-            @Valid @RequestBody CargoRequest body,
+    public ResponseEntity<ApiResult<RoleResponse>> update(@PathVariable("roleId") Long roleId,
+            @Valid @RequestBody RoleRequest body,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Cargo atualizado com sucesso",
-                service.update(cargoId, body, user), request.getRequestURI()));
+                service.update(roleId, body, user), request.getRequestURI()));
     }
 
-    @PostMapping("/{cargoId}/nrs")
+    @PostMapping("/{roleId}/nrs")
     @Operation(summary = "Vincula ou desvincula as NRs informadas do cargo")
-    public ResponseEntity<ApiResult<Void>> updateNrs(@PathVariable("cargoId") Long cargoId,
-            @Valid @RequestBody UpdateCargoNrsRequest body,
+    public ResponseEntity<ApiResult<Void>> updateNrs(@PathVariable("roleId") Long roleId,
+            @Valid @RequestBody UpdateRoleNrsRequest body,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
-        service.updateNrs(cargoId, body, user);
+        service.updateNrs(roleId, body, user);
         return ResponseEntity.ok(ApiResult.success("NRs do cargo atualizadas com sucesso",
                 null, request.getRequestURI()));
     }
 
     @GetMapping
     @Operation(summary = "Lista cargos do workspace do gestor")
-    public ResponseEntity<ApiResult<List<CargoResponse>>> findAll(
+    public ResponseEntity<ApiResult<List<RoleResponse>>> findAll(
             @RequestParam("firebase_uid") String uid,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Cargos retornados com sucesso",
                 service.findAll(uid, user), request.getRequestURI()));
     }
 
-    @GetMapping("/{cargoId}/nrs")
+    @GetMapping("/{roleId}/nrs")
     @Operation(summary = "Consulta NRs vinculadas ao cargo")
-    public ResponseEntity<ApiResult<List<CargoNrResponse>>> findNrs(
-            @PathVariable("cargoId") Long cargoId, @RequestParam("firebase_uid") String uid,
+    public ResponseEntity<ApiResult<List<RoleNrResponse>>> findNrs(
+            @PathVariable("roleId") Long roleId, @RequestParam("firebase_uid") String uid,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("NRs do cargo retornadas com sucesso",
-                service.findNrs(uid, cargoId, user), request.getRequestURI()));
+                service.findNrs(uid, roleId, user), request.getRequestURI()));
     }
 
-    @GetMapping("/{cargoId}/nrs/options")
+    @GetMapping("/{roleId}/nrs/options")
     @Operation(summary = "Lista opções de NRs e indica os vínculos do cargo")
-    public ResponseEntity<ApiResult<List<CargoNrOptionResponse>>> findNrOptions(
-            @PathVariable("cargoId") Long cargoId, @RequestParam("firebase_uid") String uid,
+    public ResponseEntity<ApiResult<List<RoleNrOptionResponse>>> findNrOptions(
+            @PathVariable("roleId") Long roleId, @RequestParam("firebase_uid") String uid,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Opções de NRs retornadas com sucesso",
-                service.findNrOptions(uid, cargoId, user), request.getRequestURI()));
+                service.findNrOptions(uid, roleId, user), request.getRequestURI()));
     }
 }

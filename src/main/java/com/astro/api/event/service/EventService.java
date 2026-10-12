@@ -1,6 +1,6 @@
 package com.astro.api.event.service;
 
-import com.astro.api.cargo.repository.CargoRepository;
+import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.conformidade.repository.NrCatalogRepository;
@@ -45,7 +45,7 @@ public class EventService {
     private final EventClassRepository eventClassRepository;
     private final EventClassParticipantRepository eventClassParticipantRepository;
     private final UserRepository userRepository;
-    private final CargoRepository cargoRepository;
+    private final RoleRepository roleRepository;
     private final NrCatalogRepository nrCatalogRepository;
     private final EventMapper eventMapper;
 
@@ -54,14 +54,14 @@ public class EventService {
             EventClassRepository eventClassRepository,
             EventClassParticipantRepository eventClassParticipantRepository,
             UserRepository userRepository,
-            CargoRepository cargoRepository,
+            RoleRepository roleRepository,
             NrCatalogRepository nrCatalogRepository,
             EventMapper eventMapper) {
         this.eventRepository = eventRepository;
         this.eventClassRepository = eventClassRepository;
         this.eventClassParticipantRepository = eventClassParticipantRepository;
         this.userRepository = userRepository;
-        this.cargoRepository = cargoRepository;
+        this.roleRepository = roleRepository;
         this.nrCatalogRepository = nrCatalogRepository;
         this.eventMapper = eventMapper;
     }
@@ -441,7 +441,7 @@ public class EventService {
                 .toList();
         return roleIds.isEmpty()
                 ? Set.of()
-                : new HashSet<>(cargoRepository.findIdsAssociatedWithNr(nrId, roleIds));
+                : new HashSet<>(roleRepository.findIdsAssociatedWithNr(nrId, roleIds));
     }
 
     private User findAuthenticatedManager(String firebaseUid) {

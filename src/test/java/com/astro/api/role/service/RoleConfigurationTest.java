@@ -1,4 +1,4 @@
-package com.astro.api.cargo.service;
+package com.astro.api.role.service;
 
 import com.astro.api.conformidade.model.NrDocument;
 import org.junit.jupiter.api.Test;
@@ -9,7 +9,7 @@ import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class CargoConfigurationTest {
+class RoleConfigurationTest {
     @Test
     void resolvesTheMongoCollectionDefaultAndOverride() {
         for (String collection : new String[]{"nrs", "NRs", "nr_catalogo"}) {

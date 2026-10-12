@@ -1,6 +1,6 @@
-package com.astro.api.cargo.controller;
+package com.astro.api.role.controller;
 
-import com.astro.api.cargo.service.CargoService;
+import com.astro.api.role.service.RoleService;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -17,12 +17,12 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-class CargoAuthorizationTest {
+class RoleAuthorizationTest {
     @Test
     void enforcesManagerRolesThroughTheRealMethodSecurityProxy() {
         try (var context = new AnnotationConfigApplicationContext(Config.class)) {
-            var controller = context.getBean(CargoController.class);
-            var service = context.getBean(CargoService.class);
+            var controller = context.getBean(RoleController.class);
+            var service = context.getBean(RoleService.class);
             for (String role : List.of("GESTOR", "GESTOR_WORKSPACE")) {
                 authenticate(role);
                 assertEquals(200, controller.findAll("gestor", null, new MockHttpServletRequest()).getStatusCode().value());
@@ -47,7 +47,7 @@ class CargoAuthorizationTest {
     @Configuration
     @EnableMethodSecurity
     static class Config {
-        @Bean CargoService cargoService() { return mock(CargoService.class); }
-        @Bean CargoController cargoController(CargoService service) { return new CargoController(service); }
+        @Bean RoleService cargoService() { return mock(RoleService.class); }
+        @Bean RoleController cargoController(RoleService service) { return new RoleController(service); }
     }
 }

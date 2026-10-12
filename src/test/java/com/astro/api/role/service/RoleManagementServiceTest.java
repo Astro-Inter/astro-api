@@ -1,13 +1,13 @@
-package com.astro.api.cargo.service;
+package com.astro.api.role.service;
 
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.security.Role;
-import com.astro.api.cargo.dto.request.CargoRequest;
-import com.astro.api.cargo.dto.request.CargoNrRequest;
-import com.astro.api.cargo.dto.request.UpdateCargoNrsRequest;
-import com.astro.api.cargo.dto.response.CargoNrResponse;
-import com.astro.api.cargo.repository.CargoManagementRepository;
-import com.astro.api.cargo.repository.CargoRepository;
+import com.astro.api.role.dto.request.RoleRequest;
+import com.astro.api.role.dto.request.RoleNrRequest;
+import com.astro.api.role.dto.request.UpdateRoleNrsRequest;
+import com.astro.api.role.dto.response.RoleNrResponse;
+import com.astro.api.role.repository.RoleManagementRepository;
+import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.conformidade.model.NrDocument;
 import com.astro.api.conformidade.repository.NrDocumentRepository;
@@ -20,15 +20,15 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-class CargoManagementServiceTest {
-    private final CargoManagementRepository repository = mock(CargoManagementRepository.class);
+class RoleManagementServiceTest {
+    private final RoleManagementRepository repository = mock(RoleManagementRepository.class);
     private final NrDocumentRepository documents = mock(NrDocumentRepository.class);
     private final AuthenticatedUser user = new AuthenticatedUser("gestor", "gestor@astro.com", Role.GESTOR);
-    private CargoService service;
+    private RoleService service;
 
     @BeforeEach
     void setUp() {
-        service = new CargoService(mock(CargoRepository.class), repository, documents,
+        service = new RoleService(mock(RoleRepository.class), repository, documents,
                 tools.jackson.databind.json.JsonMapper.builder().build());
     }
 
@@ -49,16 +49,16 @@ class CargoManagementServiceTest {
 
     @Test
     void mergesNumericMongoIdsWithLinkedNrsAndSortsTheOptions() {
-        when(repository.findNrs("gestor", 12L)).thenReturn(List.of(new CargoNrResponse(1, "SQL")));
+        when(repository.findNrs("gestor", 12L)).thenReturn(List.of(new RoleNrResponse(1, "SQL")));
         when(documents.findByUsability("Colaborador")).thenReturn(List.of(nr(17, "Ergonomia"), nr(1, "Mongo")));
 
         var options = service.findNrOptions("gestor", 12L, user);
 
         assertEquals(2, options.size());
         assertEquals(1, options.getFirst().nr());
-        assertEquals("Mongo", options.getFirst().descricao());
-        assertTrue(options.getFirst().ativo());
-        assertFalse(options.getLast().ativo());
+        assertEquals("Mongo", options.getFirst().description());
+        assertTrue(options.getFirst().active());
+        assertFalse(options.getLast().active());
         verify(documents).findByUsability("Colaborador");
     }
 
@@ -77,16 +77,16 @@ class CargoManagementServiceTest {
 
     @Test
     void rejectsDuplicateNrsBeforeExecutingTheProcedure() {
-        var body = new UpdateCargoNrsRequest("gestor", List.of(
-                new CargoNrRequest(1, true), new CargoNrRequest(1, false)));
+        var body = new UpdateRoleNrsRequest("gestor", List.of(
+                new RoleNrRequest(1, true), new RoleNrRequest(1, false)));
         assertThrows(BusinessException.class, () -> service.updateNrs(12L, body, user));
         verifyNoInteractions(repository);
     }
 
     @Test
     void serializesOnlyTheSpecifiedNrChangesAsJsonbPayload() throws Exception {
-        var body = new UpdateCargoNrsRequest("gestor", List.of(
-                new CargoNrRequest(1, true), new CargoNrRequest(17, false)));
+        var body = new UpdateRoleNrsRequest("gestor", List.of(
+                new RoleNrRequest(1, true), new RoleNrRequest(17, false)));
         service.updateNrs(12L, body, user);
         var json = org.mockito.ArgumentCaptor.forClass(String.class);
         verify(repository).updateNrs(eq("gestor"), eq(12L), json.capture());
@@ -99,22 +99,22 @@ class CargoManagementServiceTest {
 
     @Test
     void trimsNameBeforeApplyingDatabaseLengthLimits() {
-        service.create(new CargoRequest("gestor", "  Gerente  ", "Ativo"), user);
+        service.create(new RoleRequest("gestor", "  Gerente  ", "Ativo"), user);
         verify(repository).create("gestor", "Gerente", "Ativo");
         assertThrows(BusinessException.class,
-                () -> service.create(new CargoRequest("gestor", " a ", "Ativo"), user));
+                () -> service.create(new RoleRequest("gestor", " a ", "Ativo"), user));
         assertThrows(BusinessException.class,
-                () -> service.update(12L, new CargoRequest("gestor", "x".repeat(256), "Ativo"), user));
+                () -> service.update(12L, new RoleRequest("gestor", "x".repeat(256), "Ativo"), user));
     }
 
     @Test
     void rejectsImpersonationForEveryMutation() {
-        var request = new CargoRequest("outro", "Gerente", "Ativo");
+        var request = new RoleRequest("outro", "Gerente", "Ativo");
         assertThrows(AccessDeniedException.class, () -> service.create(request, user));
         assertThrows(AccessDeniedException.class, () -> service.update(12L, request, user));
         assertThrows(AccessDeniedException.class, () -> service.toggleStatus("outro", 12L, user));
         assertThrows(AccessDeniedException.class, () -> service.updateNrs(12L,
-                new UpdateCargoNrsRequest("outro", List.of()), user));
+                new UpdateRoleNrsRequest("outro", List.of()), user));
         verifyNoInteractions(repository);
     }
 

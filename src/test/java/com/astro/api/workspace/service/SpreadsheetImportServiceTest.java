@@ -1,6 +1,6 @@
 package com.astro.api.workspace.service;
 
-import com.astro.api.cargo.model.Cargo;
+import com.astro.api.role.model.Role;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -26,7 +26,7 @@ class SpreadsheetImportServiceTest {
                 new SpreadsheetImportService.SpreadsheetRow(4, "Ana 2", "52998224725", "ana@astro.com", "Matriz", "Dev", "REMOTO")
         );
         Unit unit = new Unit(); unit.name = "Matriz";
-        Cargo cargo = new Cargo(); cargo.setActive(true);
+        Role cargo = new Role(); cargo.setActive(true);
 
         SpreadsheetImportService.ImportProcessingResult result = service.validateAndBuild(
                 rows, List.of(unit), rows.getFirst(), Map.of("dev", cargo));

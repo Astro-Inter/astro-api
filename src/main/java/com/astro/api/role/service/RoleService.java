@@ -1,14 +1,14 @@
-package com.astro.api.cargo.service;
+package com.astro.api.role.service;
 
 import com.astro.api.auth.security.AuthenticatedUser;
-import com.astro.api.cargo.dto.request.CargoRequest;
-import com.astro.api.cargo.dto.request.UpdateCargoNrsRequest;
-import com.astro.api.cargo.dto.response.CargoNrOptionResponse;
-import com.astro.api.cargo.dto.response.CargoNrResponse;
-import com.astro.api.cargo.dto.response.CargoResponse;
-import com.astro.api.cargo.model.Cargo;
-import com.astro.api.cargo.repository.CargoManagementRepository;
-import com.astro.api.cargo.repository.CargoRepository;
+import com.astro.api.role.dto.request.RoleRequest;
+import com.astro.api.role.dto.request.UpdateRoleNrsRequest;
+import com.astro.api.role.dto.response.RoleNrOptionResponse;
+import com.astro.api.role.dto.response.RoleNrResponse;
+import com.astro.api.role.dto.response.RoleResponse;
+import com.astro.api.role.model.Role;
+import com.astro.api.role.repository.RoleManagementRepository;
+import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.conformidade.repository.NrDocumentRepository;
 import com.astro.api.workspace.model.Workspace;
@@ -30,46 +30,46 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
-public class CargoService {
-    private final CargoRepository cargoRepository;
-    private final CargoManagementRepository managementRepository;
+public class RoleService {
+    private final RoleRepository roleRepository;
+    private final RoleManagementRepository managementRepository;
     private final NrDocumentRepository nrDocuments;
     private final JsonMapper objectMapper;
 
-    public CargoService(CargoRepository cargoRepository, CargoManagementRepository managementRepository,
+    public RoleService(RoleRepository roleRepository, RoleManagementRepository managementRepository,
                         NrDocumentRepository nrDocuments, JsonMapper objectMapper) {
-        this.cargoRepository = cargoRepository;
+        this.roleRepository = roleRepository;
         this.managementRepository = managementRepository;
         this.nrDocuments = nrDocuments;
         this.objectMapper = objectMapper;
     }
 
     @Transactional
-    public void create(CargoRequest body, AuthenticatedUser user) {
+    public void create(RoleRequest body, AuthenticatedUser user) {
         checkIdentity(body.firebaseUid(), user);
-        checkName(body.nome());
-        managementRepository.create(body.firebaseUid(), body.nome().trim(), body.status().trim());
+        checkName(body.name());
+        managementRepository.create(body.firebaseUid(), body.name().trim(), body.status().trim());
     }
 
     @Transactional
-    public boolean toggleStatus(String uid, Long cargoId, AuthenticatedUser user) {
+    public boolean toggleStatus(String uid, Long roleId, AuthenticatedUser user) {
         checkIdentity(uid, user);
-        checkCargoId(cargoId);
-        return managementRepository.toggleStatus(uid, cargoId);
+        checkRoleId(roleId);
+        return managementRepository.toggleStatus(uid, roleId);
     }
 
     @Transactional
-    public CargoResponse update(Long cargoId, CargoRequest body, AuthenticatedUser user) {
+    public RoleResponse update(Long roleId, RoleRequest body, AuthenticatedUser user) {
         checkIdentity(body.firebaseUid(), user);
-        checkCargoId(cargoId);
-        checkName(body.nome());
-        return managementRepository.update(body.firebaseUid(), cargoId, body.nome().trim(), body.status().trim());
+        checkRoleId(roleId);
+        checkName(body.name());
+        return managementRepository.update(body.firebaseUid(), roleId, body.name().trim(), body.status().trim());
     }
 
     @Transactional
-    public void updateNrs(Long cargoId, UpdateCargoNrsRequest body, AuthenticatedUser user) {
+    public void updateNrs(Long roleId, UpdateRoleNrsRequest body, AuthenticatedUser user) {
         checkIdentity(body.firebaseUid(), user);
-        checkCargoId(cargoId);
+        checkRoleId(roleId);
         Set<Integer> codes = new HashSet<>();
         for (var nr : body.nrs()) {
             if (!codes.add(nr.nr())) {
@@ -77,7 +77,7 @@ public class CargoService {
             }
         }
         try {
-            managementRepository.updateNrs(body.firebaseUid(), cargoId, objectMapper.writeValueAsString(body.nrs()));
+            managementRepository.updateNrs(body.firebaseUid(), roleId, objectMapper.writeValueAsString(body.nrs()));
         } catch (JacksonException ex) {
             throw new IllegalStateException("Não foi possível serializar a lista de NRs", ex);
         }
@@ -90,25 +90,25 @@ public class CargoService {
     }
 
     @Transactional(readOnly = true)
-    public List<CargoResponse> findAll(String uid, AuthenticatedUser user) {
+    public List<RoleResponse> findAll(String uid, AuthenticatedUser user) {
         checkIdentity(uid, user);
         return managementRepository.findAll(uid);
     }
 
     @Transactional(readOnly = true)
-    public List<CargoNrResponse> findNrs(String uid, Long cargoId, AuthenticatedUser user) {
+    public List<RoleNrResponse> findNrs(String uid, Long roleId, AuthenticatedUser user) {
         checkIdentity(uid, user);
-        checkCargoId(cargoId);
-        return managementRepository.findNrs(uid, cargoId);
+        checkRoleId(roleId);
+        return managementRepository.findNrs(uid, roleId);
     }
 
     @Transactional(readOnly = true)
-    public List<CargoNrOptionResponse> findNrOptions(String uid, Long cargoId, AuthenticatedUser user) {
-        Set<Integer> linked = findNrs(uid, cargoId, user).stream()
-                .map(CargoNrResponse::codigoNr).collect(Collectors.toSet());
+    public List<RoleNrOptionResponse> findNrOptions(String uid, Long roleId, AuthenticatedUser user) {
+        Set<Integer> linked = findNrs(uid, roleId, user).stream()
+                .map(RoleNrResponse::nrCode).collect(Collectors.toSet());
         return nrDocuments.findByUsability("Colaborador").stream()
-                .map(nr -> new CargoNrOptionResponse(nr.getId(), nr.getDescription(), linked.contains(nr.getId())))
-                .sorted(Comparator.comparing(CargoNrOptionResponse::nr))
+                .map(nr -> new RoleNrOptionResponse(nr.getId(), nr.getDescription(), linked.contains(nr.getId())))
+                .sorted(Comparator.comparing(RoleNrOptionResponse::nr))
                 .toList();
     }
 
@@ -121,30 +121,30 @@ public class CargoService {
         }
     }
 
-    private void checkCargoId(Long cargoId) {
-        if (cargoId == null || cargoId <= 0) {
+    private void checkRoleId(Long roleId) {
+        if (roleId == null || roleId <= 0) {
             throw new BusinessException("id_cargo deve ser positivo");
         }
     }
 
-    public Map<String, Cargo> createForWorkspace(Workspace workspace, Collection<String> names) {
+    public Map<String, Role> createForWorkspace(Workspace workspace, Collection<String> names) {
         Map<String, String> namesByNormalizedValue = new LinkedHashMap<>();
         names.stream()
                 .filter(this::hasText)
                 .forEach(name -> namesByNormalizedValue.putIfAbsent(normalize(name), name.trim()));
 
-        List<Cargo> cargos = namesByNormalizedValue.values().stream()
+        List<Role> cargos = namesByNormalizedValue.values().stream()
                 .map(name -> create(workspace, name))
                 .toList();
-        List<Cargo> savedCargos = cargoRepository.saveAll(cargos);
+        List<Role> savedRoles = roleRepository.saveAll(cargos);
 
-        Map<String, Cargo> cargosByName = new LinkedHashMap<>();
-        savedCargos.forEach(cargo -> cargosByName.put(normalize(cargo.getName()), cargo));
+        Map<String, Role> cargosByName = new LinkedHashMap<>();
+        savedRoles.forEach(cargo -> cargosByName.put(normalize(cargo.getName()), cargo));
         return cargosByName;
     }
 
-    private Cargo create(Workspace workspace, String name) {
-        Cargo cargo = new Cargo();
+    private Role create(Workspace workspace, String name) {
+        Role cargo = new Role();
         cargo.setName(name);
         cargo.setActive(true);
         cargo.setWorkspace(workspace);

@@ -1,11 +1,13 @@
 # API de cargos — SCRUM-481
 
-Os endpoints seguem a arquitetura do módulo `cargo`: controller, DTOs, `CargoService`
+Os endpoints seguem a arquitetura do módulo `role`: controller, DTOs, `RoleService`
 e repository. O serviço existente de importação de cargos foi preservado. As rotinas
-PostgreSQL são chamadas pelo `CargoManagementRepository` via JDBC; o `CargoRepository`
-JPA continua atendendo importações e consultas já existentes.
+PostgreSQL são declaradas como métodos nativos `@Query` no `RoleRepository` JPA,
+seguindo o padrão do `AuthRepository`. Projections mapeiam as colunas retornadas.
+O `RoleManagementRepository` converte as projections em DTOs e traduz SQLSTATEs.
+O repositório JPA também mantém as importações e consultas já existentes.
 
-As rotas usam nomes em inglês, como os demais módulos da API: `/positions` para
+As rotas usam nomes em inglês, como os demais módulos da API: `/roles` para
 cargos e `/nrs/options` para as opções. Os campos JSON continuam seguindo os
 payloads da especificação. As mensagens das constraints das requests ficam em
 `src/main/resources/ValidationMessages.properties`.
@@ -17,13 +19,13 @@ os arrays, o cargo editado e o booleano de status ficam na propriedade `data`.
 
 | Task | Método e rota | Rotina / fonte |
 | --- | --- | --- |
-| SCRUM-482 | `GET /positions?firebase_uid=...` | `fn_seleciona_cargos(TEXT)` |
-| SCRUM-483 | `GET /positions/{cargoId}/nrs?firebase_uid=...` | `fn_seleciona_cargo_nrs(TEXT, BIGINT)` |
-| SCRUM-484 | `GET /positions/{cargoId}/nrs/options?firebase_uid=...` | Mongo + `fn_seleciona_cargo_nrs` |
-| SCRUM-485 | `POST /positions` | `pr_inseri_cargo(TEXT, TEXT, TEXT)` |
-| SCRUM-486 | `PATCH /positions/{cargoId}/status` | `fn_altera_status_cargo(TEXT, BIGINT)` |
-| SCRUM-487 | `PUT /positions/{cargoId}` | `fn_altera_cargo(TEXT, BIGINT, TEXT, TEXT)` |
-| SCRUM-488 | `POST /positions/{cargoId}/nrs` | `pr_alterar_cargo_nrs(TEXT, BIGINT, JSONB)` |
+| SCRUM-482 | `GET /roles?firebase_uid=...` | `fn_seleciona_cargos(TEXT)` |
+| SCRUM-483 | `GET /roles/{roleId}/nrs?firebase_uid=...` | `fn_seleciona_cargo_nrs(TEXT, BIGINT)` |
+| SCRUM-484 | `GET /roles/{roleId}/nrs/options?firebase_uid=...` | Mongo + `fn_seleciona_cargo_nrs` |
+| SCRUM-485 | `POST /roles` | `pr_inseri_cargo(TEXT, TEXT, TEXT)` |
+| SCRUM-486 | `PATCH /roles/{roleId}/status` | `fn_altera_status_cargo(TEXT, BIGINT)` |
+| SCRUM-487 | `PUT /roles/{roleId}` | `fn_altera_cargo(TEXT, BIGINT, TEXT, TEXT)` |
+| SCRUM-488 | `POST /roles/{roleId}/nrs` | `pr_alterar_cargo_nrs(TEXT, BIGINT, JSONB)` |
 
 ## Payloads
 
@@ -36,7 +38,7 @@ Criação e edição recebem:
 O nome, após remover espaços nas extremidades, deve ter entre 2 e 255 caracteres.
 O status aceita `Ativo` ou `Inativo`, sem distinguir maiúsculas e minúsculas.
 A criação responde 201, sem objeto em `data`, pois a procedure não retorna um ID.
-A edição responde 200 com os campos de `vw_cargos`, mapeando `cargo` para `nome`.
+A edição responde 200 com os campos de `vw_cargos`, mapeando `role` para `nome`.
 
 A alternância recebe `{"firebase_uid":"uid-do-gestor"}` e responde 200 com
 `data: true` quando ficou ativo ou `data: false` quando ficou inativo.
@@ -77,6 +79,6 @@ para 409 e 503. Falhas inesperadas permanecem 500.
 
 Testes de controller verificam rotas, payloads, campos JSON e respostas HTTP.
 Testes de serviço cobrem identidade, limites de nome, união das opções, alterações
-parciais de NRs e duplicidades. Testes do repository verificam o mapeamento da view,
+parciais de NRs e duplicidades. Testes do repository verificam o mapeamento das projections JPA,
 os parâmetros JSONB e a tradução de SQLSTATE. Esses testes usam mocks e não substituem
 uma validação das rotinas instaladas em um ambiente PostgreSQL/MongoDB.

@@ -1,9 +1,9 @@
-package com.astro.api.cargo.controller;
+package com.astro.api.role.controller;
 
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.security.Role;
-import com.astro.api.cargo.dto.response.CargoResponse;
-import com.astro.api.cargo.service.CargoService;
+import com.astro.api.role.dto.response.RoleResponse;
+import com.astro.api.role.service.RoleService;
 import com.astro.api.common.handler.GlobalExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,14 +25,14 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-class CargoControllerTest {
-    private final CargoService service = mock(CargoService.class);
+class RoleControllerTest {
+    private final RoleService service = mock(RoleService.class);
     private final AuthenticatedUser user = new AuthenticatedUser("gestor", "gestor@astro.com", Role.GESTOR);
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
-        mvc = MockMvcBuilders.standaloneSetup(new CargoController(service))
+        mvc = MockMvcBuilders.standaloneSetup(new RoleController(service))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
                     public boolean supportsParameter(MethodParameter parameter) {
@@ -47,8 +47,8 @@ class CargoControllerTest {
 
     @Test
     void exposesPortugueseFieldsWithinTheStandardApiEnvelope() throws Exception {
-        when(service.findAll("gestor", user)).thenReturn(List.of(new CargoResponse(12L, 3L, "Gerente", 25, "Ativo")));
-        mvc.perform(get("/positions").param("firebase_uid", "gestor"))
+        when(service.findAll("gestor", user)).thenReturn(List.of(new RoleResponse(12L, 3L, "Gerente", 25, "Ativo")));
+        mvc.perform(get("/roles").param("firebase_uid", "gestor"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].id_cargo").value(12))
                 .andExpect(jsonPath("$.data[0].id_workspace").value(3))
@@ -60,8 +60,8 @@ class CargoControllerTest {
     void resolvesNestedNrRoutesSeparately() throws Exception {
         when(service.findNrs("gestor", 12L, user)).thenReturn(List.of());
         when(service.findNrOptions("gestor", 12L, user)).thenReturn(List.of());
-        mvc.perform(get("/positions/12/nrs").param("firebase_uid", "gestor")).andExpect(status().isOk());
-        mvc.perform(get("/positions/12/nrs/options").param("firebase_uid", "gestor")).andExpect(status().isOk());
+        mvc.perform(get("/roles/12/nrs").param("firebase_uid", "gestor")).andExpect(status().isOk());
+        mvc.perform(get("/roles/12/nrs/options").param("firebase_uid", "gestor")).andExpect(status().isOk());
         verify(service).findNrs("gestor", 12L, user);
         verify(service).findNrOptions("gestor", 12L, user);
     }
@@ -69,7 +69,7 @@ class CargoControllerTest {
     @Test
     void returnsForbiddenForAnIdentityMismatch() throws Exception {
         when(service.findAll("outro", user)).thenThrow(new AccessDeniedException("UID inválido"));
-        mvc.perform(get("/positions").param("firebase_uid", "outro"))
+        mvc.perform(get("/roles").param("firebase_uid", "outro"))
                 .andExpect(status().isForbidden());
     }
 
@@ -78,15 +78,15 @@ class CargoControllerTest {
         String body = """
                 {"firebase_uid":"gestor","nome":"Gerente","status":"Ativo"}
                 """;
-        mvc.perform(post("/positions").contentType(MediaType.APPLICATION_JSON).content(body))
+        mvc.perform(post("/roles").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated());
-        mvc.perform(put("/positions/12").contentType(MediaType.APPLICATION_JSON).content(body))
+        mvc.perform(put("/roles/12").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk());
         when(service.toggleStatus("gestor", 12L, user)).thenReturn(false);
-        mvc.perform(patch("/positions/12/status").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(patch("/roles/12/status").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"firebase_uid\":\"gestor\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data").value(false));
-        mvc.perform(post("/positions/12/nrs").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/roles/12/nrs").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"firebase_uid\":\"gestor\",\"nrs\":[{\"nr\":17,\"ativo\":false}]}"))
                 .andExpect(status().isOk());
         verify(service).create(any(), eq(user));
@@ -96,11 +96,11 @@ class CargoControllerTest {
 
     @Test
     void rejectsInvalidStatusAndIncompleteNrChanges() throws Exception {
-        mvc.perform(post("/positions").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/roles").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"firebase_uid\":\"gestor\",\"nome\":\"Gerente\",\"status\":\"desconhecido\"}"))
                 .andExpect(status().isBadRequest());
         for (String nrs : List.of("null", "[null]", "[{\"nr\":1}]", "[{\"nr\":0,\"ativo\":true}]")) {
-            mvc.perform(post("/positions/12/nrs").contentType(MediaType.APPLICATION_JSON)
+            mvc.perform(post("/roles/12/nrs").contentType(MediaType.APPLICATION_JSON)
                             .content("{\"firebase_uid\":\"gestor\",\"nrs\":" + nrs + "}"))
                     .andExpect(status().isBadRequest());
         }
@@ -109,7 +109,7 @@ class CargoControllerTest {
 
     @Test
     void permitsAnEmptyNrPatchWithoutReplacingExistingLinks() throws Exception {
-        mvc.perform(post("/positions/12/nrs").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/roles/12/nrs").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"firebase_uid\":\"gestor\",\"nrs\":[]}"))
                 .andExpect(status().isOk());
         verify(service).updateNrs(eq(12L), any(), eq(user));
@@ -117,24 +117,24 @@ class CargoControllerTest {
 
     @Test
     void rejectsMissingUidAndMalformedCargoIdAsBadRequests() throws Exception {
-        mvc.perform(get("/positions")).andExpect(status().isBadRequest());
-        mvc.perform(get("/positions/abc/nrs").param("firebase_uid", "gestor"))
+        mvc.perform(get("/roles")).andExpect(status().isBadRequest());
+        mvc.perform(get("/roles/abc/nrs").param("firebase_uid", "gestor"))
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(service);
     }
 
     @Test
     void resolvesCargoAndStatusValidationMessagesFromTheResourceBundle() throws Exception {
-        mvc.perform(post("/positions").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/roles").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"firebase_uid\":\"\",\"nome\":\"\",\"status\":\"\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors", hasItem(containsString("O Firebase UID é obrigatório"))))
                 .andExpect(jsonPath("$.errors", hasItem(containsString("O nome do cargo é obrigatório"))))
                 .andExpect(jsonPath("$.errors", hasItem(containsString("O status do cargo é obrigatório"))));
-        mvc.perform(patch("/positions/12/status").contentType(MediaType.APPLICATION_JSON).content("{}"))
+        mvc.perform(patch("/roles/12/status").contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors", hasItem(containsString("O Firebase UID é obrigatório"))));
-        mvc.perform(put("/positions/12").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(put("/roles/12").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"firebase_uid\":\"gestor\",\"nome\":\"Gerente\",\"status\":\"outro\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors", hasItem(containsString("O status do cargo deve ser Ativo ou Inativo"))));
@@ -152,7 +152,7 @@ class CargoControllerTest {
     }
 
     private void assertNrValidationError(String nrs, String message) throws Exception {
-        mvc.perform(post("/positions/12/nrs").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/roles/12/nrs").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"firebase_uid\":\"gestor\",\"nrs\":" + nrs + "}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors", hasItem(containsString(message))));
