@@ -58,9 +58,9 @@ public class WorkspaceRegistrationTransactionalService {
 
         List<Unit> units = unitService.createForWorkspace(workspace, request.units());
         Unit managerUnit = spreadsheetImportService.findManagerUnit(managerRow, units);
-        Map<String, Role> cargosByName = roleService.createForWorkspace(workspace,
-                rows.stream().map(SpreadsheetImportService.SpreadsheetRow::cargo).toList());
-        Role managerCargo = spreadsheetImportService.findManagerCargo(managerRow, cargosByName);
+        Map<String, Role> rolesByName = roleService.createForWorkspace(workspace,
+                rows.stream().map(SpreadsheetImportService.SpreadsheetRow::role).toList());
+        Role managerRole = spreadsheetImportService.findManagerRole(managerRow, rolesByName);
         User manager = new User();
         manager.setName(managerRow.name().trim());
         manager.setEmail(request.email().trim().toLowerCase(Locale.ROOT));
@@ -68,11 +68,11 @@ public class WorkspaceRegistrationTransactionalService {
         manager.setType(UserType.GESTOR_WORKSPACE);
         manager.setStatus(UserStatus.ATIVO);
         manager.setUnit(managerUnit);
-        manager.setCargo(managerCargo);
+        manager.setCargo(managerRole);
         manager.setCreatedAt(Instant.now());
         userRepository.save(manager);
 
-        spreadsheetImportService.bindPersistedDependencies(importResult.validUsers(), units, cargosByName);
+        spreadsheetImportService.bindPersistedDependencies(importResult.validUsers(), units, rolesByName);
         userBatchService.saveAllPreRegistered(importResult.validUsers());
         eventPublisher.publishEvent(new PreRegisteredCollaboratorsCreatedEvent(
                 importResult.validUsers().stream().map(User::getEmail).toList()));

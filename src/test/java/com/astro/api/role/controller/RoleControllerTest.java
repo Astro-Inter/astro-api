@@ -116,7 +116,7 @@ class RoleControllerTest {
     }
 
     @Test
-    void rejectsMissingUidAndMalformedCargoIdAsBadRequests() throws Exception {
+    void rejectsMissingUidAndMalformedRoleIdAsBadRequests() throws Exception {
         mvc.perform(get("/roles")).andExpect(status().isBadRequest());
         mvc.perform(get("/roles/abc/nrs").param("firebase_uid", "gestor"))
                 .andExpect(status().isBadRequest());
@@ -124,7 +124,7 @@ class RoleControllerTest {
     }
 
     @Test
-    void resolvesCargoAndStatusValidationMessagesFromTheResourceBundle() throws Exception {
+    void resolvesRoleAndStatusValidationMessagesFromTheResourceBundle() throws Exception {
         mvc.perform(post("/roles").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"firebase_uid\":\"\",\"nome\":\"\",\"status\":\"\"}"))
                 .andExpect(status().isBadRequest())

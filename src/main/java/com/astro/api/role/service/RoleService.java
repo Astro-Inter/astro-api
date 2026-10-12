@@ -133,22 +133,22 @@ public class RoleService {
                 .filter(this::hasText)
                 .forEach(name -> namesByNormalizedValue.putIfAbsent(normalize(name), name.trim()));
 
-        List<Role> cargos = namesByNormalizedValue.values().stream()
+        List<Role> roles = namesByNormalizedValue.values().stream()
                 .map(name -> create(workspace, name))
                 .toList();
-        List<Role> savedRoles = roleRepository.saveAll(cargos);
+        List<Role> savedRoles = roleRepository.saveAll(roles);
 
-        Map<String, Role> cargosByName = new LinkedHashMap<>();
-        savedRoles.forEach(cargo -> cargosByName.put(normalize(cargo.getName()), cargo));
-        return cargosByName;
+        Map<String, Role> rolesByName = new LinkedHashMap<>();
+        savedRoles.forEach(role -> rolesByName.put(normalize(role.getName()), role));
+        return rolesByName;
     }
 
     private Role create(Workspace workspace, String name) {
-        Role cargo = new Role();
-        cargo.setName(name);
-        cargo.setActive(true);
-        cargo.setWorkspace(workspace);
-        return cargo;
+        Role role = new Role();
+        role.setName(name);
+        role.setActive(true);
+        role.setWorkspace(workspace);
+        return role;
     }
 
     private boolean hasText(String value) {

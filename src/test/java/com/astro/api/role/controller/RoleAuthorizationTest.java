@@ -47,7 +47,7 @@ class RoleAuthorizationTest {
     @Configuration
     @EnableMethodSecurity
     static class Config {
-        @Bean RoleService cargoService() { return mock(RoleService.class); }
-        @Bean RoleController cargoController(RoleService service) { return new RoleController(service); }
+        @Bean RoleService roleService() { return mock(RoleService.class); }
+        @Bean RoleController roleController(RoleService service) { return new RoleController(service); }
     }
 }

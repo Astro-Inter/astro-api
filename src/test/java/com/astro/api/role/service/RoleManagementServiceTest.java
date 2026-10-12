@@ -41,7 +41,7 @@ class RoleManagementServiceTest {
     }
 
     @Test
-    void rejectsBlankIdentityAndInvalidCargoId() {
+    void rejectsBlankIdentityAndInvalidRoleId() {
         assertThrows(BusinessException.class, () -> service.findAll(" ", user));
         assertThrows(BusinessException.class, () -> service.findNrs("gestor", 0L, user));
         verifyNoInteractions(repository, documents);
@@ -63,14 +63,14 @@ class RoleManagementServiceTest {
     }
 
     @Test
-    void doesNotReadMongoWhenDatabaseRejectsTheCargo() {
+    void doesNotReadMongoWhenDatabaseRejectsTheRole() {
         when(repository.findNrs("gestor", 12L)).thenThrow(new BusinessException("Cargo fora do workspace"));
         assertThrows(BusinessException.class, () -> service.findNrOptions("gestor", 12L, user));
         verifyNoInteractions(documents);
     }
 
     @Test
-    void preservesFalseWhenDeactivatingCargo() {
+    void preservesFalseWhenDeactivatingRole() {
         when(repository.toggleStatus("gestor", 12L)).thenReturn(false);
         assertFalse(service.toggleStatus("gestor", 12L, user));
     }
