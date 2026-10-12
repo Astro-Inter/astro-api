@@ -45,7 +45,7 @@ class UnitManagementServiceTest {
     @Test
     void combinesTheMongoCatalogWithPostgresAssociations() {
         when(repository.findNrs("manager", 12L)).thenReturn(List.of(new UnitNrResponse(17, "Título PostgreSQL")));
-        when(catalog.findCollaboratorNrs()).thenReturn(List.of(nr(17, "Ergonomia"), nr(1, "Disposições gerais")));
+        when(catalog.findCompanyNrs()).thenReturn(List.of(nr(17, "Ergonomia"), nr(1, "Disposições gerais")));
         assertEquals(List.of(new UnitNrOptionResponse(1, "Disposições gerais", false),
                 new UnitNrOptionResponse(17, "Ergonomia", true)), service.findNrOptions(12L, user));
     }

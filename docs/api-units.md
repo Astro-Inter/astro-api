@@ -25,7 +25,7 @@ as regras de desativação dos usuários vinculados.
 
 As NRs associadas retornam `nr` e `descricao`, vindos de `codigo_nr` e `descricao`
 da função. As opções usam o modelo `NrDocument` existente, consultando explicitamente
-a collection `NRs` (nome sensível a maiúsculas) com `usabilidade: "Colaborador"`.
+a collection `NRs` (nome sensível a maiúsculas) com `usabilidade: "Empresa"`.
 Usam `_id` numérico e `descricao` do MongoDB e acrescentam `ativo` de acordo com
 as associações PostgreSQL. Essa consulta não depende do nome configurado para a
 collection dos outros módulos. As opções são ordenadas pelo código.
