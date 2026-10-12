@@ -156,6 +156,16 @@ http://localhost:8080/swagger-ui.html
 | `REDIS_PASSWORD` | Senha do Redis                                | `********` |
 | `FIREBASE_PROJECT_ID` | ID do projeto no Firebase                     | `astro-app` |
 | `FIREBASE_CREDENTIALS_BASE64` | Credenciais do Firebase codificadas em Base64 | `********` |
+| `CORS_ALLOWED_ORIGINS` | Origens do frontend separadas por vírgula (padrão: GitHub Pages do Astro) | `https://astro-inter.github.io` |
+
+O CORS permite por padrão a origem `https://astro-inter.github.io`, usada pelo
+frontend em `/astro-web`. Informe somente protocolo, domínio e porta, sem caminho.
+Para desenvolvimento direto contra a API, configure, por exemplo,
+`CORS_ALLOWED_ORIGINS=https://astro-inter.github.io,http://localhost:5173`.
+Reinicie a API após alterar essa variável. As requisições prévias `OPTIONS` são
+tratadas antes da autenticação; as chamadas às rotas protegidas continuam exigindo
+token Firebase e as permissões correspondentes. O frontend usa o token no
+cabeçalho `Authorization`, sem cookies de sessão entre origens.
 
 ## Observabilidade
 
