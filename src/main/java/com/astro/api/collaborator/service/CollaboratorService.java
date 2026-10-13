@@ -4,6 +4,9 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.collaborator.dto.response.CollaboratorSummaryResponse;
 import com.astro.api.collaborator.mapper.CollaboratorMapper;
 import com.astro.api.collaborator.repository.CollaboratorRepository;
+import com.astro.api.collaborator.dto.response.CollaboratorDetailsResponse;
+import com.astro.api.common.exception.BusinessException;
+import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
@@ -46,5 +49,20 @@ public class CollaboratorService {
             throw new AccessDeniedException("Gestor ativo com workspace necessário");
         }
         return manager;
+    }
+
+    @Transactional(readOnly = true)
+    public CollaboratorDetailsResponse findById(Long collaboratorId, AuthenticatedUser principal) {
+        User manager = requireManager(principal);
+        checkId(collaboratorId);
+        return repository.findDetailsInScope(collaboratorId, principal.firebaseUid(), manager.getUnit().workspace.id)
+                .map(mapper::toDetails)
+                .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
+    }
+
+    private void checkId(Long collaboratorId) {
+        if (collaboratorId == null || collaboratorId <= 0) {
+            throw new BusinessException("O identificador do colaborador deve ser positivo");
+        }
     }
 }

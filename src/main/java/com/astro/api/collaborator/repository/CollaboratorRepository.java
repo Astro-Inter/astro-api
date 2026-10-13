@@ -6,8 +6,21 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface CollaboratorRepository extends JpaRepository<User, Long> {
+    @Query(value = """
+            SELECT v.id_usuario AS id, v.nome AS name, v.email, v.cpf,
+                   v.modalidade AS "workModel", v.status,
+                   v.cargo_id AS "roleId", v.cargo AS "roleName",
+                   v.unidade_id AS "unitId", v.unidade AS "unitName", v.workspace_id AS "workspaceId"
+            FROM vw_colaboradores v
+            WHERE v.id_usuario = :collaboratorId AND v.workspace_id = :workspaceId
+              AND v.unidade_id IN (SELECT id_unidade FROM fn_seleciona_unidades(:firebaseUid))
+            """, nativeQuery = true)
+    Optional<CollaboratorDetailsProjection> findDetailsInScope(@Param("collaboratorId") Long collaboratorId,
+            @Param("firebaseUid") String firebaseUid, @Param("workspaceId") Long workspaceId);
+
     @Query(value = """
             SELECT v.id_usuario AS id, v.nome AS name, v.email,
                    v.cargo_id AS "roleId", v.cargo AS "roleName",

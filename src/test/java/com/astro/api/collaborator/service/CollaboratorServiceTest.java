@@ -5,6 +5,9 @@ import com.astro.api.auth.security.Role;
 import com.astro.api.collaborator.mapper.CollaboratorMapper;
 import com.astro.api.collaborator.repository.CollaboratorRepository;
 import com.astro.api.collaborator.repository.CollaboratorSummaryProjection;
+import com.astro.api.collaborator.repository.CollaboratorDetailsProjection;
+import com.astro.api.common.exception.BusinessException;
+import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.user.model.*;
 import com.astro.api.user.repository.UserRepository;
@@ -85,5 +88,31 @@ class CollaboratorServiceTest {
         when(row.getUnitName()).thenReturn("Matriz");
         when(row.getStatus()).thenReturn(status);
         return row;
+    }
+
+    @Test
+    void loadsDetailsOnlyFromTheAuthorizedViewAndMapsNullableWorkModel() {
+        var row = mock(CollaboratorDetailsProjection.class);
+        when(row.getId()).thenReturn(2L);
+        when(row.getCpf()).thenReturn("52998224725");
+        when(row.getStatus()).thenReturn("PRE_CADASTRADO");
+        when(row.getWorkspaceId()).thenReturn(3L);
+        when(repository.findDetailsInScope(2L, "manager", 3L)).thenReturn(Optional.of(row));
+        var response = service.findById(2L, principal);
+        assertEquals("52998224725", response.cpf());
+        assertEquals(3L, response.workspaceId());
+        assertNull(response.workModel());
+        when(row.getWorkModel()).thenReturn("HIBRIDO");
+        assertEquals(WorkModel.HIBRIDO, service.findById(2L, principal).workModel());
+    }
+
+    @Test
+    void givesTheSameNotFoundResponseForMissingAndOutOfScopeDetails() {
+        for (Long id : List.of(2L, 999L)) {
+            when(repository.findDetailsInScope(id, "manager", 3L)).thenReturn(Optional.empty());
+            var error = assertThrows(ResourceNotFoundException.class, () -> service.findById(id, principal));
+            assertEquals("Colaborador não encontrado", error.getMessage());
+        }
+        assertThrows(BusinessException.class, () -> service.findById(0L, principal));
     }
 }

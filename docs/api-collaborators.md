@@ -18,6 +18,15 @@ O resultado em `data` contém `id_usuario`, `nome`, `email`, `cargo_id`, `cargo`
 de colaboradores autorizados resulta em `data: []`. CPF, senha e Firebase UID
 não fazem parte desse contrato.
 
+## Detalhes — SCRUM-519
+
+`GET /collaborators/{collaboratorId}` consulta a mesma view e o mesmo escopo.
+Retorna os campos da listagem e acrescenta `cpf`, `modalidade` e `workspace_id`.
+A modalidade pode ser nula para cadastros antigos. Registros inexistentes, gestores
+e colaboradores de outro workspace retornam o mesmo erro 404, sem revelar sua
+existência. IDs não positivos retornam 400. A rota atende informações e edição,
+sem alterar o endpoint de perfil próprio `/user/me`.
+
 ## Dependências
 
 A [view vw_colaboradores](https://github.com/Astro-Inter/banco-de-dados/pull/32)

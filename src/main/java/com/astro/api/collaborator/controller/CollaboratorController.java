@@ -2,6 +2,7 @@ package com.astro.api.collaborator.controller;
 
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.collaborator.dto.response.CollaboratorSummaryResponse;
+import com.astro.api.collaborator.dto.response.CollaboratorDetailsResponse;
 import com.astro.api.collaborator.service.CollaboratorService;
 import com.astro.api.common.response.ApiResult;
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,5 +40,17 @@ public class CollaboratorController {
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Colaboradores retornados com sucesso",
                 service.findAll(user), request.getRequestURI()));
+    }
+
+    @GetMapping("/{collaboratorId}")
+    @Operation(summary = "Consulta detalhes do colaborador para informações e edição",
+            description = "Inclui CPF e modalidade; restringe a consulta ao workspace e às unidades autorizadas. Não expõe dados de autenticação.")
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "Detalhes do colaborador"),
+            @ApiResponse(responseCode = "404", description = "Colaborador inexistente ou fora do escopo")})
+    public ResponseEntity<ApiResult<CollaboratorDetailsResponse>> findById(
+            @PathVariable Long collaboratorId, @AuthenticationPrincipal AuthenticatedUser user,
+            HttpServletRequest request) {
+        return ResponseEntity.ok(ApiResult.success("Colaborador retornado com sucesso",
+                service.findById(collaboratorId, user), request.getRequestURI()));
     }
 }

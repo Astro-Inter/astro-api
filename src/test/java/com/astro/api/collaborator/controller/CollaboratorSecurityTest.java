@@ -41,12 +41,17 @@ class CollaboratorSecurityTest {
             mvc.perform(get("/collaborators")).andExpect(result -> assertTrue(result.getResponse().getStatus() >= 400));
             mvc.perform(get("/collaborators").header("Authorization", "invalid"))
                     .andExpect(result -> assertTrue(result.getResponse().getStatus() >= 400));
+            when(tokens.verify("invalid-token")).thenThrow(mock(com.google.firebase.auth.FirebaseAuthException.class));
+            mvc.perform(get("/collaborators").header("Authorization", "Bearer invalid-token"))
+                    .andExpect(result -> assertTrue(result.getResponse().getStatus() >= 400));
             FirebaseToken token = mock(FirebaseToken.class);
             when(token.getUid()).thenReturn("manager");
             when(tokens.verify("valid")).thenReturn(token);
             for (Role role : List.of(Role.COLABORADOR, Role.ADMIN)) {
                 when(authorization.getRole("manager")).thenReturn(Optional.of(role));
                 mvc.perform(get("/collaborators").header("Authorization", "Bearer valid"))
+                        .andExpect(status().isForbidden());
+                mvc.perform(get("/collaborators/2").header("Authorization", "Bearer valid"))
                         .andExpect(status().isForbidden());
             }
             verifyNoInteractions(service);
