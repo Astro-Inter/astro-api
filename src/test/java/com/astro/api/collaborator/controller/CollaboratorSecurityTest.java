@@ -53,6 +53,13 @@ class CollaboratorSecurityTest {
                         .andExpect(status().isForbidden());
                 mvc.perform(get("/collaborators/2").header("Authorization", "Bearer valid"))
                         .andExpect(status().isForbidden());
+                mvc.perform(post("/collaborators").header("Authorization", "Bearer valid")
+                                .contentType("application/json").content(CollaboratorControllerTest.CREATE_JSON))
+                        .andExpect(status().isForbidden());
+                mvc.perform(put("/collaborators/2").header("Authorization", "Bearer valid")
+                                .contentType("application/json").content(CollaboratorControllerTest.CREATE_JSON
+                                        .replace("\"modalidade\":\"HIBRIDO\"", "\"modalidade\":\"HIBRIDO\",\"status\":\"ATIVO\"")))
+                        .andExpect(status().isForbidden());
             }
             verifyNoInteractions(service);
             for (Role role : List.of(Role.GESTOR, Role.GESTOR_WORKSPACE)) {

@@ -51,6 +51,31 @@ o mesmo fluxo Redis de importação; `/verify-key` e `/activate` continuam respo
 pela conclusão do cadastro. Uma falha de Redis após commit mantém o comportamento
 existente de registrar o erro para reprocessamento operacional.
 
+## Edição — SCRUM-521
+
+`PUT /collaborators/{collaboratorId}` exige os seis campos do cadastro e `status`.
+Todos são obrigatórios e não nulos: é uma substituição dos campos editáveis.
+O status pode ser mantido como `PRE_CADASTRADO` apenas se já estiver assim; não
+é permitido voltar ao pré-cadastro nem concluir o cadastro por esta rota.
+ID, tipo, data de criação e Firebase UID são preservados. Conflitos excluem o
+próprio colaborador da comparação. Vínculos inativos podem ser mantidos quando
+seus IDs permanecem iguais; toda nova vinculação exige cargo/unidade ativos e
+do workspace, com autorização sobre a unidade de destino.
+
+A leitura para alteração bloqueia o registro do colaborador no PostgreSQL para
+serializar edições concorrentes. A alteração de e-mail de uma conta vinculada
+consulta o estado anterior no Firebase, grava e valida os dados locais e atualiza
+a identidade antes do commit, marcando o novo e-mail como não verificado.
+Falhas incertas de atualização ou de commit compensam o e-mail e sua verificação
+no Firebase após o rollback. Conflitos explícitos do Firebase retornam 409.
+Uma divergência prévia entre e-mails exige reconciliação antes da edição.
+
+PostgreSQL e Firebase não compartilham uma transação. Se a compensação falhar,
+a API tenta desativar somente o colaborador afetado em uma nova transação,
+registra o incidente para reconciliação operacional e responde 500. Se o banco
+também estiver indisponível, essa contenção não pode ser garantida; o incidente
+permanece registrado para intervenção. Não há alterações do gestor solicitante.
+
 ## Dependências
 
 A [view vw_colaboradores](https://github.com/Astro-Inter/banco-de-dados/pull/32)

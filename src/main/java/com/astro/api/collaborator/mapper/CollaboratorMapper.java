@@ -7,6 +7,7 @@ import com.astro.api.user.model.WorkModel;
 import com.astro.api.collaborator.dto.response.CollaboratorDetailsResponse;
 import com.astro.api.collaborator.repository.CollaboratorDetailsProjection;
 import com.astro.api.collaborator.dto.request.CreateCollaboratorRequest;
+import com.astro.api.collaborator.dto.request.UpdateCollaboratorRequest;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserType;
 import com.astro.api.role.model.Role;
@@ -16,6 +17,15 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class CollaboratorMapper {
+    public void applyUpdate(User user, UpdateCollaboratorRequest body, Role role, Unit unit) {
+        user.setName(body.name());
+        user.setCpf(body.cpf());
+        user.setEmail(body.email());
+        user.setRole(role);
+        user.setUnit(unit);
+        user.setWorkModel(body.workModel());
+    }
+
     public User toNewUser(CreateCollaboratorRequest body, Role role, Unit unit) {
         User user = new User();
         user.setName(body.name());

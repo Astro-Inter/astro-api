@@ -16,6 +16,13 @@ import com.astro.api.unit.repository.UnitRepository;
 import com.astro.api.workspace.event.PreRegisteredCollaboratorsCreatedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
+import com.astro.api.auth.service.FirebaseIdentityService;
+import com.astro.api.collaborator.dto.request.UpdateCollaboratorRequest;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.TransactionDefinition;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
@@ -28,21 +35,31 @@ import java.util.List;
 
 @Service
 public class CollaboratorService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(CollaboratorService.class);
     private final CollaboratorRepository repository;
     private final UserRepository users;
     private final CollaboratorMapper mapper;
     private final RoleRepository roles;
     private final UnitRepository units;
     private final ApplicationEventPublisher events;
+    private final FirebaseIdentityService identities;
+    private final CollaboratorStatusPolicy statusPolicy;
+    private final TransactionTemplate transactions;
 
     public CollaboratorService(CollaboratorRepository repository, UserRepository users, CollaboratorMapper mapper,
-                               RoleRepository roles, UnitRepository units, ApplicationEventPublisher events) {
+                               RoleRepository roles, UnitRepository units, ApplicationEventPublisher events,
+                               FirebaseIdentityService identities, CollaboratorStatusPolicy statusPolicy,
+                               PlatformTransactionManager transactionManager) {
         this.repository = repository;
         this.users = users;
         this.mapper = mapper;
         this.roles = roles;
         this.units = units;
         this.events = events;
+        this.identities = identities;
+        this.statusPolicy = statusPolicy;
+        this.transactions = new TransactionTemplate(transactionManager);
+        this.transactions.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     @Transactional(readOnly = true)
@@ -142,4 +159,70 @@ public class CollaboratorService {
             throw exception;
         }
     }
+
+    public CollaboratorDetailsResponse update(Long collaboratorId, UpdateCollaboratorRequest body,
+                                              AuthenticatedUser principal) {
+        // The template includes the PostgreSQL commit, so compensation also covers commit failures.
+        EmailChange[] emailChange = new EmailChange[1];
+        try {
+            return transactions.execute(transaction -> {
+                User manager = requireManager(principal);
+                User collaborator = requireCollaborator(collaboratorId, principal, manager);
+                Long workspaceId = manager.getUnit().workspace.id;
+                Role role = requireRole(body.roleId(), workspaceId, !body.roleId().equals(collaborator.getRole().getId()));
+                Unit unit = requireUnit(body.unitId(), workspaceId, principal.firebaseUid(), !body.unitId().equals(collaborator.getUnit().id));
+                checkConflicts(body.cpf(), body.email(), collaboratorId);
+                String previousEmail = collaborator.getEmail();
+                mapper.applyUpdate(collaborator, body, role, unit);
+                statusPolicy.validate(collaborator, body.status());
+                collaborator.setStatus(body.status());
+                User saved = persist(collaborator);
+                if (saved.getFirebaseUid() != null && !saved.getFirebaseUid().isBlank()
+                        && !body.email().equals(previousEmail)) {
+                    var previous = identities.readEmailState(saved.getFirebaseUid());
+                    if (previous.email() == null || !previousEmail.equalsIgnoreCase(previous.email())) {
+                        throw new ConflictException("O e-mail da autenticação precisa ser reconciliado antes da edição");
+                    }
+                    emailChange[0] = new EmailChange(saved.getId(), saved.getFirebaseUid(), previous);
+                    identities.updateEmail(saved.getFirebaseUid(), body.email());
+                }
+                return mapper.toDetails(saved);
+            });
+        } catch (RuntimeException exception) {
+            EmailChange change = emailChange[0];
+            if (change != null && !(exception instanceof ConflictException)) {
+                compensateEmail(change, exception);
+            }
+            throw exception;
+        }
+    }
+
+    private User requireCollaborator(Long collaboratorId, AuthenticatedUser principal, User manager) {
+        checkId(collaboratorId);
+        return repository.findForUpdateInScope(collaboratorId, principal.firebaseUid(), manager.getUnit().workspace.id)
+                .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
+    }
+
+    private void compensateEmail(EmailChange change, RuntimeException original) {
+        try {
+            identities.restoreEmail(change.firebaseUid(), change.previous());
+        } catch (RuntimeException compensationFailure) {
+            original.addSuppressed(compensationFailure);
+            // Contain inconsistent identities using the existing per-request status authorization.
+            try {
+                transactions.executeWithoutResult(transaction -> {
+                    if (repository.deactivateAfterEmailFailure(change.collaboratorId(), change.firebaseUid()) != 1) {
+                        throw new IllegalStateException("Colaborador não encontrado para contenção da falha");
+                    }
+                });
+            } catch (RuntimeException containmentFailure) {
+                original.addSuppressed(containmentFailure);
+            }
+            LOGGER.error("Falha na compensação de e-mail do colaborador {}; reconciliação operacional necessária",
+                    change.collaboratorId(), original);
+            throw new IllegalStateException("Falha de sincronização da autenticação do colaborador", original);
+        }
+    }
+
+    private record EmailChange(Long collaboratorId, String firebaseUid, FirebaseIdentityService.EmailState previous) { }
 }

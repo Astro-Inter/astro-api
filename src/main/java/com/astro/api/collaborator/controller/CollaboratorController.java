@@ -4,6 +4,7 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.collaborator.dto.response.CollaboratorSummaryResponse;
 import com.astro.api.collaborator.dto.response.CollaboratorDetailsResponse;
 import com.astro.api.collaborator.dto.request.CreateCollaboratorRequest;
+import com.astro.api.collaborator.dto.request.UpdateCollaboratorRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
 import com.astro.api.collaborator.service.CollaboratorService;
@@ -69,5 +70,19 @@ public class CollaboratorController {
         var response = service.create(body, user);
         return ResponseEntity.created(URI.create("/collaborators/" + response.id()))
                 .body(ApiResult.success("Colaborador pré-cadastrado com sucesso", response, request.getRequestURI()));
+    }
+
+    @PutMapping("/{collaboratorId}")
+    @Operation(summary = "Edita todos os campos administrativos do colaborador",
+            description = "Exige todos os campos editáveis não nulos, incluindo status. Mantém vínculos inativos quando não alterados. Preserva ID, tipo, criado_em e Firebase UID. Mudanças de e-mail vinculadas ao Firebase usam compensação em caso de falha.")
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "Colaborador atualizado"),
+            @ApiResponse(responseCode = "404", description = "Colaborador, cargo ou unidade inexistente no escopo"),
+            @ApiResponse(responseCode = "409", description = "CPF ou e-mail em conflito"),
+            @ApiResponse(responseCode = "500", description = "Falha de sincronização com a autenticação")})
+    public ResponseEntity<ApiResult<CollaboratorDetailsResponse>> update(@PathVariable Long collaboratorId,
+            @Valid @RequestBody UpdateCollaboratorRequest body, @AuthenticationPrincipal AuthenticatedUser user,
+            HttpServletRequest request) {
+        return ResponseEntity.ok(ApiResult.success("Colaborador atualizado com sucesso",
+                service.update(collaboratorId, body, user), request.getRequestURI()));
     }
 }

@@ -9,6 +9,9 @@ import com.astro.api.auth.security.Role;
 import com.astro.api.collaborator.service.CollaboratorService;
 import com.astro.api.collaborator.mapper.CollaboratorMapper;
 import com.astro.api.collaborator.dto.request.CreateCollaboratorRequest;
+import com.astro.api.collaborator.dto.request.UpdateCollaboratorRequest;
+import com.astro.api.auth.service.FirebaseIdentityService;
+import com.astro.api.collaborator.service.CollaboratorStatusPolicy;
 import com.astro.api.common.exception.ConflictException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.Test;
@@ -31,6 +34,66 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Uses only an explicitly configured disposable database with the official SQL objects installed. */
 @EnabledIfEnvironmentVariable(named = "COLLABORATOR_TEST_JDBC_URL", matches = "jdbc:postgresql://(localhost|127\\.0\\.0\\.1):[0-9]+/scrum517")
 class CollaboratorPostgresTest {
+    @Test
+    void editsTheRealUserPreservingInternalFieldsAndUnchangedInactiveLinks() {
+        try (var context = new AnnotationConfigApplicationContext(Config.class)) {
+            var jdbc = new JdbcTemplate(context.getBean(DataSource.class));
+            var service = context.getBean(CollaboratorService.class);
+            seed(jdbc);
+            try {
+                var createdAt = jdbc.queryForObject("SELECT criado_em FROM usuario WHERE id_usuario=91002", java.sql.Timestamp.class);
+                jdbc.update("UPDATE cargo SET ativo=false WHERE id_cargo=91001");
+                jdbc.update("UPDATE unidade SET ativo=false WHERE id_unidade=91001");
+                var principal = new AuthenticatedUser("scrum517-manager", "scrum517-manager@example.com", Role.GESTOR);
+                var response = service.update(91002L, new UpdateCollaboratorRequest("Nome editado", "52998224725",
+                        "edited@example.com", 91001L, 91001L, WorkModel.REMOTO, UserStatus.PRE_CADASTRADO), principal);
+                assertEquals("Nome editado", response.name());
+                assertEquals("edited@example.com", jdbc.queryForObject("SELECT email FROM usuario WHERE id_usuario=91002", String.class));
+                assertEquals("COLABORADOR", jdbc.queryForObject("SELECT tipo FROM usuario WHERE id_usuario=91002", String.class));
+                assertNull(jdbc.queryForObject("SELECT firebase_uid FROM usuario WHERE id_usuario=91002", String.class));
+                assertEquals(createdAt, jdbc.queryForObject("SELECT criado_em FROM usuario WHERE id_usuario=91002", java.sql.Timestamp.class));
+                assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class, () -> service.update(92002L,
+                        new UpdateCollaboratorRequest("Nome editado", "52998224725", "edited@example.com", 91001L, 91001L,
+                                WorkModel.REMOTO, UserStatus.DESATIVADO), principal));
+            } finally {
+                cleanSeed(jdbc);
+            }
+        }
+    }
+
+    @Test
+    void rollsBackAllLocalEditsWhenFirebaseFailsAndRestoresThePreviousIdentity() {
+        try (var context = new AnnotationConfigApplicationContext(Config.class)) {
+            var jdbc = new JdbcTemplate(context.getBean(DataSource.class));
+            var service = context.getBean(CollaboratorService.class);
+            var identities = context.getBean(FirebaseIdentityService.class);
+            seed(jdbc);
+            try {
+                var previous = new FirebaseIdentityService.EmailState("scrum517-b@example.com", true);
+                org.mockito.Mockito.when(identities.readEmailState("scrum517-collaborator")).thenReturn(previous);
+                org.mockito.Mockito.doThrow(new IllegalStateException("Firebase unavailable")).when(identities)
+                        .updateEmail("scrum517-collaborator", "new@example.com");
+                var principal = new AuthenticatedUser("scrum517-manager", "scrum517-manager@example.com", Role.GESTOR);
+                assertThrows(IllegalStateException.class, () -> service.update(91003L, new UpdateCollaboratorRequest(
+                        "Nome editado", "11144477735", "new@example.com", 91001L, 91001L, WorkModel.HIBRIDO,
+                        UserStatus.DESATIVADO), principal));
+                assertEquals("scrum517-b@example.com", jdbc.queryForObject("SELECT email FROM usuario WHERE id_usuario=91003", String.class));
+                assertEquals("Bia teste", jdbc.queryForObject("SELECT nome FROM usuario WHERE id_usuario=91003", String.class));
+                assertEquals("ATIVO", jdbc.queryForObject("SELECT status FROM usuario WHERE id_usuario=91003", String.class));
+                org.mockito.Mockito.verify(identities).restoreEmail("scrum517-collaborator", previous);
+            } finally {
+                cleanSeed(jdbc);
+            }
+        }
+    }
+
+    private void cleanSeed(JdbcTemplate jdbc) {
+        jdbc.update("DELETE FROM usuario WHERE unidade_id IN (91001,91002,92001)");
+        jdbc.update("DELETE FROM unidade WHERE id_unidade IN (91001,91002,92001)");
+        jdbc.update("DELETE FROM cargo WHERE id_cargo IN (91001,92001)");
+        jdbc.update("DELETE FROM workspace WHERE id_workspace IN (91001,92001)");
+    }
+
     @Test
     void createsAndReadsARealPreRegisteredUserWithoutAuthenticationFields() {
         try (var context = new AnnotationConfigApplicationContext(Config.class)) {
@@ -127,10 +190,12 @@ class CollaboratorPostgresTest {
     }
 
     @Configuration
+    @org.springframework.transaction.annotation.EnableTransactionManagement
     @EnableJpaRepositories(basePackages = {"com.astro.api.collaborator.repository", "com.astro.api.user.repository",
             "com.astro.api.unit.repository", "com.astro.api.role.repository"})
-    @Import({CollaboratorService.class, CollaboratorMapper.class})
+    @Import({CollaboratorService.class, CollaboratorMapper.class, CollaboratorStatusPolicy.class})
     static class Config {
+        @Bean FirebaseIdentityService firebaseIdentityService() { return org.mockito.Mockito.mock(FirebaseIdentityService.class); }
         @Bean DataSource dataSource() {
             return new DriverManagerDataSource(System.getenv("COLLABORATOR_TEST_JDBC_URL"), "postgres", "");
         }

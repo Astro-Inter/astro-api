@@ -14,6 +14,11 @@ import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.unit.repository.UnitRepository;
 import com.astro.api.workspace.event.PreRegisteredCollaboratorsCreatedEvent;
 import org.springframework.context.ApplicationEventPublisher;
+import com.astro.api.auth.service.FirebaseIdentityService;
+import com.astro.api.collaborator.dto.request.UpdateCollaboratorRequest;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
+import java.time.Instant;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.user.model.*;
 import com.astro.api.user.repository.UserRepository;
@@ -34,7 +39,10 @@ class CollaboratorServiceTest {
     final RoleRepository roles = mock(RoleRepository.class);
     final UnitRepository units = mock(UnitRepository.class);
     final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
-    final CollaboratorService service = new CollaboratorService(repository, users, new CollaboratorMapper(), roles, units, events);
+    final FirebaseIdentityService identities = mock(FirebaseIdentityService.class);
+    final PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
+    final CollaboratorService service = new CollaboratorService(repository, users, new CollaboratorMapper(), roles, units,
+            events, identities, new CollaboratorStatusPolicy(), transactionManager);
     final AuthenticatedUser principal = new AuthenticatedUser("manager", "manager@example.com", Role.GESTOR);
     User manager;
     Workspace workspace;
@@ -43,6 +51,7 @@ class CollaboratorServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(transactionManager.getTransaction(any())).thenAnswer(invocation -> new SimpleTransactionStatus());
         workspace = new Workspace();
         workspace.id = 3L;
         Unit unit = new Unit();
@@ -208,5 +217,113 @@ class CollaboratorServiceTest {
             assertTrue(error.getMessage().contains(constraint.endsWith("cpf") ? "CPF" : "e-mail"));
         }
         verifyNoInteractions(events);
+    }
+
+    User collaborator(UserStatus status, String firebaseUid) {
+        User user = new User();
+        user.setId(2L);
+        user.setName("Nome anterior");
+        user.setCpf("52998224725");
+        user.setEmail("old@example.com");
+        user.setType(UserType.COLABORADOR);
+        user.setRole(role);
+        user.setUnit(destination);
+        user.setStatus(status);
+        user.setFirebaseUid(firebaseUid);
+        user.setCreatedAt(Instant.parse("2025-01-01T00:00:00Z"));
+        when(repository.findForUpdateInScope(2L, "manager", 3L)).thenReturn(Optional.of(user));
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(identities.readEmailState("completed")).thenReturn(new FirebaseIdentityService.EmailState("old@example.com", true));
+        return user;
+    }
+
+    UpdateCollaboratorRequest updateBody(UserStatus status) {
+        return new UpdateCollaboratorRequest("Novo nome", "529.982.247-25", " NEW@EXAMPLE.COM ", 5L, 12L, WorkModel.REMOTO, status);
+    }
+
+    @Test
+    void updatesOnlyEditableFieldsAndCoordinatesFirebaseEmailBeforeCommit() {
+        User user = collaborator(UserStatus.ATIVO, "completed");
+        Instant createdAt = user.getCreatedAt();
+        var response = service.update(2L, updateBody(UserStatus.ATIVO), principal);
+        assertEquals("Novo nome", response.name());
+        assertEquals("new@example.com", response.email());
+        assertEquals(WorkModel.REMOTO, response.workModel());
+        assertEquals(2L, user.getId());
+        assertEquals(UserType.COLABORADOR, user.getType());
+        assertEquals("completed", user.getFirebaseUid());
+        assertEquals(createdAt, user.getCreatedAt());
+        var order = inOrder(repository, identities, transactionManager);
+        order.verify(repository).saveAndFlush(user);
+        order.verify(identities).readEmailState("completed");
+        order.verify(identities).updateEmail("completed", "new@example.com");
+        order.verify(transactionManager).commit(any());
+        verify(identities, never()).restoreEmail(any(), any());
+    }
+
+    @Test
+    void keepsInactiveLinksWhenUnchangedAndDoesNotUseFirebaseForPreRegistration() {
+        collaborator(UserStatus.PRE_CADASTRADO, null);
+        role.setActive(false);
+        destination.isActive = false;
+        var response = service.update(2L, updateBody(UserStatus.PRE_CADASTRADO), principal);
+        assertEquals(UserStatus.PRE_CADASTRADO, response.status());
+        verifyNoInteractions(identities);
+    }
+
+    @Test
+    void validatesNewLinksAndDestinationPermissionsBeforeWriting() {
+        collaborator(UserStatus.DESATIVADO, "completed");
+        Unit other = new Unit(); other.id = 13L; other.workspace = workspace; other.isActive = true;
+        when(units.findById(13L)).thenReturn(Optional.of(other));
+        var request = new UpdateCollaboratorRequest("Novo nome", "52998224725", "old@example.com", 5L, 13L, WorkModel.HIBRIDO, UserStatus.DESATIVADO);
+        assertThrows(AccessDeniedException.class, () -> service.update(2L, request, principal));
+        when(repository.canAccessUnit("manager", 13L)).thenReturn(true);
+        other.isActive = false;
+        assertThrows(BusinessException.class, () -> service.update(2L, request, principal));
+        other.isActive = true;
+        assertEquals(13L, service.update(2L, request, principal).unitId());
+        verifyNoInteractions(identities);
+    }
+
+    @Test
+    void rejectsMissingTargetsConflictsAndInvalidStatusTransitions() {
+        when(repository.findForUpdateInScope(2L, "manager", 3L)).thenReturn(Optional.empty());
+        assertThrows(ResourceNotFoundException.class, () -> service.update(2L, updateBody(UserStatus.ATIVO), principal));
+        collaborator(UserStatus.PRE_CADASTRADO, null);
+        assertThrows(BusinessException.class, () -> service.update(2L, updateBody(UserStatus.ATIVO), principal));
+        when(repository.emailExists("new@example.com", 2L)).thenReturn(true);
+        assertThrows(ConflictException.class, () -> service.update(2L, updateBody(UserStatus.PRE_CADASTRADO), principal));
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void rollsBackAndRestoresFirebaseForUncertainUpdateFailures() {
+        collaborator(UserStatus.ATIVO, "completed");
+        doThrow(new IllegalStateException("Firebase unavailable")).when(identities).updateEmail("completed", "new@example.com");
+        assertThrows(IllegalStateException.class, () -> service.update(2L, updateBody(UserStatus.ATIVO), principal));
+        verify(transactionManager).rollback(any());
+        verify(transactionManager, never()).commit(any());
+        verify(identities).restoreEmail("completed", new FirebaseIdentityService.EmailState("old@example.com", true));
+    }
+
+    @Test
+    void compensatesFirebaseEvenWhenTheDatabaseCommitFails() {
+        collaborator(UserStatus.ATIVO, "completed");
+        doThrow(new IllegalStateException("Commit failed")).when(transactionManager).commit(any());
+        assertThrows(IllegalStateException.class, () -> service.update(2L, updateBody(UserStatus.ATIVO), principal));
+        verify(identities).restoreEmail("completed", new FirebaseIdentityService.EmailState("old@example.com", true));
+    }
+
+    @Test
+    void containsFailedCompensationByDeactivatingOnlyTheAffectedCollaborator() {
+        collaborator(UserStatus.ATIVO, "completed");
+        doThrow(new IllegalStateException("Firebase unavailable")).when(identities).updateEmail(any(), any());
+        doThrow(new IllegalStateException("Compensation unavailable")).when(identities).restoreEmail(any(), any());
+        when(repository.deactivateAfterEmailFailure(2L, "completed")).thenReturn(1);
+        var error = assertThrows(IllegalStateException.class, () -> service.update(2L, updateBody(UserStatus.ATIVO), principal));
+        assertEquals("Falha de sincronização da autenticação do colaborador", error.getMessage());
+        verify(repository).deactivateAfterEmailFailure(2L, "completed");
+        verify(transactionManager).commit(any());
     }
 }

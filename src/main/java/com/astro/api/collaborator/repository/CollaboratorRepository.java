@@ -3,12 +3,28 @@ package com.astro.api.collaborator.repository;
 import com.astro.api.user.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
 
 public interface CollaboratorRepository extends JpaRepository<User, Long> {
+    @Query(value = """
+            SELECT u.* FROM usuario u
+            INNER JOIN unidade un ON un.id_unidade = u.unidade_id
+            WHERE u.id_usuario = :collaboratorId AND u.tipo = 'COLABORADOR'
+              AND un.workspace_id = :workspaceId
+              AND u.unidade_id IN (SELECT id_unidade FROM fn_seleciona_unidades(:firebaseUid))
+            FOR UPDATE OF u
+            """, nativeQuery = true)
+    Optional<User> findForUpdateInScope(@Param("collaboratorId") Long collaboratorId,
+            @Param("firebaseUid") String firebaseUid, @Param("workspaceId") Long workspaceId);
+
+    @Modifying
+    @Query("UPDATE User u SET u.status = com.astro.api.user.model.UserStatus.DESATIVADO WHERE u.id = :collaboratorId AND u.type = com.astro.api.user.model.UserType.COLABORADOR AND u.firebaseUid = :firebaseUid")
+    int deactivateAfterEmailFailure(@Param("collaboratorId") Long collaboratorId, @Param("firebaseUid") String firebaseUid);
+
     @Query(value = """
             SELECT EXISTS (SELECT 1 FROM fn_seleciona_unidades(:firebaseUid) WHERE id_unidade = :unitId)
             """, nativeQuery = true)
