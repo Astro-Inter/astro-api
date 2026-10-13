@@ -37,47 +37,49 @@ import java.util.List;
 @Service
 public class CollaboratorService {
     private static final Logger LOGGER = LoggerFactory.getLogger(CollaboratorService.class);
-    private final CollaboratorRepository repository;
-    private final UserRepository users;
-    private final CollaboratorMapper mapper;
-    private final RoleRepository roles;
-    private final UnitRepository units;
-    private final ApplicationEventPublisher events;
-    private final FirebaseIdentityService identities;
-    private final CollaboratorStatusPolicy statusPolicy;
-    private final TransactionTemplate transactions;
-    private final UserAvatarService avatars;
+    private final CollaboratorRepository collaboratorRepository;
+    private final UserRepository userRepository;
+    private final CollaboratorMapper collaboratorMapper;
+    private final RoleRepository roleRepository;
+    private final UnitRepository unitRepository;
+    private final ApplicationEventPublisher eventPublisher;
+    private final FirebaseIdentityService firebaseIdentityService;
+    private final CollaboratorStatusPolicy collaboratorStatusPolicy;
+    private final TransactionTemplate transactionTemplate;
+    private final UserAvatarService userAvatarService;
 
-    public CollaboratorService(CollaboratorRepository repository, UserRepository users, CollaboratorMapper mapper,
-                               RoleRepository roles, UnitRepository units, ApplicationEventPublisher events,
-                               FirebaseIdentityService identities, CollaboratorStatusPolicy statusPolicy,
-                               PlatformTransactionManager transactionManager, UserAvatarService avatars) {
-        this.repository = repository;
-        this.users = users;
-        this.mapper = mapper;
-        this.roles = roles;
-        this.units = units;
-        this.events = events;
-        this.identities = identities;
-        this.statusPolicy = statusPolicy;
-        this.transactions = new TransactionTemplate(transactionManager);
-        this.transactions.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-        this.avatars = avatars;
+    public CollaboratorService(CollaboratorRepository collaboratorRepository, UserRepository userRepository,
+                               CollaboratorMapper collaboratorMapper, RoleRepository roleRepository,
+                               UnitRepository unitRepository, ApplicationEventPublisher eventPublisher,
+                               FirebaseIdentityService firebaseIdentityService,
+                               CollaboratorStatusPolicy collaboratorStatusPolicy,
+                               PlatformTransactionManager transactionManager, UserAvatarService userAvatarService) {
+        this.collaboratorRepository = collaboratorRepository;
+        this.userRepository = userRepository;
+        this.collaboratorMapper = collaboratorMapper;
+        this.roleRepository = roleRepository;
+        this.unitRepository = unitRepository;
+        this.eventPublisher = eventPublisher;
+        this.firebaseIdentityService = firebaseIdentityService;
+        this.collaboratorStatusPolicy = collaboratorStatusPolicy;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.userAvatarService = userAvatarService;
     }
 
     @Transactional(readOnly = true)
     public List<CollaboratorSummaryResponse> findAll(AuthenticatedUser principal) {
         User manager = requireManager(principal);
-        var rows = repository.findAllInScope(principal.firebaseUid(), manager.getUnit().workspace.id);
-        var urls = avatars.findUrls(rows.stream().map(row -> row.getId()).toList());
-        return rows.stream().map(row -> mapper.toSummary(row, urls.get(row.getId()))).toList();
+        var rows = collaboratorRepository.findAllInScope(principal.firebaseUid(), manager.getUnit().workspace.id);
+        var urls = userAvatarService.findUrls(rows.stream().map(row -> row.getId()).toList());
+        return rows.stream().map(row -> collaboratorMapper.toSummary(row, urls.get(row.getId()))).toList();
     }
 
     private User requireManager(AuthenticatedUser principal) {
         if (principal == null || principal.firebaseUid() == null || principal.firebaseUid().isBlank()) {
             throw new AccessDeniedException("Gestor autenticado necessário");
         }
-        User manager = users.findByFirebaseUid(principal.firebaseUid())
+        User manager = userRepository.findByFirebaseUid(principal.firebaseUid())
                 .orElseThrow(() -> new AccessDeniedException("Gestor ativo necessário"));
         if (manager.getStatus() != UserStatus.ATIVO
                 || (manager.getType() != UserType.GESTOR && manager.getType() != UserType.GESTOR_WORKSPACE)
@@ -92,8 +94,8 @@ public class CollaboratorService {
     public CollaboratorDetailsResponse findById(Long collaboratorId, AuthenticatedUser principal) {
         User manager = requireManager(principal);
         checkId(collaboratorId);
-        return repository.findDetailsInScope(collaboratorId, principal.firebaseUid(), manager.getUnit().workspace.id)
-                .map(row -> mapper.toDetails(row, avatars.findUrl(row.getId())))
+        return collaboratorRepository.findDetailsInScope(collaboratorId, principal.firebaseUid(), manager.getUnit().workspace.id)
+                .map(row -> collaboratorMapper.toDetails(row, userAvatarService.findUrl(row.getId())))
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
     }
 
@@ -110,13 +112,13 @@ public class CollaboratorService {
         Role role = requireRole(body.roleId(), workspaceId, true);
         Unit unit = requireUnit(body.unitId(), workspaceId, principal.firebaseUid(), true);
         checkConflicts(body.cpf(), body.email(), null);
-        User saved = persist(mapper.toNewUser(body, role, unit));
-        events.publishEvent(new PreRegisteredCollaboratorsCreatedEvent(List.of(saved.getEmail())));
-        return mapper.toDetails(saved, null);
+        User saved = persist(collaboratorMapper.toNewUser(body, role, unit));
+        eventPublisher.publishEvent(new PreRegisteredCollaboratorsCreatedEvent(List.of(saved.getEmail())));
+        return collaboratorMapper.toDetails(saved, null);
     }
 
     private Role requireRole(Long roleId, Long workspaceId, boolean requireActive) {
-        Role role = roles.findById(roleId).filter(value -> value.getWorkspace() != null
+        Role role = roleRepository.findById(roleId).filter(value -> value.getWorkspace() != null
                         && workspaceId.equals(value.getWorkspace().id))
                 .orElseThrow(() -> new ResourceNotFoundException("Cargo não encontrado no workspace"));
         if (requireActive && !role.isActive()) {
@@ -126,9 +128,9 @@ public class CollaboratorService {
     }
 
     private Unit requireUnit(Long unitId, Long workspaceId, String firebaseUid, boolean requireActive) {
-        Unit unit = units.findById(unitId).filter(value -> value.workspace != null && workspaceId.equals(value.workspace.id))
+        Unit unit = unitRepository.findById(unitId).filter(value -> value.workspace != null && workspaceId.equals(value.workspace.id))
                 .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada no workspace"));
-        if (!repository.canAccessUnit(firebaseUid, unitId)) {
+        if (!collaboratorRepository.canAccessUnit(firebaseUid, unitId)) {
             throw new AccessDeniedException("Sem permissão sobre a unidade de destino");
         }
         if (requireActive && !unit.isActive) {
@@ -138,17 +140,17 @@ public class CollaboratorService {
     }
 
     private void checkConflicts(String cpf, String email, Long excludedId) {
-        if (repository.cpfExists(cpf, excludedId)) {
+        if (collaboratorRepository.cpfExists(cpf, excludedId)) {
             throw new ConflictException("Já existe um usuário com este CPF");
         }
-        if (repository.emailExists(email, excludedId)) {
+        if (collaboratorRepository.emailExists(email, excludedId)) {
             throw new ConflictException("Já existe um usuário com este e-mail");
         }
     }
 
     private User persist(User user) {
         try {
-            return repository.saveAndFlush(user);
+            return collaboratorRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException exception) {
             for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
                 if (cause instanceof org.hibernate.exception.ConstraintViolationException violation) {
@@ -169,7 +171,7 @@ public class CollaboratorService {
         // The template includes the PostgreSQL commit, so compensation also covers commit failures.
         EmailChange[] emailChange = new EmailChange[1];
         try {
-            return transactions.execute(transaction -> {
+            return transactionTemplate.execute(transaction -> {
                 User manager = requireManager(principal);
                 User collaborator = requireCollaborator(collaboratorId, principal, manager);
                 Long workspaceId = manager.getUnit().workspace.id;
@@ -177,20 +179,20 @@ public class CollaboratorService {
                 Unit unit = requireUnit(body.unitId(), workspaceId, principal.firebaseUid(), !body.unitId().equals(collaborator.getUnit().id));
                 checkConflicts(body.cpf(), body.email(), collaboratorId);
                 String previousEmail = collaborator.getEmail();
-                mapper.applyUpdate(collaborator, body, role, unit);
+                collaboratorMapper.applyUpdate(collaborator, body, role, unit);
                 validateStatus(collaborator, body.status(), workspaceId);
                 collaborator.setStatus(body.status());
                 User saved = persist(collaborator);
                 if (saved.getFirebaseUid() != null && !saved.getFirebaseUid().isBlank()
                         && !body.email().equals(previousEmail)) {
-                    var previous = identities.readEmailState(saved.getFirebaseUid());
+                    var previous = firebaseIdentityService.readEmailState(saved.getFirebaseUid());
                     if (previous.email() == null || !previousEmail.equalsIgnoreCase(previous.email())) {
                         throw new ConflictException("O e-mail da autenticação precisa ser reconciliado antes da edição");
                     }
                     emailChange[0] = new EmailChange(saved.getId(), saved.getFirebaseUid(), previous);
-                    identities.updateEmail(saved.getFirebaseUid(), body.email());
+                    firebaseIdentityService.updateEmail(saved.getFirebaseUid(), body.email());
                 }
-                return mapper.toDetails(saved, avatars.findUrl(saved.getId()));
+                return collaboratorMapper.toDetails(saved, userAvatarService.findUrl(saved.getId()));
             });
         } catch (RuntimeException exception) {
             EmailChange change = emailChange[0];
@@ -203,19 +205,19 @@ public class CollaboratorService {
 
     private User requireCollaborator(Long collaboratorId, AuthenticatedUser principal, User manager) {
         checkId(collaboratorId);
-        return repository.findForUpdateInScope(collaboratorId, principal.firebaseUid(), manager.getUnit().workspace.id)
+        return collaboratorRepository.findForUpdateInScope(collaboratorId, principal.firebaseUid(), manager.getUnit().workspace.id)
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
     }
 
     private void compensateEmail(EmailChange change, RuntimeException original) {
         try {
-            identities.restoreEmail(change.firebaseUid(), change.previous());
+            firebaseIdentityService.restoreEmail(change.firebaseUid(), change.previous());
         } catch (RuntimeException compensationFailure) {
             original.addSuppressed(compensationFailure);
             // Contain inconsistent identities using the existing per-request status authorization.
             try {
-                transactions.executeWithoutResult(transaction -> {
-                    if (repository.deactivateAfterEmailFailure(change.collaboratorId(), change.firebaseUid()) != 1) {
+                transactionTemplate.executeWithoutResult(transaction -> {
+                    if (collaboratorRepository.deactivateAfterEmailFailure(change.collaboratorId(), change.firebaseUid()) != 1) {
                         throw new IllegalStateException("Colaborador não encontrado para contenção da falha");
                     }
                 });
@@ -241,15 +243,15 @@ public class CollaboratorService {
             collaborator.setStatus(desired);
             persist(collaborator);
         }
-        return mapper.toDetails(collaborator, avatars.findUrl(collaborator.getId()));
+        return collaboratorMapper.toDetails(collaborator, userAvatarService.findUrl(collaborator.getId()));
     }
 
     private void validateStatus(User collaborator, UserStatus desired, Long workspaceId) {
-        statusPolicy.validate(collaborator, desired);
+        collaboratorStatusPolicy.validate(collaborator, desired);
         if (desired == UserStatus.ATIVO && collaborator.getStatus() != UserStatus.ATIVO) {
             // Fresh scalar reads avoid stale JPA entities and serialize activation against link deactivation.
-            Boolean roleActive = repository.lockRoleActive(collaborator.getRole().getId(), workspaceId);
-            Boolean unitActive = repository.lockUnitActive(collaborator.getUnit().id, workspaceId);
+            Boolean roleActive = collaboratorRepository.lockRoleActive(collaborator.getRole().getId(), workspaceId);
+            Boolean unitActive = collaboratorRepository.lockUnitActive(collaborator.getUnit().id, workspaceId);
             if (!Boolean.TRUE.equals(roleActive) || !Boolean.TRUE.equals(unitActive)) {
                 throw new BusinessException("Cargo e unidade devem estar ativos no workspace para ativar o colaborador");
             }
