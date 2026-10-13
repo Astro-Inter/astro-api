@@ -10,6 +10,17 @@ import java.util.Optional;
 
 public interface CollaboratorRepository extends JpaRepository<User, Long> {
     @Query(value = """
+            SELECT EXISTS (SELECT 1 FROM fn_seleciona_unidades(:firebaseUid) WHERE id_unidade = :unitId)
+            """, nativeQuery = true)
+    boolean canAccessUnit(@Param("firebaseUid") String firebaseUid, @Param("unitId") Long unitId);
+
+    @Query("SELECT COUNT(u) > 0 FROM User u WHERE LOWER(u.email) = :email AND (:excludedId IS NULL OR u.id <> :excludedId)")
+    boolean emailExists(@Param("email") String email, @Param("excludedId") Long excludedId);
+
+    @Query("SELECT COUNT(u) > 0 FROM User u WHERE u.cpf = :cpf AND (:excludedId IS NULL OR u.id <> :excludedId)")
+    boolean cpfExists(@Param("cpf") String cpf, @Param("excludedId") Long excludedId);
+
+    @Query(value = """
             SELECT v.id_usuario AS id, v.nome AS name, v.email, v.cpf,
                    v.modalidade AS "workModel", v.status,
                    v.cargo_id AS "roleId", v.cargo AS "roleName",

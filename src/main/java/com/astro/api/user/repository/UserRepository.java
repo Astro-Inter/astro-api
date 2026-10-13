@@ -38,10 +38,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
                        LIMIT 1
                    ) AS validity
             FROM cargo_nr
-            WHERE cargo_nr.cargo_id = :cargoId
+            WHERE cargo_nr.cargo_id = :roleId
             ORDER BY cargo_nr.nr_id
             """, nativeQuery = true)
-    List<UserNrValidityProjection> findNrValiditiesByCargoIdAndUserId(
-            @Param("cargoId") Long cargoId,
+    List<UserNrValidityProjection> findNrValiditiesByRoleIdAndUserId(
+            @Param("roleId") Long roleId,
             @Param("userId") Long userId);
 }

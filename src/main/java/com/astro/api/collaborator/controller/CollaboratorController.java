@@ -3,6 +3,9 @@ package com.astro.api.collaborator.controller;
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.collaborator.dto.response.CollaboratorSummaryResponse;
 import com.astro.api.collaborator.dto.response.CollaboratorDetailsResponse;
+import com.astro.api.collaborator.dto.request.CreateCollaboratorRequest;
+import jakarta.validation.Valid;
+import java.net.URI;
 import com.astro.api.collaborator.service.CollaboratorService;
 import com.astro.api.common.response.ApiResult;
 import io.swagger.v3.oas.annotations.Operation;
@@ -52,5 +55,19 @@ public class CollaboratorController {
             HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Colaborador retornado com sucesso",
                 service.findById(collaboratorId, user), request.getRequestURI()));
+    }
+
+    @PostMapping
+    @Operation(summary = "Pré-cadastra um colaborador",
+            description = "Exige nome, CPF válido, e-mail, roleId, unitId e modalidade. Normaliza CPF e e-mail, valida vínculos ativos e cria COLABORADOR/PRE_CADASTRADO sem senha. Reutiliza a fila de conclusão do cadastro.")
+    @ApiResponses({@ApiResponse(responseCode = "201", description = "Colaborador pré-cadastrado"),
+            @ApiResponse(responseCode = "404", description = "Cargo ou unidade inexistente no workspace"),
+            @ApiResponse(responseCode = "409", description = "CPF ou e-mail já cadastrado")})
+    public ResponseEntity<ApiResult<CollaboratorDetailsResponse>> create(
+            @Valid @RequestBody CreateCollaboratorRequest body, @AuthenticationPrincipal AuthenticatedUser user,
+            HttpServletRequest request) {
+        var response = service.create(body, user);
+        return ResponseEntity.created(URI.create("/collaborators/" + response.id()))
+                .body(ApiResult.success("Colaborador pré-cadastrado com sucesso", response, request.getRequestURI()));
     }
 }

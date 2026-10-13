@@ -140,22 +140,22 @@ public class UserService {
     }
 
     private List<UserProfileResponse.NrProfileResponse> findNrs(User user) {
-        if (user.getCargo() == null) {
+        if (user.getRole() == null) {
             return List.of();
         }
 
-        List<UserNrValidityProjection> nrsByCargo = userRepository
-                .findNrValiditiesByCargoIdAndUserId(user.getCargo().getId(), user.getId());
-        if (nrsByCargo.isEmpty()) {
+        List<UserNrValidityProjection> nrsByRole = userRepository
+                .findNrValiditiesByRoleIdAndUserId(user.getRole().getId(), user.getId());
+        if (nrsByRole.isEmpty()) {
             return List.of();
         }
 
         Map<Integer, NrDocument> documentsById = nrDocumentRepository.findAllById(
-                        nrsByCargo.stream().map(UserNrValidityProjection::getNrId).toList())
+                        nrsByRole.stream().map(UserNrValidityProjection::getNrId).toList())
                 .stream()
                 .collect(Collectors.toMap(NrDocument::getId, Function.identity()));
 
-        return nrsByCargo.stream()
+        return nrsByRole.stream()
                 .map(nr -> toNrProfile(nr, documentsById.get(nr.getNrId())))
                 .filter(java.util.Objects::nonNull)
                 .toList();

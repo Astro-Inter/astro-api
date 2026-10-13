@@ -1,6 +1,16 @@
 package com.astro.api.collaborator.repository;
 
 import com.astro.api.user.model.User;
+import com.astro.api.user.model.UserStatus;
+import com.astro.api.user.model.UserType;
+import com.astro.api.user.model.WorkModel;
+import com.astro.api.auth.security.AuthenticatedUser;
+import com.astro.api.auth.security.Role;
+import com.astro.api.collaborator.service.CollaboratorService;
+import com.astro.api.collaborator.mapper.CollaboratorMapper;
+import com.astro.api.collaborator.dto.request.CreateCollaboratorRequest;
+import com.astro.api.common.exception.ConflictException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.context.annotation.*;
@@ -21,6 +31,56 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Uses only an explicitly configured disposable database with the official SQL objects installed. */
 @EnabledIfEnvironmentVariable(named = "COLLABORATOR_TEST_JDBC_URL", matches = "jdbc:postgresql://(localhost|127\\.0\\.0\\.1):[0-9]+/scrum517")
 class CollaboratorPostgresTest {
+    @Test
+    void createsAndReadsARealPreRegisteredUserWithoutAuthenticationFields() {
+        try (var context = new AnnotationConfigApplicationContext(Config.class)) {
+            var jdbc = new JdbcTemplate(context.getBean(DataSource.class));
+            var service = context.getBean(CollaboratorService.class);
+            var repository = context.getBean(CollaboratorRepository.class);
+            new TransactionTemplate(context.getBean(JpaTransactionManager.class)).executeWithoutResult(transaction -> {
+                transaction.setRollbackOnly();
+                seed(jdbc);
+                var principal = new AuthenticatedUser("scrum517-manager", "scrum517-manager@example.com", Role.GESTOR);
+                var request = new CreateCollaboratorRequest("Novo teste", "168.995.350-09", " NEW@EXAMPLE.COM ",
+                        91001L, 91001L, WorkModel.REMOTO);
+                var result = service.create(request, principal);
+                User saved = repository.findById(result.id()).orElseThrow();
+                assertEquals("16899535009", saved.getCpf());
+                assertEquals("new@example.com", saved.getEmail());
+                assertEquals(UserStatus.PRE_CADASTRADO, saved.getStatus());
+                assertEquals(UserType.COLABORADOR, saved.getType());
+                assertNull(saved.getFirebaseUid());
+                assertNotNull(saved.getCreatedAt());
+                assertTrue(repository.findDetailsInScope(result.id(), "scrum517-manager", 91001L).isPresent());
+                assertThrows(ConflictException.class, () -> service.create(request, principal));
+            });
+        }
+    }
+
+    @Test
+    void keepsDatabaseUniqueConstraintsAsProtectionAgainstRacingWrites() {
+        for (boolean duplicateCpf : List.of(true, false)) {
+            try (var context = new AnnotationConfigApplicationContext(Config.class)) {
+                var jdbc = new JdbcTemplate(context.getBean(DataSource.class));
+                var repository = context.getBean(CollaboratorRepository.class);
+                new TransactionTemplate(context.getBean(JpaTransactionManager.class)).executeWithoutResult(transaction -> {
+                    transaction.setRollbackOnly();
+                    seed(jdbc);
+                    User existing = repository.findById(91002L).orElseThrow();
+                    User duplicate = new User();
+                    duplicate.setName("Duplicado teste");
+                    duplicate.setType(UserType.COLABORADOR);
+                    duplicate.setStatus(UserStatus.PRE_CADASTRADO);
+                    duplicate.setRole(existing.getRole());
+                    duplicate.setUnit(existing.getUnit());
+                    duplicate.setCpf(duplicateCpf ? existing.getCpf() : "16899535009");
+                    duplicate.setEmail(duplicateCpf ? "unique@example.com" : existing.getEmail());
+                    assertThrows(DataIntegrityViolationException.class, () -> repository.saveAndFlush(duplicate));
+                });
+            }
+        }
+    }
+
     @Test
     void queriesTheRealViewWithWorkspaceUnitProfileAndStatusIsolation() {
         try (var context = new AnnotationConfigApplicationContext(Config.class)) {
@@ -67,7 +127,9 @@ class CollaboratorPostgresTest {
     }
 
     @Configuration
-    @EnableJpaRepositories(basePackageClasses = CollaboratorRepository.class)
+    @EnableJpaRepositories(basePackages = {"com.astro.api.collaborator.repository", "com.astro.api.user.repository",
+            "com.astro.api.unit.repository", "com.astro.api.role.repository"})
+    @Import({CollaboratorService.class, CollaboratorMapper.class})
     static class Config {
         @Bean DataSource dataSource() {
             return new DriverManagerDataSource(System.getenv("COLLABORATOR_TEST_JDBC_URL"), "postgres", "");

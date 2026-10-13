@@ -47,8 +47,8 @@ public class EventMapper {
     }
 
     public EventCandidateResponse toCandidateResponse(User user) {
-        Long roleId = user.getCargo() == null ? null : user.getCargo().getId();
-        String roleName = user.getCargo() == null ? null : user.getCargo().getName();
+        Long roleId = user.getRole() == null ? null : user.getRole().getId();
+        String roleName = user.getRole() == null ? null : user.getRole().getName();
         return new EventCandidateResponse(user.getId(), user.getName(), user.getEmail(), roleId, roleName);
     }
 

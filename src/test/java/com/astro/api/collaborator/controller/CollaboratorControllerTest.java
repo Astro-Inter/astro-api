@@ -6,6 +6,8 @@ import com.astro.api.collaborator.dto.response.CollaboratorSummaryResponse;
 import com.astro.api.collaborator.dto.response.CollaboratorDetailsResponse;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.user.model.WorkModel;
+import com.astro.api.collaborator.dto.request.CreateCollaboratorRequest;
+import org.springframework.http.MediaType;
 import com.astro.api.collaborator.service.CollaboratorService;
 import com.astro.api.common.handler.GlobalExceptionHandler;
 import com.astro.api.user.model.UserStatus;
@@ -78,5 +80,45 @@ class CollaboratorControllerTest {
         mvc.perform(get("/collaborators/999")).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Colaborador não encontrado"));
         mvc.perform(get("/collaborators/invalid")).andExpect(status().isBadRequest());
+    }
+
+    static final String CREATE_JSON = """
+            {"nome":"  Colaborador teste  ","cpf":"529.982.247-25","email":" TEST@EXAMPLE.COM ",
+             "roleId":5,"unitId":12,"modalidade":"HIBRIDO"}
+            """;
+
+    @Test
+    void createsWithLocationAndNormalizedFieldsWithoutAcceptingInternalAssignments() throws Exception {
+        when(service.create(any(), eq(principal))).thenReturn(new CollaboratorDetailsResponse(2L, "Colaborador teste",
+                "52998224725", "test@example.com", WorkModel.HIBRIDO, UserStatus.PRE_CADASTRADO,
+                5L, "Operador", 12L, "Matriz", 3L));
+        mvc.perform(post("/collaborators").contentType(MediaType.APPLICATION_JSON).content(CREATE_JSON))
+                .andExpect(status().isCreated()).andExpect(header().string("Location", "/collaborators/2"))
+                .andExpect(jsonPath("$.data.status").value("PRE_CADASTRADO"));
+        verify(service).create(new CreateCollaboratorRequest("Colaborador teste", "52998224725", "test@example.com",
+                5L, 12L, WorkModel.HIBRIDO), principal);
+    }
+
+    @Test
+    void rejectsInvalidOrMissingRequiredFieldsWithPortugueseMessages() throws Exception {
+        mvc.perform(post("/collaborators").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Erro de validação"))
+                .andExpect(jsonPath("$.errors", org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("O CPF é obrigatório"))))
+                .andExpect(jsonPath("$.errors", org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("A modalidade é obrigatória"))));
+        for (String body : List.of(CREATE_JSON.replace("529.982.247-25", "111.111.111-11"),
+                CREATE_JSON.replace("TEST@EXAMPLE.COM", "invalid"), CREATE_JSON.replace("\"roleId\":5", "\"roleId\":0"),
+                CREATE_JSON.replace("HIBRIDO", "INVALID"), CREATE_JSON.replace("\"unitId\":12", "\"unitId\":null"))) {
+            mvc.perform(post("/collaborators").contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void preservesTheConflictHttpContract() throws Exception {
+        when(service.create(any(), eq(principal))).thenThrow(new com.astro.api.common.exception.ConflictException("Já existe um usuário com este CPF"));
+        mvc.perform(post("/collaborators").contentType(MediaType.APPLICATION_JSON).content(CREATE_JSON))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value("Já existe um usuário com este CPF"));
     }
 }
