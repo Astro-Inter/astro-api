@@ -68,7 +68,7 @@ public class WorkspaceRegistrationTransactionalService {
         manager.setType(UserType.GESTOR_WORKSPACE);
         manager.setStatus(UserStatus.ATIVO);
         manager.setUnit(managerUnit);
-        manager.setCargo(managerRole);
+        manager.setRole(managerRole);
         manager.setCreatedAt(Instant.now());
         userRepository.save(manager);
 

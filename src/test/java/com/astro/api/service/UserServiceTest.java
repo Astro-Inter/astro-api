@@ -54,7 +54,7 @@ class UserServiceTest {
         userProfilePhotoRepository = mock(UserProfilePhotoRepository.class);
         userMapper = mock(UserMapper.class);
         userService = new UserService(userRepository, redisTemplate, nrDocumentRepository, userProfilePhotoRepository, userMapper,
-                mock(R2StorageService.class));
+                mock(R2StorageService.class), mock(com.astro.api.user.service.UserAvatarService.class));
         ReflectionTestUtils.setField(userService, "workspaceAccessTokenPrefix", "workspace:");
         ReflectionTestUtils.setField(userService, "collaboratorAccessTokenPrefix", "collaborator:");
     }

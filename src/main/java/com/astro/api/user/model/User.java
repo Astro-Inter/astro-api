@@ -45,5 +45,5 @@ public class User extends Account {
 
     @ManyToOne
     @JoinColumn(name = "cargo_id")
-    private Role cargo;
+    private Role role;
 }
