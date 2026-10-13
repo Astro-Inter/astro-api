@@ -54,6 +54,35 @@ a necessidade de reconciliação operacional. Se o próprio banco estiver indisp
 nessa contenção, a falha também é registrada. Identidade previamente divergente
 retorna 409 e exige reconciliação antes de editar. Não há senha neste contrato.
 
+## PATCH /managers/{id}/status — SCRUM-530
+
+Request: `{"status":"DESATIVADO"}`. Status obrigatório, somente ATIVO ou DESATIVADO.
+Retorna 200 com detalhes. Usa as mesmas regras do PUT, mantém tipo GESTOR e não
+conclui pré-cadastro. Solicitar o estado atual é idempotente. Ativação bloqueia
+os vínculos e exige que ambos estejam ativos no workspace autorizado.
+Desativação bloqueia a conta nas próximas requisições, inclusive com o mesmo token.
+
+## Verificação local
+
+Executar `./mvnw --batch-mode --no-transfer-progress verify`. Para incluir os testes
+PostgreSQL, configurar `MANAGER_TEST_DATABASE_URL=jdbc:postgresql://localhost:55425/astro525`,
+`MANAGER_TEST_DATABASE_USER=postgres` e `MANAGER_TEST_DATABASE_PASSWORD` com a senha
+do banco descartável local. Sem a URL, somente a classe PostgreSQL é ignorada.
+O CI provisiona PostgreSQL 16 e executa essa classe. Os testes usam schema único e
+removem somente esse schema após a execução; aceitam apenas banco `astro525` local.
+MockMvc valida os contratos HTTP e a cadeia real de segurança. Firebase é simulado,
+sem alteração de contas reais. Testes HTTP por servidor local e testes dos novos
+endpoints publicados exigem execução separada; o PR não realiza implantação.
+
+Validação desta entrega: Maven Wrapper 3.9.16, Java 21, `verify` em modo offline
+com dependências já instaladas: 180 testes, zero falhas/erros, um teste de contexto
+previamente desabilitado, JAR empacotado com sucesso. Inclui 32 testes de gestores,
+dos quais oito usam PostgreSQL 16 isolado (leitura, isolamento, promoção concorrente,
+preservação de histórico, conflitos, status e rollback/compensação de e-mail).
+O teste Python do workflow de CD e `git diff --check` também passaram.
+No ambiente publicado foi consultado apenas o Swagger existente; os cinco novos
+endpoints não foram testados lá, pois não houve merge nem implantação.
+
 ## Dependências
 
 A view pertence à SCRUM-524, PR Astro-Inter/banco-de-dados#33. A API não cria nem

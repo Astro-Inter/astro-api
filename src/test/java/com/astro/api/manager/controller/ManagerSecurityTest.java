@@ -53,6 +53,11 @@ class ManagerSecurityTest {
             mvc.perform(get("/managers/1").header("Authorization", "Bearer valid")).andExpect(status().isForbidden());
             mvc.perform(post("/managers").header("Authorization", "Bearer valid").contentType("application/json")
                     .content("{\"collaboratorId\":4,\"status\":\"ATIVO\"}")).andExpect(status().isForbidden());
+            mvc.perform(put("/managers/1").header("Authorization", "Bearer valid").contentType("application/json")
+                    .content("{\"nome\":\"Gestor\",\"cpf\":\"52998224725\",\"email\":\"user@astro.com\",\"roleId\":1,\"unitId\":1,\"modalidade\":\"REMOTO\",\"status\":\"ATIVO\"}"))
+                    .andExpect(status().isForbidden());
+            mvc.perform(patch("/managers/1/status").header("Authorization", "Bearer valid").contentType("application/json")
+                    .content("{\"status\":\"DESATIVADO\"}")).andExpect(status().isForbidden());
         }
         verifyNoInteractions(service);
     }

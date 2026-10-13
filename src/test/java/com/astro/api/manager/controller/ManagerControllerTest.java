@@ -95,4 +95,13 @@ class ManagerControllerTest {
         }
         verifyNoInteractions(service);
     }
+    @Test void patchRequiresAnExplicitActiveOrInactiveStatus() throws Exception {
+        mvc.perform(patch("/managers/1/status").contentType("application/json").content("{\"status\":\"DESATIVADO\"}"))
+                .andExpect(status().isOk());
+        verify(service).changeStatus(eq(1L), any(), eq(principal)); clearInvocations(service);
+        for (String body : List.of("{}", "{\"status\":null}", "{\"status\":\"PRE_CADASTRADO\"}", "{\"status\":\"invalid\"}")) {
+            mvc.perform(patch("/managers/1/status").contentType("application/json").content(body)).andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(service);
+    }
 }

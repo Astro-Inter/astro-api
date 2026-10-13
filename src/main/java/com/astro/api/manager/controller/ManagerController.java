@@ -6,6 +6,7 @@ import com.astro.api.manager.dto.response.ManagerSummaryResponse;
 import com.astro.api.manager.dto.response.ManagerDetailsResponse;
 import com.astro.api.manager.dto.request.PromoteManagerRequest;
 import com.astro.api.manager.dto.request.UpdateManagerRequest;
+import com.astro.api.manager.dto.request.ManagerStatusRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
 import com.astro.api.manager.service.ManagerService;
@@ -57,5 +58,14 @@ public class ManagerController {
             HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Gestor atualizado com sucesso",
                 service.update(managerId, body, principal), request.getRequestURI()));
+    }
+
+    @PatchMapping("/{managerId}/status")
+    @Operation(summary = "Ativa ou desativa explicitamente toda a conta de um gestor")
+    public ResponseEntity<ApiResult<ManagerDetailsResponse>> changeStatus(@PathVariable("managerId") Long managerId,
+            @Valid @RequestBody ManagerStatusRequest body, @AuthenticationPrincipal AuthenticatedUser principal,
+            HttpServletRequest request) {
+        return ResponseEntity.ok(ApiResult.success("Status do gestor alterado com sucesso",
+                service.changeStatus(managerId, body, principal), request.getRequestURI()));
     }
 }

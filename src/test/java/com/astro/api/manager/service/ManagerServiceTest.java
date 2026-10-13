@@ -149,6 +149,46 @@ class ManagerServiceTest {
         assertThrows(IllegalStateException.class, () -> service.update(4L, body, principal));
         verify(repository).deactivateAfterEmailFailure(4L, "collaborator-uid");
     }
+    com.astro.api.manager.dto.request.ManagerStatusRequest statusBody(com.astro.api.manager.dto.request.ManagerAccountStatus status) {
+        return new com.astro.api.manager.dto.request.ManagerStatusRequest(status);
+    }
+    @Test void statusIsExplicitIdempotentAndPreservesTheManagerProfile() {
+        var user = editableManager();
+        service.changeStatus(4L, statusBody(com.astro.api.manager.dto.request.ManagerAccountStatus.DESATIVADO), principal);
+        assertEquals(UserStatus.DESATIVADO, user.getStatus()); assertEquals(UserType.GESTOR, user.getType());
+        clearInvocations(repository);
+        service.changeStatus(4L, statusBody(com.astro.api.manager.dto.request.ManagerAccountStatus.DESATIVADO), principal);
+        verify(repository, never()).saveAndFlush(any());
+        service.changeStatus(4L, statusBody(com.astro.api.manager.dto.request.ManagerAccountStatus.ATIVO), principal);
+        assertEquals(UserStatus.ATIVO, user.getStatus()); assertEquals(UserType.GESTOR, user.getType());
+        verify(repository).lockRoleActive(2L, 1L); verify(repository).lockUnitActive(10L, 1L);
+    }
+    @Test void activationRequiresCompletedAuthenticationAndActiveLinksForBothPutAndPatch() {
+        var request = statusBody(com.astro.api.manager.dto.request.ManagerAccountStatus.ATIVO);
+        var user = editableManager(); user.setStatus(UserStatus.PRE_CADASTRADO);
+        assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.changeStatus(4L, request, principal));
+        assertThrows(com.astro.api.common.exception.BusinessException.class,
+                () -> service.update(4L, updateBody(user.getEmail(), 2L, 10L, UserStatus.ATIVO), principal));
+        user.setStatus(UserStatus.DESATIVADO); user.setFirebaseUid(null);
+        assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.changeStatus(4L, request, principal));
+        user.setFirebaseUid("uid"); when(repository.lockRoleActive(2L, 1L)).thenReturn(false);
+        assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.changeStatus(4L, request, principal));
+        when(repository.lockRoleActive(2L, 1L)).thenReturn(true); when(repository.lockUnitActive(10L, 1L)).thenReturn(false);
+        assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.changeStatus(4L, request, principal));
+        user.setType(UserType.GESTOR_WORKSPACE);
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,
+                () -> service.changeStatus(4L, statusBody(com.astro.api.manager.dto.request.ManagerAccountStatus.DESATIVADO), principal));
+        verify(repository, never()).saveAndFlush(any());
+    }
+    @Test void fullUpdateCanMoveToAnActiveUnitAndRoleInTheSameWorkspace() {
+        var user = editableManager();
+        var role = new com.astro.api.role.model.Role(); role.setId(3L); role.setWorkspace(user.getUnit().workspace);
+        var unit = new Unit(); unit.id = 11L; unit.workspace = user.getUnit().workspace;
+        when(roles.findById(3L)).thenReturn(Optional.of(role)); when(units.findById(11L)).thenReturn(Optional.of(unit));
+        when(repository.lockRoleActive(3L, 1L)).thenReturn(true); when(repository.lockUnitActive(11L, 1L)).thenReturn(true);
+        var response = service.update(4L, updateBody(user.getEmail(), 3L, 11L, UserStatus.ATIVO), principal);
+        assertEquals(3L, response.roleId()); assertEquals(11L, response.unitId()); assertSame(unit, user.getUnit());
+    }
     @Test void promotesTheExistingAccountToBothRequestedStatusesPreservingIdentityAndLinks() {
         for (var status : com.astro.api.manager.dto.request.ManagerAccountStatus.values()) {
             User user = eligibleCollaborator(); var role = user.getRole(); var unit = user.getUnit(); var created = user.getCreatedAt();

@@ -138,6 +138,34 @@ class ManagerPostgresTest {
         assertEquals("user1@astro.com", jdbc.queryForObject("SELECT email FROM usuario WHERE id_usuario=1", String.class));
         assertEquals("GESTOR", jdbc.queryForObject("SELECT tipo FROM usuario WHERE id_usuario=1", String.class));
     }
+    @Test void statusChangesPersistAndCannotActivatePreRegistrationOrInactiveLinks() {
+        var service = context.getBean(ManagerService.class);
+        var inactive = new com.astro.api.manager.dto.request.ManagerStatusRequest(com.astro.api.manager.dto.request.ManagerAccountStatus.DESATIVADO);
+        var active = new com.astro.api.manager.dto.request.ManagerStatusRequest(com.astro.api.manager.dto.request.ManagerAccountStatus.ATIVO);
+        service.changeStatus(1L, inactive, owner()); service.changeStatus(1L, inactive, owner());
+        assertEquals("DESATIVADO", jdbc.queryForObject("SELECT status FROM usuario WHERE id_usuario=1", String.class));
+        service.changeStatus(1L, active, owner());
+        assertEquals("ATIVO", jdbc.queryForObject("SELECT status FROM usuario WHERE id_usuario=1", String.class));
+        assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.changeStatus(2L, active, owner()));
+        jdbc.update("UPDATE usuario SET status='DESATIVADO' WHERE id_usuario=2");
+        assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.changeStatus(2L, active, owner()));
+        jdbc.update("UPDATE usuario SET firebase_uid=null,status='DESATIVADO' WHERE id_usuario=1");
+        assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.changeStatus(1L, active, owner()));
+        for (long id : List.of(4L, 5L, 100L, 999L)) {
+            assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class, () -> service.changeStatus(id, inactive, owner()));
+        }
+        assertEquals("GESTOR_WORKSPACE", jdbc.queryForObject("SELECT tipo FROM usuario WHERE id_usuario=100", String.class));
+    }
+    @Test void cpfAndEmailConflictsAreDetectedGloballyAndPreserveTheTarget() {
+        var service = context.getBean(ManagerService.class);
+        jdbc.update("UPDATE usuario SET cpf='52998224725' WHERE id_usuario=5");
+        assertThrows(com.astro.api.common.exception.ConflictException.class,
+                () -> service.update(1L, update(1,1,"user1@astro.com",com.astro.api.user.model.UserStatus.ATIVO),owner()));
+        jdbc.update("UPDATE usuario SET cpf='11144477735' WHERE id_usuario=5");
+        assertThrows(com.astro.api.common.exception.ConflictException.class,
+                () -> service.update(1L, update(1,1,"USER5@ASTRO.COM",com.astro.api.user.model.UserStatus.ATIVO),owner()));
+        assertEquals("user1@astro.com", jdbc.queryForObject("SELECT email FROM usuario WHERE id_usuario=1", String.class));
+    }
     static DriverManagerDataSource dataSource() {
         String url = System.getenv("MANAGER_TEST_DATABASE_URL");
         if (!url.matches("jdbc:postgresql://(localhost|127\\.0\\.0\\.1):[0-9]+/astro525")) {

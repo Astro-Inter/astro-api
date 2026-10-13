@@ -9,6 +9,7 @@ import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.exception.ConflictException;
 import com.astro.api.manager.dto.request.PromoteManagerRequest;
 import com.astro.api.manager.dto.request.UpdateManagerRequest;
+import com.astro.api.manager.dto.request.ManagerStatusRequest;
 import com.astro.api.auth.service.FirebaseIdentityService;
 import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.unit.repository.UnitRepository;
@@ -148,6 +149,17 @@ public class ManagerService {
         return repository.findUserForUpdateInWorkspace(managerId, workspaceId)
                 .filter(user -> user.getType() == UserType.GESTOR)
                 .orElseThrow(() -> new ResourceNotFoundException("Gestor não encontrado"));
+    }
+
+    @Transactional
+    public ManagerDetailsResponse changeStatus(Long managerId, ManagerStatusRequest body, AuthenticatedUser principal) {
+        Long workspaceId = requireWorkspaceManager(principal).getUnit().workspace.id;
+        User manager = requireManager(managerId, workspaceId);
+        UserStatus desired = body.status().toUserStatus();
+        UserStatus previous = manager.getStatus();
+        applyStatus(manager, desired, workspaceId);
+        if (desired != previous) persist(manager);
+        return mapper.toDetails(manager);
     }
 
     private void applyStatus(User manager, UserStatus desired, Long workspaceId) {
