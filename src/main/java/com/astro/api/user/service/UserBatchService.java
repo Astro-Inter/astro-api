@@ -37,7 +37,7 @@ public class UserBatchService {
             statement.setString(7, user.getStatus().name());
             statement.setTimestamp(8, Timestamp.from(user.getCreatedAt()));
             statement.setLong(9, user.getUnit().id);
-            statement.setLong(10, user.getCargo().getId());
+            statement.setLong(10, user.getRole().getId());
         });
     }
 }

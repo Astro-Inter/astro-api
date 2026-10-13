@@ -50,8 +50,8 @@ class ProfileServiceTest {
     }
 
     @Test
-    void shouldReturnAuthenticatedUsersProfileAndActiveNrsFromTheirCargo() {
-        User user = userWithCargo();
+    void shouldReturnAuthenticatedUsersProfileAndActiveNrsFromTheirRole() {
+        User user = userWithRole();
         NrDocument nr = new NrDocument();
         nr.setId(35);
         nr.setDescription("Trabalho em altura");
@@ -64,7 +64,7 @@ class ProfileServiceTest {
         when(userProfilePhotoRepository.findById(20L)).thenReturn(Optional.of(profilePhoto));
         when(r2StorageService.getDownloadUrl("usuarios/20/foto-perfil.jpg"))
                 .thenReturn("https://r2.example.com/astro/usuarios/20/foto-perfil.jpg?X-Amz-Signature=signature");
-        when(userRepository.findNrValiditiesByCargoIdAndUserId(10L, 20L))
+        when(userRepository.findNrValiditiesByRoleIdAndUserId(10L, 20L))
                 .thenReturn(List.of(projection(35, LocalDate.of(2027, 10, 3))));
         when(nrDocumentRepository.findAllById(any())).thenReturn(List.of(nr));
 
@@ -88,7 +88,7 @@ class ProfileServiceTest {
     }
 
     @Test
-    void shouldReturnNoNrsWhenUserHasNoCargo() {
+    void shouldReturnNoNrsWhenUserHasNoRole() {
         User user = new User();
         user.setName("Bruno Baptista");
         user.setEmail("bruno@astro.com");
@@ -113,10 +113,10 @@ class ProfileServiceTest {
         verifyNoInteractions(nrDocumentRepository, userProfilePhotoRepository, r2StorageService);
     }
 
-    private User userWithCargo() {
-        Role cargo = new Role();
-        cargo.setId(10L);
-        cargo.setName("Engenheiro de Segurança");
+    private User userWithRole() {
+        Role role = new Role();
+        role.setId(10L);
+        role.setName("Engenheiro de Segurança");
 
         Unit unit = new Unit();
         unit.name = "Osasco";
@@ -126,7 +126,7 @@ class ProfileServiceTest {
         user.setName("Bruno Baptista");
         user.setEmail("bruno@astro.com");
         user.setWorkModel(WorkModel.PRESENCIAL);
-        user.setCargo(cargo);
+        user.setRole(role);
         user.setUnit(unit);
         return user;
     }

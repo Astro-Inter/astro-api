@@ -64,4 +64,17 @@ class ManagerControllerTest {
         mvc.perform(get("/managers/99")).andExpect(status().isNotFound()).andExpect(jsonPath("$.message").value("Gestor não encontrado"));
         mvc.perform(get("/managers/abc")).andExpect(status().isBadRequest());
     }
+    @Test void promotionValidatesItsContractAndReturnsTheSameUserLocation() throws Exception {
+        when(service.promote(any(), eq(principal))).thenReturn(new com.astro.api.manager.dto.response.ManagerDetailsResponse(
+                4L, "Gestor", "12345678900", "user@astro.com", null, UserStatus.DESATIVADO, 2L, "Cargo", 10L, "Unidade", 3L));
+        mvc.perform(post("/managers").contentType("application/json").content("{\"collaboratorId\":4,\"status\":\"DESATIVADO\"}"))
+                .andExpect(status().isCreated()).andExpect(header().string("Location", "/managers/4"))
+                .andExpect(jsonPath("$.data.status").value("DESATIVADO"));
+        clearInvocations(service);
+        for (String body : List.of("{}", "{\"collaboratorId\":0,\"status\":\"ATIVO\"}",
+                "{\"collaboratorId\":4,\"status\":\"PRE_CADASTRADO\"}")) {
+            mvc.perform(post("/managers").contentType("application/json").content(body)).andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(service);
+    }
 }

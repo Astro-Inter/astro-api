@@ -248,7 +248,7 @@ class EventServiceTest {
         user.setEmail("u" + id + "@astro.com");
         user.setStatus(status);
         user.setUnit(unit);
-        user.setCargo(role);
+        user.setRole(role);
         return user;
     }
 

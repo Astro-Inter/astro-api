@@ -17,7 +17,7 @@ public class UserMapper {
             List<UserProfileResponse.NrProfileResponse> nrs) {
         return new UserProfileResponse(
                 user.getName(),
-                user.getCargo() == null ? null : user.getCargo().getName(),
+                user.getRole() == null ? null : user.getRole().getName(),
                 user.getUnit() == null ? null : user.getUnit().name,
                 user.getWorkModel() == null ? null : user.getWorkModel().name(),
                 user.getEmail(),

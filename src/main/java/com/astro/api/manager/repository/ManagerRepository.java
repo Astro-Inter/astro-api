@@ -25,4 +25,17 @@ public interface ManagerRepository extends JpaRepository<User, Long> {
             """, nativeQuery = true)
     Optional<ManagerDetailsProjection> findDetailsInWorkspace(@Param("managerId") Long managerId,
                                                              @Param("workspaceId") Long workspaceId);
+
+    @Query(value = """
+            SELECT u.* FROM usuario u JOIN unidade un ON un.id_unidade = u.unidade_id
+            WHERE u.id_usuario = :userId AND un.workspace_id = :workspaceId
+            FOR UPDATE OF u
+            """, nativeQuery = true)
+    Optional<User> findUserForUpdateInWorkspace(@Param("userId") Long userId, @Param("workspaceId") Long workspaceId);
+
+    @Query(value = "SELECT ativo FROM cargo WHERE id_cargo = :roleId AND workspace_id = :workspaceId FOR SHARE", nativeQuery = true)
+    Boolean lockRoleActive(@Param("roleId") Long roleId, @Param("workspaceId") Long workspaceId);
+
+    @Query(value = "SELECT ativo FROM unidade WHERE id_unidade = :unitId AND workspace_id = :workspaceId FOR SHARE", nativeQuery = true)
+    Boolean lockUnitActive(@Param("unitId") Long unitId, @Param("workspaceId") Long workspaceId);
 }

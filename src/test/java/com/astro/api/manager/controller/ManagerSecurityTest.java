@@ -50,6 +50,9 @@ class ManagerSecurityTest {
         for (Role role : List.of(Role.COLABORADOR, Role.GESTOR, Role.ADMIN)) {
             when(authorization.getRole("uid")).thenReturn(Optional.of(role));
             mvc.perform(get("/managers").header("Authorization", "Bearer valid")).andExpect(status().isForbidden());
+            mvc.perform(get("/managers/1").header("Authorization", "Bearer valid")).andExpect(status().isForbidden());
+            mvc.perform(post("/managers").header("Authorization", "Bearer valid").contentType("application/json")
+                    .content("{\"collaboratorId\":4,\"status\":\"ATIVO\"}")).andExpect(status().isForbidden());
         }
         verifyNoInteractions(service);
     }
@@ -61,8 +64,33 @@ class ManagerSecurityTest {
         mvc.perform(get("/managers").header("Authorization", "Bearer valid"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data").isEmpty());
     }
+    @Test void theSameIssuedTokenUsesTheCurrentProfileAndLosesAccessAfterDeactivation() throws Exception {
+        var authRepository = mock(com.astro.api.auth.repository.AuthRepository.class);
+        var userService = mock(com.astro.api.user.service.UserService.class);
+        var actualAuthorization = new AuthorizationService(authRepository, userService);
+        var type = new java.util.concurrent.atomic.AtomicReference<>("COLABORADOR");
+        var status = new java.util.concurrent.atomic.AtomicReference<>(com.astro.api.user.model.UserStatus.ATIVO);
+        when(authRepository.findAccessLevel("target")).thenAnswer(call -> type.get());
+        when(userService.findStatusByFirebaseUid("target")).thenAnswer(call -> Optional.of(status.get()));
+        when(authorization.getRole("target")).thenAnswer(call -> actualAuthorization.getRole("target"));
+        var token = mock(FirebaseToken.class); when(token.getUid()).thenReturn("target");
+        when(tokens.verify("same-token")).thenReturn(token);
+        mvc.perform(get("/manager-access").header("Authorization", "Bearer same-token")).andExpect(status().isForbidden());
+        type.set("GESTOR");
+        mvc.perform(get("/manager-access").header("Authorization", "Bearer same-token")).andExpect(status().isOk());
+        status.set(com.astro.api.user.model.UserStatus.DESATIVADO);
+        mvc.perform(get("/manager-access").header("Authorization", "Bearer same-token")).andExpect(status().isForbidden());
+        verify(tokens, times(3)).verify("same-token");
+        verify(authRepository, times(3)).findAccessLevel("target");
+    }
+    @org.springframework.web.bind.annotation.RestController
+    static class ProbeController {
+        @org.springframework.web.bind.annotation.GetMapping("/manager-access")
+        @org.springframework.security.access.prepost.PreAuthorize("hasRole('GESTOR')")
+        public String access() { return "ok"; }
+    }
     @Configuration @EnableWebSecurity @EnableWebMvc
-    @Import({SecurityConfig.class, CorsConfig.class, FirebaseAuthenticationFilter.class, ManagerController.class})
+    @Import({SecurityConfig.class, CorsConfig.class, FirebaseAuthenticationFilter.class, ManagerController.class, ProbeController.class})
     static class Config {
         @Bean ManagerService service() { return mock(ManagerService.class); }
         @Bean FirebaseTokenService tokens() { return mock(FirebaseTokenService.class); }

@@ -59,6 +59,48 @@ class ManagerServiceTest {
         assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.findById(0L, principal));
     }
 
+    User eligibleCollaborator() {
+        User user = new User(); user.setId(4L); user.setName("Colaborador"); user.setCpf("12345678900");
+        user.setEmail("collaborator@astro.com"); user.setFirebaseUid("collaborator-uid");
+        user.setCreatedAt(java.time.Instant.parse("2026-01-01T00:00:00Z"));
+        user.setType(UserType.COLABORADOR); user.setStatus(UserStatus.ATIVO); user.setWorkModel(WorkModel.REMOTO);
+        var role = new com.astro.api.role.model.Role(); role.setId(2L); role.setActive(true);
+        role.setWorkspace(requester.getUnit().workspace); user.setRole(role); user.setUnit(requester.getUnit());
+        when(repository.findUserForUpdateInWorkspace(4L, 1L)).thenReturn(Optional.of(user));
+        when(repository.lockRoleActive(2L, 1L)).thenReturn(true); when(repository.lockUnitActive(10L, 1L)).thenReturn(true);
+        when(repository.saveAndFlush(user)).thenReturn(user);
+        return user;
+    }
+    @Test void promotesTheExistingAccountToBothRequestedStatusesPreservingIdentityAndLinks() {
+        for (var status : com.astro.api.manager.dto.request.ManagerAccountStatus.values()) {
+            User user = eligibleCollaborator(); var role = user.getRole(); var unit = user.getUnit(); var created = user.getCreatedAt();
+            var result = service.promote(new com.astro.api.manager.dto.request.PromoteManagerRequest(4L, status), principal);
+            assertEquals(4L, result.id()); assertEquals(UserType.GESTOR, user.getType()); assertEquals(status.name(), result.status().name());
+            assertEquals("collaborator-uid", user.getFirebaseUid()); assertSame(role, user.getRole()); assertSame(unit, user.getUnit());
+            assertEquals(created, user.getCreatedAt()); assertEquals("12345678900", user.getCpf()); assertEquals(WorkModel.REMOTO, user.getWorkModel());
+        }
+    }
+    @Test void rejectsIneligibleCandidatesAndOtherProfiles() {
+        var request = new com.astro.api.manager.dto.request.PromoteManagerRequest(4L, com.astro.api.manager.dto.request.ManagerAccountStatus.ATIVO);
+        for (UserStatus status : List.of(UserStatus.PRE_CADASTRADO, UserStatus.DESATIVADO)) {
+            var user = eligibleCollaborator(); user.setStatus(status);
+            assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.promote(request, principal));
+        }
+        var user = eligibleCollaborator(); user.setFirebaseUid(" ");
+        assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.promote(request, principal));
+        for (UserType type : List.of(UserType.GESTOR, UserType.GESTOR_WORKSPACE)) {
+            user = eligibleCollaborator(); user.setType(type);
+            assertThrows(com.astro.api.common.exception.ConflictException.class, () -> service.promote(request, principal));
+        }
+        eligibleCollaborator(); when(repository.lockRoleActive(2L, 1L)).thenReturn(false);
+        assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.promote(request, principal));
+        eligibleCollaborator(); when(repository.lockUnitActive(10L, 1L)).thenReturn(false);
+        assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.promote(request, principal));
+        when(repository.findUserForUpdateInWorkspace(4L, 1L)).thenReturn(Optional.empty());
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class, () -> service.promote(request, principal));
+        verify(repository, never()).saveAndFlush(any());
+    }
+
     @Test void rejectsUntrustedIdentityRolesAndInactiveRequesterBeforeQuerying() {
         assertThrows(AccessDeniedException.class, () -> service.findAll(null));
         for (Role role : Role.values()) {

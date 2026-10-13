@@ -70,6 +70,41 @@ class ManagerPostgresTest {
         assertEquals(1L, row.getWorkspaceId()); assertEquals("PRESENCIAL", row.getWorkModel());
         for (long id : List.of(4L, 5L, 100L, 999L)) assertTrue(repository.findDetailsInWorkspace(id, 1L).isEmpty());
     }
+    com.astro.api.auth.security.AuthenticatedUser owner() {
+        return new com.astro.api.auth.security.AuthenticatedUser("uid100", "user100@astro.com", com.astro.api.auth.security.Role.GESTOR_WORKSPACE);
+    }
+    @Test void promotionPreservesThePersistedAccountAndBothRequestedStatuses() {
+        var service = context.getBean(ManagerService.class);
+        var before = jdbc.queryForMap("SELECT * FROM usuario WHERE id_usuario=4");
+        jdbc.update("INSERT INTO conformidade VALUES (1,4,'2027-01-01')");
+        for (var status : com.astro.api.manager.dto.request.ManagerAccountStatus.values()) {
+            jdbc.update("UPDATE usuario SET tipo='COLABORADOR',status='ATIVO' WHERE id_usuario=4");
+            var response = service.promote(new com.astro.api.manager.dto.request.PromoteManagerRequest(4L, status), owner());
+            assertEquals(4L, response.id()); assertEquals(status.name(), response.status().name());
+            var after = jdbc.queryForMap("SELECT * FROM usuario WHERE id_usuario=4");
+            for (String key : before.keySet()) if (!List.of("tipo", "status").contains(key)) assertEquals(before.get(key), after.get(key), key);
+            assertEquals(6, jdbc.queryForObject("SELECT count(*) FROM usuario", Integer.class));
+            assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM conformidade WHERE usuario_id=4", Integer.class));
+        }
+    }
+    @Test void concurrentPromotionCommitsExactlyOnce() throws Exception {
+        var service = context.getBean(ManagerService.class);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        var ready = new java.util.concurrent.CountDownLatch(2);
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            java.util.concurrent.Callable<Boolean> operation = () -> {
+                ready.countDown(); assertTrue(start.await(10, java.util.concurrent.TimeUnit.SECONDS));
+                try {
+                    service.promote(new com.astro.api.manager.dto.request.PromoteManagerRequest(4L,
+                            com.astro.api.manager.dto.request.ManagerAccountStatus.ATIVO), owner()); return true;
+                } catch (com.astro.api.common.exception.ConflictException conflict) { return false; }
+            };
+            var first = executor.submit(operation); var second = executor.submit(operation);
+            assertTrue(ready.await(10, java.util.concurrent.TimeUnit.SECONDS)); start.countDown();
+            assertNotEquals(first.get(20, java.util.concurrent.TimeUnit.SECONDS), second.get(20, java.util.concurrent.TimeUnit.SECONDS));
+        }
+        assertEquals("GESTOR", jdbc.queryForObject("SELECT tipo FROM usuario WHERE id_usuario=4", String.class));
+    }
     static DriverManagerDataSource dataSource() {
         String url = System.getenv("MANAGER_TEST_DATABASE_URL");
         if (!url.matches("jdbc:postgresql://(localhost|127\\.0\\.0\\.1):[0-9]+/astro525")) {
