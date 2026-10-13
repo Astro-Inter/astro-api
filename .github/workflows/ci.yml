@@ -13,6 +13,23 @@ jobs:
   build-and-test:
     name: Build and test
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: astro525-isolated
+          POSTGRES_DB: astro525
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MANAGER_TEST_DATABASE_URL: jdbc:postgresql://localhost:5432/astro525
+      MANAGER_TEST_DATABASE_USER: postgres
+      MANAGER_TEST_DATABASE_PASSWORD: astro525-isolated
 
     steps:
       - name: Check out source code
