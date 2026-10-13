@@ -2,6 +2,8 @@ package com.astro.api.home;
 
 import com.astro.api.home.controller.HomeController;
 import com.astro.api.home.service.HomeService;
+import com.astro.api.auth.security.AuthenticatedUser;
+import com.astro.api.auth.security.Role;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -16,29 +18,25 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
 
 class HomeAuthorizationTest {
     @Test
-    void permitsOnlyManagerRolesThroughTheMethodSecurityProxy() {
+    void permitsOnlyHomeRolesThroughTheMethodSecurityProxy() {
         try (var context = new AnnotationConfigApplicationContext(Config.class)) {
             var controller = context.getBean(HomeController.class);
-            var service = context.getBean(HomeService.class);
-            for (String role : List.of("GESTOR", "GESTOR_WORKSPACE")) {
+            for (String role : List.of("COLABORADOR", "GESTOR", "GESTOR_WORKSPACE")) {
                 authenticate(role);
-                assertEquals(200, controller.loadHome(null, new MockHttpServletRequest()).getStatusCode().value());
+                assertDoesNotThrow(() -> controller.collaboratorHome(principal(), new MockHttpServletRequest()));
             }
-            clearInvocations(service);
-            for (String role : List.of("COLABORADOR", "ADMIN")) {
-                authenticate(role);
-                assertThrows(AccessDeniedException.class,
-                        () -> controller.loadHome(null, new MockHttpServletRequest()));
-            }
+            authenticate("ADMIN");
+            assertThrows(AccessDeniedException.class,
+                    () -> controller.collaboratorHome(principal(), new MockHttpServletRequest()));
             SecurityContextHolder.clearContext();
             assertThrows(AuthenticationCredentialsNotFoundException.class,
-                    () -> controller.loadHome(null, new MockHttpServletRequest()));
-            verifyNoInteractions(service);
+                    () -> controller.collaboratorHome(principal(), new MockHttpServletRequest()));
         } finally {
             SecurityContextHolder.clearContext();
         }
@@ -46,7 +44,11 @@ class HomeAuthorizationTest {
 
     private void authenticate(String role) {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
-                "manager", null, List.of(new SimpleGrantedAuthority("ROLE_" + role))));
+                "user", null, List.of(new SimpleGrantedAuthority("ROLE_" + role))));
+    }
+
+    private AuthenticatedUser principal() {
+        return new AuthenticatedUser("uid", "user@astro.com", Role.COLABORADOR);
     }
 
     @Configuration

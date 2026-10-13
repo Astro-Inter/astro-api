@@ -6,6 +6,8 @@ import com.astro.api.common.handler.GlobalExceptionHandler;
 import com.astro.api.home.controller.HomeController;
 import com.astro.api.home.repository.HomeRepository;
 import com.astro.api.home.service.HomeService;
+import com.astro.api.common.service.ViewedService;
+import com.astro.api.notification.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
@@ -29,7 +31,8 @@ class HomeControllerTest {
 
     @BeforeEach
     void setUp() {
-        var service = new HomeService(repository, JsonMapper.builder().build());
+        var service = new HomeService(repository, JsonMapper.builder().build(),
+                mock(NotificationService.class), mock(ViewedService.class));
         mvc = MockMvcBuilders.standaloneSetup(new HomeController(service))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
@@ -53,10 +56,10 @@ class HomeControllerTest {
                   "quantidade_pendentes":3,"percentual_conformidade_geral":92.00,
                   "data_referencia":"2026-10-12"}}
                 """);
-        mvc.perform(get("/home-workspace").param("firebase_uid", "another-manager").param("workspace_id", "999"))
+        mvc.perform(get("/home/workspace").param("firebase_uid", "another-manager").param("workspace_id", "999"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.path").value("/home-workspace"))
+                .andExpect(jsonPath("$.path").value("/home/workspace"))
                 .andExpect(jsonPath("$.data.nome_usuario").value("Kirk Hammett"))
                 .andExpect(jsonPath("$.data.estatisticas.quantidade_unidades").value(4))
                 .andExpect(jsonPath("$.data.estatisticas.quantidade_colaboradores").value(248))
@@ -81,7 +84,7 @@ class HomeControllerTest {
                   "quantidade_pendentes":0,"percentual_conformidade_geral":0.00,
                   "data_referencia":"2026-10-12"}}
                 """);
-        mvc.perform(get("/home-workspace"))
+        mvc.perform(get("/home/workspace"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.estatisticas.quantidade_requisitos").value(0))
                 .andExpect(jsonPath("$.data.estatisticas.percentual_conformidade_geral").value(0.0));
@@ -89,7 +92,7 @@ class HomeControllerTest {
 
     @Test
     void returnsForbiddenWhenTheDatabaseDeniesWorkspaceAccess() throws Exception {
-        mvc.perform(get("/home-workspace"))
+        mvc.perform(get("/home/workspace"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.errors[0]").value("Você não tem permissão para executar esta operação"));
@@ -98,7 +101,7 @@ class HomeControllerTest {
     @Test
     void preservesTheDatabaseUnavailableResponse() throws Exception {
         when(repository.loadHome("manager")).thenThrow(new DataAccessResourceFailureException("offline"));
-        mvc.perform(get("/home-workspace"))
+        mvc.perform(get("/home/workspace"))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.success").value(false));
     }

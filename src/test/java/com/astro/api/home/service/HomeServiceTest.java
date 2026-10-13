@@ -7,6 +7,7 @@ import com.astro.api.notification.model.Notification;
 import com.astro.api.notification.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Instant;
 import java.util.List;
@@ -30,7 +31,7 @@ class HomeServiceTest {
         homeRepository = mock(HomeRepository.class);
         notificationService = mock(NotificationService.class);
         viewedService = mock(ViewedService.class);
-        service = new HomeService(homeRepository, notificationService, viewedService);
+        service = new HomeService(homeRepository, JsonMapper.builder().build(), notificationService, viewedService);
         HomeRepository.UserIdProjection identity = mock(HomeRepository.UserIdProjection.class);
         when(identity.getUserId()).thenReturn(42L);
         when(homeRepository.findUserIdByFirebaseUid("uid")).thenReturn(Optional.of(identity));
