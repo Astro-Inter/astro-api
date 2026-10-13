@@ -74,7 +74,7 @@ MockMvc valida os contratos HTTP e a cadeia real de segurança. Firebase é simu
 sem alteração de contas reais. Testes HTTP por servidor local e testes dos novos
 endpoints publicados exigem execução separada; o PR não realiza implantação.
 
-Validação desta entrega: Maven Wrapper 3.9.16, Java 21, `verify` em modo offline
+Validação original desta entrega: Maven Wrapper 3.9.16, Java 21, `verify` em modo offline
 com dependências já instaladas: 180 testes, zero falhas/erros, um teste de contexto
 previamente desabilitado, JAR empacotado com sucesso. Inclui 32 testes de gestores,
 dos quais oito usam PostgreSQL 16 isolado (leitura, isolamento, promoção concorrente,
@@ -83,6 +83,12 @@ O teste Python do workflow de CD e `git diff --check` também passaram.
 No ambiente publicado foi consultado apenas o Swagger existente; os cinco novos
 endpoints não foram testados lá, pois não houve merge nem implantação.
 
+Após integrar a main com a SCRUM-517, `verify` passou novamente: 238 testes,
+zero falhas/erros e 18 ignorados (oito PostgreSQL de gestores, sete PostgreSQL de
+colaboradores, dois Redis e o teste de contexto já desabilitado). O Docker estava
+indisponível nesta atualização; os testes PostgreSQL de gestores são executados
+novamente pelo CI, que provisiona o banco isolado.
+
 ## Dependências
 
 A view pertence à SCRUM-524, PR Astro-Inter/banco-de-dados#33. A API não cria nem
@@ -90,6 +96,7 @@ altera objetos SQL de produção. No banco configurado, a view foi confirmada co
 as onze colunas do contrato, em conexão somente leitura e consulta `WHERE false`.
 Os testes PostgreSQL usam uma cópia do contrato existente em schema temporário
 exclusivo de um banco local descartável; não acessam contas reais.
-GET /collaborators não está presente na main utilizada nem no Swagger publicado
-consultado nesta entrega. O dropdown depende da entrega de colaboradores
-(SCRUM-517). GET /roles e GET /units são reutilizados para a edição.
+GET /collaborators passou a integrar a main pela SCRUM-517 (PR #30), incorporada
+na atualização desta branch para resolver conflitos. A implementação está disponível
+no código; sua publicação não foi verificada nesta atualização.
+GET /roles e GET /units são reutilizados para a edição.
