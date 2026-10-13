@@ -39,6 +39,8 @@ class CollaboratorSecurityTest {
             var authorization = context.getBean(AuthorizationService.class);
             var service = context.getBean(CollaboratorService.class);
             mvc.perform(get("/collaborators")).andExpect(result -> assertTrue(result.getResponse().getStatus() >= 400));
+            mvc.perform(patch("/collaborators/2/status").contentType("application/json").content("{\"status\":\"DESATIVADO\"}"))
+                    .andExpect(result -> assertTrue(result.getResponse().getStatus() == 401 || result.getResponse().getStatus() == 403));
             mvc.perform(get("/collaborators").header("Authorization", "invalid"))
                     .andExpect(result -> assertTrue(result.getResponse().getStatus() >= 400));
             when(tokens.verify("invalid-token")).thenThrow(mock(com.google.firebase.auth.FirebaseAuthException.class));
@@ -59,6 +61,9 @@ class CollaboratorSecurityTest {
                 mvc.perform(put("/collaborators/2").header("Authorization", "Bearer valid")
                                 .contentType("application/json").content(CollaboratorControllerTest.CREATE_JSON
                                         .replace("\"modalidade\":\"HIBRIDO\"", "\"modalidade\":\"HIBRIDO\",\"status\":\"ATIVO\"")))
+                        .andExpect(status().isForbidden());
+                mvc.perform(patch("/collaborators/2/status").header("Authorization", "Bearer valid")
+                                .contentType("application/json").content("{\"status\":\"DESATIVADO\"}"))
                         .andExpect(status().isForbidden());
             }
             verifyNoInteractions(service);

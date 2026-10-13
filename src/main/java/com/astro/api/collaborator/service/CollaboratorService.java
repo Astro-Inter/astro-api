@@ -18,6 +18,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import com.astro.api.auth.service.FirebaseIdentityService;
 import com.astro.api.collaborator.dto.request.UpdateCollaboratorRequest;
+import com.astro.api.collaborator.dto.request.CollaboratorStatusRequest;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.TransactionDefinition;
@@ -174,7 +175,7 @@ public class CollaboratorService {
                 checkConflicts(body.cpf(), body.email(), collaboratorId);
                 String previousEmail = collaborator.getEmail();
                 mapper.applyUpdate(collaborator, body, role, unit);
-                statusPolicy.validate(collaborator, body.status());
+                validateStatus(collaborator, body.status(), workspaceId);
                 collaborator.setStatus(body.status());
                 User saved = persist(collaborator);
                 if (saved.getFirebaseUid() != null && !saved.getFirebaseUid().isBlank()
@@ -225,4 +226,30 @@ public class CollaboratorService {
     }
 
     private record EmailChange(Long collaboratorId, String firebaseUid, FirebaseIdentityService.EmailState previous) { }
+
+    @Transactional
+    public CollaboratorDetailsResponse changeStatus(Long collaboratorId, CollaboratorStatusRequest body,
+                                                    AuthenticatedUser principal) {
+        User manager = requireManager(principal);
+        User collaborator = requireCollaborator(collaboratorId, principal, manager);
+        UserStatus desired = UserStatus.valueOf(body.status().name());
+        validateStatus(collaborator, desired, manager.getUnit().workspace.id);
+        if (desired != collaborator.getStatus()) {
+            collaborator.setStatus(desired);
+            persist(collaborator);
+        }
+        return mapper.toDetails(collaborator);
+    }
+
+    private void validateStatus(User collaborator, UserStatus desired, Long workspaceId) {
+        statusPolicy.validate(collaborator, desired);
+        if (desired == UserStatus.ATIVO && collaborator.getStatus() != UserStatus.ATIVO) {
+            // Fresh scalar reads avoid stale JPA entities and serialize activation against link deactivation.
+            Boolean roleActive = repository.lockRoleActive(collaborator.getRole().getId(), workspaceId);
+            Boolean unitActive = repository.lockUnitActive(collaborator.getUnit().id, workspaceId);
+            if (!Boolean.TRUE.equals(roleActive) || !Boolean.TRUE.equals(unitActive)) {
+                throw new BusinessException("Cargo e unidade devem estar ativos no workspace para ativar o colaborador");
+            }
+        }
+    }
 }

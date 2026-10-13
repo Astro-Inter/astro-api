@@ -5,6 +5,7 @@ import com.astro.api.collaborator.dto.response.CollaboratorSummaryResponse;
 import com.astro.api.collaborator.dto.response.CollaboratorDetailsResponse;
 import com.astro.api.collaborator.dto.request.CreateCollaboratorRequest;
 import com.astro.api.collaborator.dto.request.UpdateCollaboratorRequest;
+import com.astro.api.collaborator.dto.request.CollaboratorStatusRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
 import com.astro.api.collaborator.service.CollaboratorService;
@@ -84,5 +85,17 @@ public class CollaboratorController {
             HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Colaborador atualizado com sucesso",
                 service.update(collaboratorId, body, user), request.getRequestURI()));
+    }
+
+    @PatchMapping("/{collaboratorId}/status")
+    @Operation(summary = "Altera explicitamente o status do colaborador",
+            description = "Aceita ATIVO ou DESATIVADO. Repetir o status atual é idempotente. Ativação exige cadastro concluído e cargo/unidade ativos; não conclui pré-cadastro. A desativação impede operações protegidas na próxima requisição.")
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "Status aplicado, com detalhes do colaborador"),
+            @ApiResponse(responseCode = "404", description = "Colaborador inexistente ou fora do escopo")})
+    public ResponseEntity<ApiResult<CollaboratorDetailsResponse>> changeStatus(@PathVariable Long collaboratorId,
+            @Valid @RequestBody CollaboratorStatusRequest body, @AuthenticationPrincipal AuthenticatedUser user,
+            HttpServletRequest request) {
+        return ResponseEntity.ok(ApiResult.success("Status do colaborador atualizado com sucesso",
+                service.changeStatus(collaboratorId, body, user), request.getRequestURI()));
     }
 }

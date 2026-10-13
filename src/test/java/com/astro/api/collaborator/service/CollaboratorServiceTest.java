@@ -16,6 +16,7 @@ import com.astro.api.workspace.event.PreRegisteredCollaboratorsCreatedEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import com.astro.api.auth.service.FirebaseIdentityService;
 import com.astro.api.collaborator.dto.request.UpdateCollaboratorRequest;
+import com.astro.api.collaborator.dto.request.CollaboratorStatusRequest;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 import java.time.Instant;
@@ -325,5 +326,44 @@ class CollaboratorServiceTest {
         assertEquals("Falha de sincronização da autenticação do colaborador", error.getMessage());
         verify(repository).deactivateAfterEmailFailure(2L, "completed");
         verify(transactionManager).commit(any());
+    }
+
+    @Test
+    void appliesExplicitStatusIdempotentlyWithoutChangingOtherFields() {
+        User user = collaborator(UserStatus.ATIVO, "completed");
+        var body = new CollaboratorStatusRequest(CollaboratorStatusRequest.Status.DESATIVADO);
+        assertEquals(UserStatus.DESATIVADO, service.changeStatus(2L, body, principal).status());
+        assertEquals(UserStatus.DESATIVADO, service.changeStatus(2L, body, principal).status());
+        assertEquals("old@example.com", user.getEmail());
+        assertEquals("completed", user.getFirebaseUid());
+        assertEquals(UserType.COLABORADOR, user.getType());
+        verify(repository, times(1)).saveAndFlush(user);
+        verifyNoInteractions(identities);
+    }
+
+    @Test
+    void activatesCompletedUsersOnlyAfterFreshLockedChecksOfTheirLinks() {
+        User user = collaborator(UserStatus.DESATIVADO, "completed");
+        when(repository.lockRoleActive(5L, 3L)).thenReturn(true);
+        when(repository.lockUnitActive(12L, 3L)).thenReturn(false);
+        var body = new CollaboratorStatusRequest(CollaboratorStatusRequest.Status.ATIVO);
+        assertThrows(BusinessException.class, () -> service.changeStatus(2L, body, principal));
+        assertEquals(UserStatus.DESATIVADO, user.getStatus());
+        when(repository.lockUnitActive(12L, 3L)).thenReturn(true);
+        assertEquals(UserStatus.ATIVO, service.changeStatus(2L, body, principal).status());
+        verify(repository, times(2)).lockRoleActive(5L, 3L);
+        verify(repository, times(2)).lockUnitActive(12L, 3L);
+    }
+
+    @Test
+    void rejectsAdministrativeActivationForIncompleteAccountsAndOutOfScopeUsers() {
+        var body = new CollaboratorStatusRequest(CollaboratorStatusRequest.Status.ATIVO);
+        collaborator(UserStatus.DESATIVADO, null);
+        assertThrows(BusinessException.class, () -> service.changeStatus(2L, body, principal));
+        collaborator(UserStatus.PRE_CADASTRADO, "completed");
+        assertThrows(BusinessException.class, () -> service.changeStatus(2L, body, principal));
+        when(repository.findForUpdateInScope(2L, "manager", 3L)).thenReturn(Optional.empty());
+        assertThrows(ResourceNotFoundException.class, () -> service.changeStatus(2L, body, principal));
+        verify(repository, never()).saveAndFlush(any());
     }
 }

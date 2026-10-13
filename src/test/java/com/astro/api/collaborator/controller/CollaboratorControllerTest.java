@@ -8,6 +8,7 @@ import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.user.model.WorkModel;
 import com.astro.api.collaborator.dto.request.CreateCollaboratorRequest;
 import com.astro.api.collaborator.dto.request.UpdateCollaboratorRequest;
+import com.astro.api.collaborator.dto.request.CollaboratorStatusRequest;
 import org.springframework.http.MediaType;
 import com.astro.api.collaborator.service.CollaboratorService;
 import com.astro.api.common.handler.GlobalExceptionHandler;
@@ -138,6 +139,23 @@ class CollaboratorControllerTest {
             mvc.perform(put("/collaborators/2").contentType(MediaType.APPLICATION_JSON).content(invalid))
                     .andExpect(status().isBadRequest());
         }
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void patchesOnlyAnExplicitSupportedStatusAndRejectsMissingBodies() throws Exception {
+        when(service.changeStatus(anyLong(), any(), eq(principal))).thenReturn(new CollaboratorDetailsResponse(2L,
+                "Colaborador", "52998224725", "test@example.com", WorkModel.HIBRIDO, UserStatus.DESATIVADO,
+                5L, "Operador", 12L, "Matriz", 3L));
+        mvc.perform(patch("/collaborators/2/status").contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"DESATIVADO\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("DESATIVADO"));
+        verify(service).changeStatus(2L, new CollaboratorStatusRequest(CollaboratorStatusRequest.Status.DESATIVADO), principal);
+        clearInvocations(service);
+        for (String invalid : List.of("{}", "{\"status\":null}", "{\"status\":\"PRE_CADASTRADO\"}", "{\"status\":true}")) {
+            mvc.perform(patch("/collaborators/2/status").contentType(MediaType.APPLICATION_JSON).content(invalid))
+                    .andExpect(status().isBadRequest());
+        }
+        mvc.perform(patch("/collaborators/2/status")).andExpect(status().isBadRequest());
         verifyNoInteractions(service);
     }
 }

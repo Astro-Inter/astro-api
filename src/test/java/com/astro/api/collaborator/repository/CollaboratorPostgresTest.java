@@ -10,6 +10,7 @@ import com.astro.api.collaborator.service.CollaboratorService;
 import com.astro.api.collaborator.mapper.CollaboratorMapper;
 import com.astro.api.collaborator.dto.request.CreateCollaboratorRequest;
 import com.astro.api.collaborator.dto.request.UpdateCollaboratorRequest;
+import com.astro.api.collaborator.dto.request.CollaboratorStatusRequest;
 import com.astro.api.auth.service.FirebaseIdentityService;
 import com.astro.api.collaborator.service.CollaboratorStatusPolicy;
 import com.astro.api.common.exception.ConflictException;
@@ -34,6 +35,31 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Uses only an explicitly configured disposable database with the official SQL objects installed. */
 @EnabledIfEnvironmentVariable(named = "COLLABORATOR_TEST_JDBC_URL", matches = "jdbc:postgresql://(localhost|127\\.0\\.0\\.1):[0-9]+/scrum517")
 class CollaboratorPostgresTest {
+    @Test
+    void changesStatusThroughTheRealScopedRepositoryAndCannotTargetManagers() {
+        try (var context = new AnnotationConfigApplicationContext(Config.class)) {
+            var jdbc = new JdbcTemplate(context.getBean(DataSource.class));
+            var service = context.getBean(CollaboratorService.class);
+            seed(jdbc);
+            try {
+                var principal = new AuthenticatedUser("scrum517-manager", "scrum517-manager@example.com", Role.GESTOR);
+                var inactive = new CollaboratorStatusRequest(CollaboratorStatusRequest.Status.DESATIVADO);
+                var active = new CollaboratorStatusRequest(CollaboratorStatusRequest.Status.ATIVO);
+                assertEquals(UserStatus.DESATIVADO, service.changeStatus(91003L, inactive, principal).status());
+                assertEquals(UserStatus.DESATIVADO, service.changeStatus(91003L, inactive, principal).status());
+                assertEquals(UserStatus.ATIVO, service.changeStatus(91003L, active, principal).status());
+                assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.changeStatus(91002L, active, principal));
+                assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.changeStatus(91004L, active, principal));
+                assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class, () -> service.changeStatus(91001L, inactive, principal));
+                assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class, () -> service.changeStatus(92002L, inactive, principal));
+                service.changeStatus(91003L, inactive, principal);
+                jdbc.update("UPDATE cargo SET ativo=false WHERE id_cargo=91001");
+                assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.changeStatus(91003L, active, principal));
+                assertEquals("ATIVO", jdbc.queryForObject("SELECT status FROM usuario WHERE id_usuario=91001", String.class));
+            } finally { cleanSeed(jdbc); }
+        }
+    }
+
     @Test
     void editsTheRealUserPreservingInternalFieldsAndUnchangedInactiveLinks() {
         try (var context = new AnnotationConfigApplicationContext(Config.class)) {

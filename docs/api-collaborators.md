@@ -76,6 +76,30 @@ registra o incidente para reconciliação operacional e responde 500. Se o banco
 também estiver indisponível, essa contenção não pode ser garantida; o incidente
 permanece registrado para intervenção. Não há alterações do gestor solicitante.
 
+## Status — SCRUM-522
+
+`PATCH /collaborators/{collaboratorId}/status` recebe explicitamente:
+
+```json
+{"status":"DESATIVADO"}
+```
+
+Aceita somente `ATIVO` e `DESATIVADO`. Campos ausentes, nulos, valores booleanos
+ou `PRE_CADASTRADO` retornam 400. Repetir o status atual retorna 200 sem nova
+gravação; a rota não alterna status automaticamente. O PUT usa a mesma política.
+
+É permitido desativar pré-cadastros. A ativação exige cadastro concluído, UID
+não vazio, cargo e unidade ativos do workspace. Não conclui pré-cadastro e não
+permite voltar a ele. Ao ativar, consultas escalares recentes com `FOR SHARE`
+protegem os vínculos contra desativação concorrente; o usuário permanece bloqueado
+com `FOR UPDATE`. A resposta contém os detalhes no envelope `ApiResult`.
+
+O filtro existente consulta `AuthorizationService` em cada requisição, que exige
+`UserStatus.ATIVO`. Assim, o mesmo token Firebase é rejeitado na próxima operação
+protegida após a desativação local. Não é necessário desativar a identidade no
+Firebase, e o colaborador pode voltar a ser ativado quando elegível.
+Gestores não são alvos destes endpoints, inclusive o próprio solicitante.
+
 ## Dependências
 
 A [view vw_colaboradores](https://github.com/Astro-Inter/banco-de-dados/pull/32)
@@ -88,3 +112,29 @@ Os erros seguem o tratamento global da API: parâmetros e dados inválidos retor
 400, perfil sem permissão retorna 403, recursos fora do escopo retornam 404,
 conflitos retornam 409 e indisponibilidade de dados retorna 503. A segurança
 existente rejeita requisições sem autenticação válida antes do controller.
+
+## Validação e reprodução
+
+`mvn --batch-mode --no-transfer-progress verify` executa os testes locais e gera
+o JAR. Os testes HTTP usam MockMvc com o filtro Firebase e a segurança reais,
+substituindo serviços externos por mocks. Incluem rejeição do mesmo token após
+desativação e preservação do acesso do gestor. Falhas de atualização, commit e
+compensação de e-mail são simuladas; não representam mutações em Firebase real.
+
+`CollaboratorPostgresTest` executa apenas quando `COLLABORATOR_TEST_JDBC_URL`
+aponta explicitamente para `jdbc:postgresql://127.0.0.1:<porta>/scrum517` ou
+`localhost`, em um banco descartável. Instale nele os scripts oficiais existentes
+`1_create_table.sql`, `2_constraints.sql`, `04_vw_unidades.sql`,
+`05_vw_colaboradores.sql` e `15_fn_seleciona_unidades.sql` do repositório do banco.
+O usuário desse banco de teste é `postgres`, sem senha; restrinja o container ao
+loopback. Os testes não criam objetos SQL. As transações de leitura/cadastro
+fazem rollback, e os testes de atualização removem seus registros em `finally`.
+
+A validação desta entrega usou PostgreSQL 17 isolado com esses objetos oficiais,
+incluindo consultas, projections, constraints únicas, preservação de campos,
+edição, status e rollback diante de falha simulada do Firebase. O build final
+executou 188 testes: nenhuma falha/erro e um teste de contexto já desabilitado
+no projeto. A verificação somente de leitura no banco configurado confirmou a
+existência da view e da função; não executou alterações nem validou os endpoints
+novos nesse ambiente. Os endpoints precisam ser implantados antes de testes HTTP
+no ambiente publicado. Os dropdowns continuam usando `/roles` e `/units`.

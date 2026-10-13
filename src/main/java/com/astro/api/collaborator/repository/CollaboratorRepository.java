@@ -10,6 +10,12 @@ import java.util.List;
 import java.util.Optional;
 
 public interface CollaboratorRepository extends JpaRepository<User, Long> {
+    @Query(value = "SELECT ativo FROM cargo WHERE id_cargo = :roleId AND workspace_id = :workspaceId FOR SHARE", nativeQuery = true)
+    Boolean lockRoleActive(@Param("roleId") Long roleId, @Param("workspaceId") Long workspaceId);
+
+    @Query(value = "SELECT ativo FROM unidade WHERE id_unidade = :unitId AND workspace_id = :workspaceId FOR SHARE", nativeQuery = true)
+    Boolean lockUnitActive(@Param("unitId") Long unitId, @Param("workspaceId") Long workspaceId);
+
     @Query(value = """
             SELECT u.* FROM usuario u
             INNER JOIN unidade un ON un.id_unidade = u.unidade_id
