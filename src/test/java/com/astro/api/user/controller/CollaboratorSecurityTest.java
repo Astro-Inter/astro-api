@@ -1,9 +1,9 @@
-package com.astro.api.collaborator.controller;
+package com.astro.api.user.controller;
 
 import com.astro.api.auth.security.*;
 import com.astro.api.auth.service.AuthorizationService;
 import com.astro.api.auth.service.FirebaseTokenService;
-import com.astro.api.collaborator.service.CollaboratorService;
+import com.astro.api.user.service.CollaboratorService;
 import com.astro.api.common.handler.GlobalExceptionHandler;
 import com.astro.api.config.CorsConfig;
 import com.google.firebase.auth.FirebaseToken;

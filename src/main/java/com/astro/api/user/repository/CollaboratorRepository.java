@@ -1,4 +1,4 @@
-package com.astro.api.collaborator.repository;
+package com.astro.api.user.repository;
 
 import com.astro.api.user.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;

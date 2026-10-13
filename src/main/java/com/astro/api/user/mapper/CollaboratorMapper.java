@@ -1,13 +1,13 @@
-package com.astro.api.collaborator.mapper;
+package com.astro.api.user.mapper;
 
-import com.astro.api.collaborator.dto.response.CollaboratorSummaryResponse;
-import com.astro.api.collaborator.repository.CollaboratorSummaryProjection;
+import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
+import com.astro.api.user.repository.CollaboratorSummaryProjection;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.WorkModel;
-import com.astro.api.collaborator.dto.response.CollaboratorDetailsResponse;
-import com.astro.api.collaborator.repository.CollaboratorDetailsProjection;
-import com.astro.api.collaborator.dto.request.CreateCollaboratorRequest;
-import com.astro.api.collaborator.dto.request.UpdateCollaboratorRequest;
+import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
+import com.astro.api.user.repository.CollaboratorDetailsProjection;
+import com.astro.api.user.dto.request.CreateCollaboratorRequest;
+import com.astro.api.user.dto.request.UpdateCollaboratorRequest;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserType;
 import com.astro.api.role.model.Role;

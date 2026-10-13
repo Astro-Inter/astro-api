@@ -1,4 +1,4 @@
-package com.astro.api.collaborator.repository;
+package com.astro.api.user.repository;
 
 public interface CollaboratorSummaryProjection {
     Long getId();

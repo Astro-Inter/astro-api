@@ -1,4 +1,4 @@
-package com.astro.api.collaborator.repository;
+package com.astro.api.user.repository;
 
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
@@ -6,13 +6,13 @@ import com.astro.api.user.model.UserType;
 import com.astro.api.user.model.WorkModel;
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.security.Role;
-import com.astro.api.collaborator.service.CollaboratorService;
-import com.astro.api.collaborator.mapper.CollaboratorMapper;
-import com.astro.api.collaborator.dto.request.CreateCollaboratorRequest;
-import com.astro.api.collaborator.dto.request.UpdateCollaboratorRequest;
-import com.astro.api.collaborator.dto.request.CollaboratorStatusRequest;
+import com.astro.api.user.service.CollaboratorService;
+import com.astro.api.user.mapper.CollaboratorMapper;
+import com.astro.api.user.dto.request.CreateCollaboratorRequest;
+import com.astro.api.user.dto.request.UpdateCollaboratorRequest;
+import com.astro.api.user.dto.request.CollaboratorStatusRequest;
 import com.astro.api.auth.service.FirebaseIdentityService;
-import com.astro.api.collaborator.service.CollaboratorStatusPolicy;
+import com.astro.api.user.service.CollaboratorStatusPolicy;
 import com.astro.api.common.exception.ConflictException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.Test;
@@ -217,7 +217,7 @@ class CollaboratorPostgresTest {
 
     @Configuration
     @org.springframework.transaction.annotation.EnableTransactionManagement
-    @EnableJpaRepositories(basePackages = {"com.astro.api.collaborator.repository", "com.astro.api.user.repository",
+    @EnableJpaRepositories(basePackages = {"com.astro.api.user.repository",
             "com.astro.api.unit.repository", "com.astro.api.role.repository"})
     @Import({CollaboratorService.class, CollaboratorMapper.class, CollaboratorStatusPolicy.class})
     static class Config {

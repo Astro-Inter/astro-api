@@ -1,4 +1,4 @@
-package com.astro.api.collaborator.dto.response;
+package com.astro.api.user.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.astro.api.user.model.UserStatus;

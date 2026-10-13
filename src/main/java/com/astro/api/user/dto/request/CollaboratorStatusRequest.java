@@ -1,4 +1,4 @@
-package com.astro.api.collaborator.dto.request;
+package com.astro.api.user.dto.request;
 
 import jakarta.validation.constraints.NotNull;
 import io.swagger.v3.oas.annotations.media.Schema;

@@ -1,11 +1,11 @@
-package com.astro.api.collaborator.controller;
+package com.astro.api.user.controller;
 
 import com.astro.api.auth.repository.AuthRepository;
 import com.astro.api.auth.security.*;
 import com.astro.api.auth.service.*;
-import com.astro.api.collaborator.mapper.CollaboratorMapper;
-import com.astro.api.collaborator.repository.CollaboratorRepository;
-import com.astro.api.collaborator.service.*;
+import com.astro.api.user.mapper.CollaboratorMapper;
+import com.astro.api.user.repository.CollaboratorRepository;
+import com.astro.api.user.service.*;
 import com.astro.api.common.handler.GlobalExceptionHandler;
 import com.astro.api.config.CorsConfig;
 import com.astro.api.role.repository.RoleRepository;

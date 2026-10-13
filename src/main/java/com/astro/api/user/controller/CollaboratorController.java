@@ -1,14 +1,14 @@
-package com.astro.api.collaborator.controller;
+package com.astro.api.user.controller;
 
 import com.astro.api.auth.security.AuthenticatedUser;
-import com.astro.api.collaborator.dto.response.CollaboratorSummaryResponse;
-import com.astro.api.collaborator.dto.response.CollaboratorDetailsResponse;
-import com.astro.api.collaborator.dto.request.CreateCollaboratorRequest;
-import com.astro.api.collaborator.dto.request.UpdateCollaboratorRequest;
-import com.astro.api.collaborator.dto.request.CollaboratorStatusRequest;
+import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
+import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
+import com.astro.api.user.dto.request.CreateCollaboratorRequest;
+import com.astro.api.user.dto.request.UpdateCollaboratorRequest;
+import com.astro.api.user.dto.request.CollaboratorStatusRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
-import com.astro.api.collaborator.service.CollaboratorService;
+import com.astro.api.user.service.CollaboratorService;
 import com.astro.api.common.response.ApiResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

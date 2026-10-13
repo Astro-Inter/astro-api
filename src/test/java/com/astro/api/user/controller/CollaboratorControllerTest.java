@@ -1,16 +1,16 @@
-package com.astro.api.collaborator.controller;
+package com.astro.api.user.controller;
 
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.security.Role;
-import com.astro.api.collaborator.dto.response.CollaboratorSummaryResponse;
-import com.astro.api.collaborator.dto.response.CollaboratorDetailsResponse;
+import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
+import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.user.model.WorkModel;
-import com.astro.api.collaborator.dto.request.CreateCollaboratorRequest;
-import com.astro.api.collaborator.dto.request.UpdateCollaboratorRequest;
-import com.astro.api.collaborator.dto.request.CollaboratorStatusRequest;
+import com.astro.api.user.dto.request.CreateCollaboratorRequest;
+import com.astro.api.user.dto.request.UpdateCollaboratorRequest;
+import com.astro.api.user.dto.request.CollaboratorStatusRequest;
 import org.springframework.http.MediaType;
-import com.astro.api.collaborator.service.CollaboratorService;
+import com.astro.api.user.service.CollaboratorService;
 import com.astro.api.common.handler.GlobalExceptionHandler;
 import com.astro.api.user.model.UserStatus;
 import org.junit.jupiter.api.AfterEach;

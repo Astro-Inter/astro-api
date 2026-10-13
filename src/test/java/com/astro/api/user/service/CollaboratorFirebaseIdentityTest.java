@@ -1,4 +1,4 @@
-package com.astro.api.collaborator.service;
+package com.astro.api.user.service;
 
 import com.astro.api.auth.service.FirebaseIdentityService;
 import com.astro.api.common.exception.ConflictException;

@@ -1,5 +1,10 @@
 # API de colaboradores — SCRUM-517
 
+Os endpoints de colaboradores pertencem ao módulo `user`. Controller, DTOs,
+mapper, repository, projections, service e política de status ficam nos pacotes
+`com.astro.api.user`, junto aos demais recursos de usuários. Os testes seguem a
+mesma organização. As rotas públicas permanecem em `/collaborators`.
+
 As rotas administrativas usam `Authorization: Bearer <token Firebase>` e
 `ApiResult`. O solicitante vem de `AuthenticatedUser`; parâmetros arbitrários de
 identidade ou workspace não participam da autorização. Somente gestores ativos
