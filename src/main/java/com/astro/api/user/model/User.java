@@ -1,6 +1,6 @@
 package com.astro.api.user.model;
 
-import com.astro.api.cargo.model.Cargo;
+import com.astro.api.role.model.Role;
 import com.astro.api.unit.model.Unit;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -45,5 +45,5 @@ public class User extends Account {
 
     @ManyToOne
     @JoinColumn(name = "cargo_id")
-    private Cargo cargo;
+    private Role cargo;
 }

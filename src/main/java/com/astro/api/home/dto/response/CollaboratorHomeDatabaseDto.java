@@ -1,4 +1,4 @@
-package com.astro.api.home.dto;
+package com.astro.api.home.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

@@ -1,4 +1,4 @@
-package com.astro.api.cargo.model;
+package com.astro.api.role.model;
 
 import com.astro.api.workspace.model.Workspace;
 import jakarta.persistence.*;
@@ -14,7 +14,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class Cargo {
+public class Role {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id_cargo")

@@ -14,6 +14,9 @@ O sistema atende três interfaces:
 
 Todas as interfaces consomem uma única API backend.
 
+O contrato de `GET /home-workspace`, com os indicadores da Home WEB, está em
+[docs/home-workspace.md](docs/home-workspace.md).
+
 ## Stack técnica
 
 - **Java 21**
@@ -62,7 +65,7 @@ com.astro.api
 │   └── controller
 │
 ├── unidade
-├── cargo
+├── role
 ├── usuario
 ├── evento
 ├── conformidade
@@ -93,7 +96,7 @@ Nem todos os módulos precisam possuir todas essas pastas. A estrutura é criada
 |---|---------------------------------------------------------------------------------|
 | `workspace` | Gerenciamento do ambiente organizacional da empresa                             |
 | `unidade` | Gerenciamento das unidades da empresa e seus endereços                          |
-| `cargo` | Gerenciamento dos cargos da empresa                                             |
+| `role` | Gerenciamento dos cargos da empresa                                             |
 | `usuario` | Gerenciamento dos usuários, incluindo Colaboradores e Gestores                  |
 | `evento` | Gerenciamento de Eventos, Turmas, participantes, conclusões e evidências        |
 | `conformidade` | Acompanhamento da situação individual dos usuários em relação às NRs aplicáveis |
@@ -156,6 +159,16 @@ http://localhost:8080/swagger-ui.html
 | `REDIS_PASSWORD` | Senha do Redis                                | `********` |
 | `FIREBASE_PROJECT_ID` | ID do projeto no Firebase                     | `astro-app` |
 | `FIREBASE_CREDENTIALS_BASE64` | Credenciais do Firebase codificadas em Base64 | `********` |
+| `CORS_ALLOWED_ORIGINS` | Origens do frontend separadas por vírgula (padrão: GitHub Pages do Astro) | `https://astro-inter.github.io` |
+
+O CORS permite por padrão a origem `https://astro-inter.github.io`, usada pelo
+frontend em `/astro-web`. Informe somente protocolo, domínio e porta, sem caminho.
+Para desenvolvimento direto contra a API, configure, por exemplo,
+`CORS_ALLOWED_ORIGINS=https://astro-inter.github.io,http://localhost:5173`.
+Reinicie a API após alterar essa variável. As requisições prévias `OPTIONS` são
+tratadas antes da autenticação; as chamadas às rotas protegidas continuam exigindo
+token Firebase e as permissões correspondentes. O frontend usa o token no
+cabeçalho `Authorization`, sem cookies de sessão entre origens.
 
 ## Observabilidade
 

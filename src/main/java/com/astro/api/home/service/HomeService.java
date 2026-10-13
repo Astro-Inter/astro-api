@@ -1,15 +1,19 @@
 package com.astro.api.home.service;
 
+import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.service.ViewedService;
-import com.astro.api.home.dto.CollaboratorHomeDatabaseDto;
-import com.astro.api.home.dto.CollaboratorHomeResponse;
+import com.astro.api.home.dto.response.CollaboratorHomeDatabaseDto;
+import com.astro.api.home.dto.response.CollaboratorHomeResponse;
+import com.astro.api.home.dto.response.WorkspaceHomeResponse;
 import com.astro.api.home.repository.HomeRepository;
 import com.astro.api.notification.model.Notification;
 import com.astro.api.notification.service.NotificationService;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
 import java.util.Set;
@@ -20,15 +24,36 @@ public class HomeService {
     private static final String NOTIFICATIONS_RESOURCE = "notifications";
 
     private final HomeRepository homeRepository;
+    private final JsonMapper objectMapper;
     private final NotificationService notificationService;
     private final ViewedService viewedService;
-    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
-    public HomeService(HomeRepository homeRepository, NotificationService notificationService,
+    public HomeService(HomeRepository homeRepository, JsonMapper objectMapper, NotificationService notificationService,
                        ViewedService viewedService) {
         this.homeRepository = homeRepository;
+        this.objectMapper = objectMapper;
         this.notificationService = notificationService;
         this.viewedService = viewedService;
+    }
+
+    @Transactional(readOnly = true)
+    public WorkspaceHomeResponse loadHome(AuthenticatedUser user) {
+        if (user == null || user.firebaseUid() == null || user.firebaseUid().isBlank()) {
+            throw new AccessDeniedException("Usuário autenticado necessário para consultar a Home");
+        }
+        String homeJson = homeRepository.loadHome(user.firebaseUid());
+        if (homeJson == null) {
+            throw new AccessDeniedException("Gestor ativo sem acesso à Home do workspace");
+        }
+        try {
+            WorkspaceHomeResponse response = objectMapper.readValue(homeJson, WorkspaceHomeResponse.class);
+            if (response == null || response.userName() == null || response.statistics() == null) {
+                throw new IllegalStateException("Dados da Home retornados pelo banco são inválidos");
+            }
+            return response;
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("Não foi possível interpretar os dados da Home", exception);
+        }
     }
 
     public CollaboratorHomeResponse getCollaboratorHome(String firebaseUid) {
@@ -71,9 +96,8 @@ public class HomeService {
     private CollaboratorHomeDatabaseDto readDatabaseHome(String json) {
         try {
             return objectMapper.readValue(json, CollaboratorHomeDatabaseDto.class);
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalStateException("Não foi possível interpretar os dados da Home", exception);
         }
     }
-
 }

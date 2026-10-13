@@ -7,7 +7,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
-@Document(collection = "nrs")
+@Document(collection = "${astro.mongodb.nr-collection:nrs}")
 @Getter
 @Setter
 @NoArgsConstructor

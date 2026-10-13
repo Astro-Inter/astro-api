@@ -17,4 +17,7 @@ public interface HomeRepository extends Repository<User, Long> {
     interface UserIdProjection {
         Long getUserId();
     }
+
+    @Query(value = "SELECT CAST(fn_carrega_workspace(:firebaseUid) AS text)", nativeQuery = true)
+    String loadHome(@Param("firebaseUid") String firebaseUid);
 }

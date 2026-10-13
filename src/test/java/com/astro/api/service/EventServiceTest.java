@@ -1,7 +1,7 @@
 package com.astro.api.service;
 
-import com.astro.api.cargo.model.Cargo;
-import com.astro.api.cargo.repository.CargoRepository;
+import com.astro.api.role.model.Role;
+import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.conformidade.repository.NrCatalogRepository;
 import com.astro.api.event.dto.request.CancelEventRequest;
@@ -44,7 +44,7 @@ class EventServiceTest {
     private EventClassRepository eventClassRepository;
     private EventClassParticipantRepository eventClassParticipantRepository;
     private UserRepository userRepository;
-    private CargoRepository cargoRepository;
+    private RoleRepository roleRepository;
     private NrCatalogRepository nrCatalogRepository;
     private EventService service;
     private User manager;
@@ -56,14 +56,14 @@ class EventServiceTest {
         eventClassRepository = mock(EventClassRepository.class);
         eventClassParticipantRepository = mock(EventClassParticipantRepository.class);
         userRepository = mock(UserRepository.class);
-        cargoRepository = mock(CargoRepository.class);
+        roleRepository = mock(RoleRepository.class);
         nrCatalogRepository = mock(NrCatalogRepository.class);
         service = new EventService(
                 eventRepository,
                 eventClassRepository,
                 eventClassParticipantRepository,
                 userRepository,
-                cargoRepository,
+                roleRepository,
                 nrCatalogRepository,
                 new EventMapper());
         workspace = new Workspace();
@@ -163,7 +163,7 @@ class EventServiceTest {
         User participant = createUser(2L, UserStatus.ATIVO, workspace);
         when(nrCatalogRepository.existsById(10)).thenReturn(true);
         when(userRepository.findAllById(any())).thenReturn(List.of(participant));
-        when(cargoRepository.findIdsAssociatedWithNr(eq(10), any())).thenReturn(List.of());
+        when(roleRepository.findIdsAssociatedWithNr(eq(10), any())).thenReturn(List.of());
 
         assertThrows(BusinessException.class, () -> service.create(
                 createRequest(10, List.of(2L)), "manager"));
@@ -238,10 +238,10 @@ class EventServiceTest {
     private User createUser(Long id, UserStatus status, Workspace owner) {
         Unit unit = new Unit();
         unit.workspace = owner;
-        Cargo role = new Cargo();
+        Role role = new Role();
         role.setId(id + 100);
         role.setWorkspace(owner);
-        role.setName("Role");
+        role.setName("Cargo");
         User user = new User();
         user.setId(id);
         user.setName("User " + id);

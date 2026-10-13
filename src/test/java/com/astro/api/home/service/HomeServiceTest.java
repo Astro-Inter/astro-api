@@ -1,7 +1,7 @@
 package com.astro.api.home.service;
 
 import com.astro.api.common.service.ViewedService;
-import com.astro.api.home.dto.CollaboratorHomeResponse;
+import com.astro.api.home.dto.response.CollaboratorHomeResponse;
 import com.astro.api.home.repository.HomeRepository;
 import com.astro.api.notification.model.Notification;
 import com.astro.api.notification.service.NotificationService;

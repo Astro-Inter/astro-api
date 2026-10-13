@@ -1,7 +1,7 @@
 package com.astro.api.workspace.service;
 
-import com.astro.api.cargo.model.Cargo;
-import com.astro.api.cargo.service.CargoService;
+import com.astro.api.role.model.Role;
+import com.astro.api.role.service.RoleService;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.unit.service.UnitService;
 import com.astro.api.user.model.User;
@@ -32,20 +32,20 @@ public class WorkspaceRegistrationTransactionalService {
     private final SpreadsheetImportService spreadsheetImportService;
     private final ApplicationEventPublisher eventPublisher;
     private final WorkspaceMapper workspaceMapper;
-    private final CargoService cargoService;
+    private final RoleService roleService;
     private final UserBatchService userBatchService;
 
     public WorkspaceRegistrationTransactionalService(WorkspaceRepository workspaceRepository, UserRepository userRepository,
                                                      UnitService unitService, SpreadsheetImportService spreadsheetImportService,
                                                      ApplicationEventPublisher eventPublisher, WorkspaceMapper workspaceMapper,
-                                                     CargoService cargoService, UserBatchService userBatchService) {
+                                                     RoleService roleService, UserBatchService userBatchService) {
         this.workspaceRepository = workspaceRepository;
         this.userRepository = userRepository;
         this.unitService = unitService;
         this.spreadsheetImportService = spreadsheetImportService;
         this.eventPublisher = eventPublisher;
         this.workspaceMapper = workspaceMapper;
-        this.cargoService = cargoService;
+        this.roleService = roleService;
         this.userBatchService = userBatchService;
     }
 
@@ -58,9 +58,9 @@ public class WorkspaceRegistrationTransactionalService {
 
         List<Unit> units = unitService.createForWorkspace(workspace, request.units());
         Unit managerUnit = spreadsheetImportService.findManagerUnit(managerRow, units);
-        Map<String, Cargo> cargosByName = cargoService.createForWorkspace(workspace,
-                rows.stream().map(SpreadsheetImportService.SpreadsheetRow::cargo).toList());
-        Cargo managerCargo = spreadsheetImportService.findManagerCargo(managerRow, cargosByName);
+        Map<String, Role> rolesByName = roleService.createForWorkspace(workspace,
+                rows.stream().map(SpreadsheetImportService.SpreadsheetRow::role).toList());
+        Role managerRole = spreadsheetImportService.findManagerRole(managerRow, rolesByName);
         User manager = new User();
         manager.setName(managerRow.name().trim());
         manager.setEmail(request.email().trim().toLowerCase(Locale.ROOT));
@@ -68,11 +68,11 @@ public class WorkspaceRegistrationTransactionalService {
         manager.setType(UserType.GESTOR_WORKSPACE);
         manager.setStatus(UserStatus.ATIVO);
         manager.setUnit(managerUnit);
-        manager.setCargo(managerCargo);
+        manager.setCargo(managerRole);
         manager.setCreatedAt(Instant.now());
         userRepository.save(manager);
 
-        spreadsheetImportService.bindPersistedDependencies(importResult.validUsers(), units, cargosByName);
+        spreadsheetImportService.bindPersistedDependencies(importResult.validUsers(), units, rolesByName);
         userBatchService.saveAllPreRegistered(importResult.validUsers());
         eventPublisher.publishEvent(new PreRegisteredCollaboratorsCreatedEvent(
                 importResult.validUsers().stream().map(User::getEmail).toList()));
