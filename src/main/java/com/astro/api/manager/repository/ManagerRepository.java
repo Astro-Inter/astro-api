@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
+import java.util.Optional;
 
 public interface ManagerRepository extends JpaRepository<User, Long> {
     @Query(value = """
@@ -15,4 +16,13 @@ public interface ManagerRepository extends JpaRepository<User, Long> {
             ORDER BY nome, id_usuario
             """, nativeQuery = true)
     List<ManagerSummaryProjection> findAllInWorkspace(@Param("workspaceId") Long workspaceId);
+
+    @Query(value = """
+            SELECT id_usuario AS id, nome AS name, email, cpf, modalidade AS workModel, status,
+                   cargo_id AS roleId, cargo AS roleName, unidade_id AS unitId,
+                   unidade AS unitName, workspace_id AS workspaceId
+            FROM vw_gestores WHERE id_usuario = :managerId AND workspace_id = :workspaceId
+            """, nativeQuery = true)
+    Optional<ManagerDetailsProjection> findDetailsInWorkspace(@Param("managerId") Long managerId,
+                                                             @Param("workspaceId") Long workspaceId);
 }

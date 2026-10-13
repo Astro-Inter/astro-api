@@ -3,6 +3,7 @@ package com.astro.api.manager.controller;
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.response.ApiResult;
 import com.astro.api.manager.dto.response.ManagerSummaryResponse;
+import com.astro.api.manager.dto.response.ManagerDetailsResponse;
 import com.astro.api.manager.service.ManagerService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,5 +27,13 @@ public class ManagerController {
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Gestores retornados com sucesso",
                 service.findAll(principal), request.getRequestURI()));
+    }
+
+    @GetMapping("/{managerId}")
+    @Operation(summary = "Consulta os detalhes de um gestor do próprio workspace")
+    public ResponseEntity<ApiResult<ManagerDetailsResponse>> findById(@PathVariable("managerId") Long managerId,
+            @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
+        return ResponseEntity.ok(ApiResult.success("Gestor retornado com sucesso",
+                service.findById(managerId, principal), request.getRequestURI()));
     }
 }

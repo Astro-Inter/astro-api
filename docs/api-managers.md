@@ -13,6 +13,13 @@ ordenada por nome e ID. Inclui PRE_CADASTRADO, ATIVO e DESATIVADO, com vínculos
 inativos e vários gestores por unidade. Não há paginação, filtros ou CPF na lista.
 Uma lista sem registros retorna `[]`. Senha e Firebase UID nunca são expostos.
 
+## GET /managers/{id} — SCRUM-527
+
+Retorna HTTP 200 com `ApiResult` e `id_usuario`, `nome`, `cpf`, `email`,
+`modalidade`, `status`, `cargo_id`, `cargo`, `unidade_id`, `unidade` e `workspace_id`.
+Modalidade pode ser nula em registros legados. ID inválido retorna 400;
+inexistente, outro perfil ou outro workspace retornam o mesmo 404.
+
 ## Dependências
 
 A view pertence à SCRUM-524, PR Astro-Inter/banco-de-dados#33. A API não cria nem

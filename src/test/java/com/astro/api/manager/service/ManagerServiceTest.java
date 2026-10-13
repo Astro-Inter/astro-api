@@ -52,6 +52,13 @@ class ManagerServiceTest {
         assertTrue(service.findAll(principal).isEmpty());
     }
 
+    @Test void detailsUseTheAuthorizedWorkspaceAndHideMissingOrInaccessibleRecords() {
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,
+                () -> service.findById(8L, principal));
+        verify(repository).findDetailsInWorkspace(8L, 1L);
+        assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.findById(0L, principal));
+    }
+
     @Test void rejectsUntrustedIdentityRolesAndInactiveRequesterBeforeQuerying() {
         assertThrows(AccessDeniedException.class, () -> service.findAll(null));
         for (Role role : Role.values()) {

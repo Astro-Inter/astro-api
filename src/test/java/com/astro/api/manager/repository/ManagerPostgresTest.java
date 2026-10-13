@@ -64,6 +64,12 @@ class ManagerPostgresTest {
         assertTrue(repository.findAllInWorkspace(99L).isEmpty());
         assertEquals(List.of(5L), repository.findAllInWorkspace(2L).stream().map(ManagerSummaryProjection::getId).toList());
     }
+    @Test void detailsExcludeOtherProfilesAndWorkspaces() {
+        var row = repository.findDetailsInWorkspace(2L, 1L).orElseThrow();
+        assertEquals("00000000002", row.getCpf()); assertEquals(2L, row.getRoleId());
+        assertEquals(1L, row.getWorkspaceId()); assertEquals("PRESENCIAL", row.getWorkModel());
+        for (long id : List.of(4L, 5L, 100L, 999L)) assertTrue(repository.findDetailsInWorkspace(id, 1L).isEmpty());
+    }
     static DriverManagerDataSource dataSource() {
         String url = System.getenv("MANAGER_TEST_DATABASE_URL");
         if (!url.matches("jdbc:postgresql://(localhost|127\\.0\\.0\\.1):[0-9]+/astro525")) {

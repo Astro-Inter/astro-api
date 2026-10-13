@@ -3,6 +3,9 @@ package com.astro.api.manager.service;
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.security.Role;
 import com.astro.api.manager.dto.response.ManagerSummaryResponse;
+import com.astro.api.manager.dto.response.ManagerDetailsResponse;
+import com.astro.api.common.exception.BusinessException;
+import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.manager.mapper.ManagerMapper;
 import com.astro.api.manager.repository.ManagerRepository;
 import com.astro.api.user.model.User;
@@ -30,6 +33,18 @@ public class ManagerService {
     public List<ManagerSummaryResponse> findAll(AuthenticatedUser principal) {
         Long workspaceId = requireWorkspaceManager(principal).getUnit().workspace.id;
         return repository.findAllInWorkspace(workspaceId).stream().map(mapper::toSummary).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ManagerDetailsResponse findById(Long managerId, AuthenticatedUser principal) {
+        Long workspaceId = requireWorkspaceManager(principal).getUnit().workspace.id;
+        checkId(managerId);
+        return repository.findDetailsInWorkspace(managerId, workspaceId).map(mapper::toDetails)
+                .orElseThrow(() -> new ResourceNotFoundException("Gestor não encontrado"));
+    }
+
+    private void checkId(Long userId) {
+        if (userId == null || userId <= 0) throw new BusinessException("O identificador do usuário deve ser positivo");
     }
 
     private User requireWorkspaceManager(AuthenticatedUser principal) {

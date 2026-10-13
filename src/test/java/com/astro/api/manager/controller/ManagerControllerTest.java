@@ -52,4 +52,16 @@ class ManagerControllerTest {
                 .andExpect(jsonPath("$.data[0].firebase_uid").doesNotExist());
         verify(service).findAll(principal);
     }
+    @Test void detailsExposeOnlyAdministrativeFieldsAndReturnStandardErrors() throws Exception {
+        when(service.findById(1L, principal)).thenReturn(new com.astro.api.manager.dto.response.ManagerDetailsResponse(
+                1L, "Gestor", "12345678900", "manager@astro.com", null, UserStatus.ATIVO,
+                2L, "Cargo", 10L, "Unidade", 3L));
+        mvc.perform(get("/managers/1")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.cpf").value("12345678900"))
+                .andExpect(jsonPath("$.data.cargo_id").value(2)).andExpect(jsonPath("$.data.workspace_id").value(3))
+                .andExpect(jsonPath("$.data.firebase_uid").doesNotExist()).andExpect(jsonPath("$.data.senha").doesNotExist());
+        when(service.findById(99L, principal)).thenThrow(new com.astro.api.common.exception.ResourceNotFoundException("Gestor não encontrado"));
+        mvc.perform(get("/managers/99")).andExpect(status().isNotFound()).andExpect(jsonPath("$.message").value("Gestor não encontrado"));
+        mvc.perform(get("/managers/abc")).andExpect(status().isBadRequest());
+    }
 }
