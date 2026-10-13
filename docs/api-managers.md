@@ -33,6 +33,27 @@ A autenticação existente consulta perfil e status em cada requisição protegi
 o token previamente emitido passa a refletir GESTOR ou ter acesso bloqueado quando
 DESATIVADO. `User.role` mapeia explicitamente a coluna existente `cargo_id`.
 
+## PUT /managers/{id} — SCRUM-529
+
+Todos os campos são obrigatórios e `null` é inválido: `nome`, `cpf`, `email`,
+`roleId`, `unitId`, `modalidade`, `status`. Modalidade: HIBRIDO, REMOTO ou PRESENCIAL.
+Retorna 200 com os detalhes. Nome é aparado, CPF validado e armazenado com onze
+dígitos, e-mail aparado e convertido para minúsculas como na importação existente.
+Conflitos de CPF/e-mail retornam 409. ID, tipo, criado_em e Firebase UID são preservados.
+Vínculos novos precisam estar ativos no próprio workspace; vínculos inativos
+existentes podem ser mantidos. A unidade única é substituída por `unitId`.
+PRE_CADASTRADO pode ser mantido para editar um registro legado, mas não é destino
+de uma transição nem pode ser ativado por este fluxo. Ativação exige Firebase UID
+e vínculos ativos; solicitação do status atual mantém o estado.
+
+E-mail de conta Firebase é atualizado na identidade existente, invalidando sua
+verificação. A transação PostgreSQL é concluída dentro de TransactionTemplate.
+Falha de atualização ou commit aciona restauração do e-mail e da verificação.
+Se a restauração falhar, a API desativa a conta em transação independente e registra
+a necessidade de reconciliação operacional. Se o próprio banco estiver indisponível
+nessa contenção, a falha também é registrada. Identidade previamente divergente
+retorna 409 e exige reconciliação antes de editar. Não há senha neste contrato.
+
 ## Dependências
 
 A view pertence à SCRUM-524, PR Astro-Inter/banco-de-dados#33. A API não cria nem

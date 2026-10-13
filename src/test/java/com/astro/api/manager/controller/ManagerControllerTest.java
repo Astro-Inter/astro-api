@@ -77,4 +77,22 @@ class ManagerControllerTest {
         }
         verifyNoInteractions(service);
     }
+    @Test void putRequiresEveryEditableFieldAndUsesPortugueseValidationMessages() throws Exception {
+        String valid = """
+                {"nome":"Gestor","cpf":"529.982.247-25","email":"manager@astro.com",
+                 "roleId":2,"unitId":10,"modalidade":"REMOTO","status":"ATIVO"}
+                """;
+        mvc.perform(put("/managers/1").contentType("application/json").content(valid)).andExpect(status().isOk());
+        clearInvocations(service);
+        mvc.perform(put("/managers/1").contentType("application/json").content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors", org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("O nome é obrigatório"))))
+                .andExpect(jsonPath("$.errors", org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("A modalidade é obrigatória"))));
+        for (String invalid : List.of(valid.replace("529.982.247-25", "11111111111"), valid.replace("manager@astro.com", "invalid"),
+                valid.replace("\"roleId\":2", "\"roleId\":null"), valid.replace("\"unitId\":10", "\"unitId\":0"),
+                valid.replace("\"REMOTO\"", "null"), valid.replace("\"ATIVO\"", "null"))) {
+            mvc.perform(put("/managers/1").contentType("application/json").content(invalid)).andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(service);
+    }
 }

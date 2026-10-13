@@ -19,11 +19,17 @@ import static org.mockito.Mockito.*;
 class ManagerServiceTest {
     final ManagerRepository repository = mock(ManagerRepository.class);
     final UserRepository users = mock(UserRepository.class);
-    final ManagerService service = new ManagerService(repository, users, new ManagerMapper());
+    final com.astro.api.role.repository.RoleRepository roles = mock(com.astro.api.role.repository.RoleRepository.class);
+    final com.astro.api.unit.repository.UnitRepository units = mock(com.astro.api.unit.repository.UnitRepository.class);
+    final com.astro.api.auth.service.FirebaseIdentityService firebase = mock(com.astro.api.auth.service.FirebaseIdentityService.class);
+    final org.springframework.transaction.PlatformTransactionManager transactions = mock(org.springframework.transaction.PlatformTransactionManager.class);
+    final ManagerService service = new ManagerService(repository, users, new ManagerMapper(), roles, units,
+            firebase, new ManagerStatusPolicy(), transactions);
     final AuthenticatedUser principal = new AuthenticatedUser("workspace-manager", "owner@astro.com", Role.GESTOR_WORKSPACE);
     User requester;
 
     @BeforeEach void setUp() {
+        when(transactions.getTransaction(any())).thenAnswer(call -> new org.springframework.transaction.support.SimpleTransactionStatus());
         Workspace workspace = new Workspace(); workspace.id = 1L;
         Unit unit = new Unit(); unit.id = 10L; unit.workspace = workspace;
         requester = new User(); requester.setId(100L); requester.setUnit(unit);
@@ -70,6 +76,78 @@ class ManagerServiceTest {
         when(repository.lockRoleActive(2L, 1L)).thenReturn(true); when(repository.lockUnitActive(10L, 1L)).thenReturn(true);
         when(repository.saveAndFlush(user)).thenReturn(user);
         return user;
+    }
+    User editableManager() {
+        var user = eligibleCollaborator(); user.setType(UserType.GESTOR);
+        when(roles.findById(2L)).thenReturn(Optional.of(user.getRole()));
+        when(units.findById(10L)).thenReturn(Optional.of(user.getUnit()));
+        return user;
+    }
+    com.astro.api.manager.dto.request.UpdateManagerRequest updateBody(String email, Long roleId, Long unitId, UserStatus status) {
+        return new com.astro.api.manager.dto.request.UpdateManagerRequest("  Gestor editado  ", "529.982.247-25",
+                email, roleId, unitId, WorkModel.HIBRIDO, status);
+    }
+    @Test void fullUpdateNormalizesFieldsPreservesInternalIdentityAndDoesNotChangeAuthenticationWhenEmailIsUnchanged() {
+        var user = editableManager(); var created = user.getCreatedAt();
+        var result = service.update(4L, updateBody(" COLLABORATOR@ASTRO.COM ", 2L, 10L, UserStatus.ATIVO), principal);
+        assertEquals("Gestor editado", result.name()); assertEquals("52998224725", result.cpf());
+        assertEquals("collaborator@astro.com", result.email()); assertEquals(WorkModel.HIBRIDO, result.workModel());
+        assertEquals(UserType.GESTOR, user.getType()); assertEquals("collaborator-uid", user.getFirebaseUid());
+        assertEquals(created, user.getCreatedAt()); assertEquals(4L, user.getId());
+        verifyNoInteractions(firebase);
+    }
+    @Test void permitsKeepingInactiveLinksButRejectsNewInactiveLinksAndOtherWorkspaces() {
+        var user = editableManager(); user.getRole().setActive(false); user.getUnit().isActive = false;
+        service.update(4L, updateBody(user.getEmail(), 2L, 10L, UserStatus.ATIVO), principal);
+        verify(repository, never()).lockRoleActive(any(), any()); verify(repository, never()).lockUnitActive(any(), any());
+        var destination = new Unit(); destination.id = 20L; destination.workspace = user.getUnit().workspace;
+        when(units.findById(20L)).thenReturn(Optional.of(destination));
+        when(repository.lockUnitActive(20L, 1L)).thenReturn(false);
+        assertThrows(com.astro.api.common.exception.BusinessException.class,
+                () -> service.update(4L, updateBody(user.getEmail(), 2L, 20L, UserStatus.ATIVO), principal));
+        var other = new Workspace(); other.id = 9L; destination.workspace = other;
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,
+                () -> service.update(4L, updateBody(user.getEmail(), 2L, 20L, UserStatus.ATIVO), principal));
+        user.getRole().setWorkspace(other);
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,
+                () -> service.update(4L, updateBody(user.getEmail(), 2L, 10L, UserStatus.ATIVO), principal));
+    }
+    @Test void detectsCpfAndEmailConflictsBeforeFirebaseAndProtectsOtherProfiles() {
+        var user = editableManager(); var body = updateBody(user.getEmail(), 2L, 10L, UserStatus.ATIVO);
+        when(repository.cpfExists(body.cpf(), 4L)).thenReturn(true);
+        assertThrows(com.astro.api.common.exception.ConflictException.class, () -> service.update(4L, body, principal));
+        when(repository.cpfExists(body.cpf(), 4L)).thenReturn(false); when(repository.emailExists(body.email(), 4L)).thenReturn(true);
+        assertThrows(com.astro.api.common.exception.ConflictException.class, () -> service.update(4L, body, principal));
+        for (UserType type : List.of(UserType.COLABORADOR, UserType.GESTOR_WORKSPACE)) {
+            user.setType(type);
+            assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class, () -> service.update(4L, body, principal));
+        }
+        verify(repository, never()).saveAndFlush(any()); verifyNoInteractions(firebase);
+    }
+    @Test void synchronizesTheExistingFirebaseAccountAndRestoresAfterCommitFailure() {
+        var user = editableManager();
+        var previous = new com.astro.api.auth.service.FirebaseIdentityService.EmailState(user.getEmail(), true);
+        when(firebase.readEmailState(user.getFirebaseUid())).thenReturn(previous);
+        service.update(4L, updateBody("new@astro.com", 2L, 10L, UserStatus.ATIVO), principal);
+        verify(firebase).updateEmail("collaborator-uid", "new@astro.com");
+        user.setEmail(previous.email());
+        doThrow(new IllegalStateException("commit failure")).when(transactions).commit(any());
+        assertThrows(IllegalStateException.class, () -> service.update(4L, updateBody("next@astro.com", 2L, 10L, UserStatus.ATIVO), principal));
+        verify(firebase).restoreEmail("collaborator-uid", previous);
+    }
+    @Test void rejectsDivergentIdentityAndContainsFailedFirebaseCompensation() {
+        var user = editableManager(); var body = updateBody("new@astro.com", 2L, 10L, UserStatus.ATIVO);
+        when(firebase.readEmailState(user.getFirebaseUid())).thenReturn(new com.astro.api.auth.service.FirebaseIdentityService.EmailState("other@astro.com", false));
+        assertThrows(com.astro.api.common.exception.ConflictException.class, () -> service.update(4L, body, principal));
+        verify(firebase, never()).updateEmail(any(), any());
+        user.setEmail("collaborator@astro.com");
+        var previous = new com.astro.api.auth.service.FirebaseIdentityService.EmailState(user.getEmail(), true);
+        when(firebase.readEmailState(user.getFirebaseUid())).thenReturn(previous);
+        doThrow(new IllegalStateException("Firebase failure")).when(firebase).updateEmail(any(), any());
+        doThrow(new IllegalStateException("restore failure")).when(firebase).restoreEmail(any(), any());
+        when(repository.deactivateAfterEmailFailure(4L, user.getFirebaseUid())).thenReturn(1);
+        assertThrows(IllegalStateException.class, () -> service.update(4L, body, principal));
+        verify(repository).deactivateAfterEmailFailure(4L, "collaborator-uid");
     }
     @Test void promotesTheExistingAccountToBothRequestedStatusesPreservingIdentityAndLinks() {
         for (var status : com.astro.api.manager.dto.request.ManagerAccountStatus.values()) {

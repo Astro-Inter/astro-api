@@ -5,6 +5,9 @@ import com.astro.api.manager.dto.response.ManagerDetailsResponse;
 import com.astro.api.manager.repository.ManagerDetailsProjection;
 import com.astro.api.user.model.WorkModel;
 import com.astro.api.user.model.User;
+import com.astro.api.manager.dto.request.UpdateManagerRequest;
+import com.astro.api.role.model.Role;
+import com.astro.api.unit.model.Unit;
 import com.astro.api.manager.repository.ManagerSummaryProjection;
 import com.astro.api.user.model.UserStatus;
 import org.springframework.stereotype.Component;
@@ -30,5 +33,10 @@ public class ManagerMapper {
                 user.getWorkModel(), user.getStatus(), role == null ? null : role.getId(),
                 role == null ? null : role.getName(), unit == null ? null : unit.id,
                 unit == null ? null : unit.name, unit == null || unit.workspace == null ? null : unit.workspace.id);
+    }
+
+    public void applyUpdate(User manager, UpdateManagerRequest body, Role role, Unit unit) {
+        manager.setName(body.name()); manager.setCpf(body.cpf()); manager.setEmail(body.email());
+        manager.setRole(role); manager.setUnit(unit); manager.setWorkModel(body.workModel());
     }
 }

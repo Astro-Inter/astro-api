@@ -5,6 +5,7 @@ import com.astro.api.common.response.ApiResult;
 import com.astro.api.manager.dto.response.ManagerSummaryResponse;
 import com.astro.api.manager.dto.response.ManagerDetailsResponse;
 import com.astro.api.manager.dto.request.PromoteManagerRequest;
+import com.astro.api.manager.dto.request.UpdateManagerRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
 import com.astro.api.manager.service.ManagerService;
@@ -47,5 +48,14 @@ public class ManagerController {
         var manager = service.promote(body, principal);
         return ResponseEntity.created(URI.create("/managers/" + manager.id())).body(ApiResult.success(
                 "Colaborador promovido a gestor com sucesso", manager, request.getRequestURI()));
+    }
+
+    @PutMapping("/{managerId}")
+    @Operation(summary = "Substitui todos os campos editáveis de um gestor do próprio workspace")
+    public ResponseEntity<ApiResult<ManagerDetailsResponse>> update(@PathVariable("managerId") Long managerId,
+            @Valid @RequestBody UpdateManagerRequest body, @AuthenticationPrincipal AuthenticatedUser principal,
+            HttpServletRequest request) {
+        return ResponseEntity.ok(ApiResult.success("Gestor atualizado com sucesso",
+                service.update(managerId, body, principal), request.getRequestURI()));
     }
 }

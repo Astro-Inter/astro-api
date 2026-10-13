@@ -40,4 +40,36 @@ public class FirebaseIdentityService {
             LOGGER.error("Falha ao compensar a identidade Firebase criada durante o cadastro (uid={})", firebaseUid, exception);
         }
     }
+
+    public EmailState readEmailState(String firebaseUid) {
+        try {
+            UserRecord user = firebaseAuth.getUser(firebaseUid);
+            return new EmailState(user.getEmail(), user.isEmailVerified());
+        } catch (FirebaseAuthException exception) {
+            throw new IllegalStateException("Não foi possível consultar a identidade Firebase", exception);
+        }
+    }
+
+    public void updateEmail(String firebaseUid, String email) {
+        try {
+            firebaseAuth.updateUser(new UserRecord.UpdateRequest(firebaseUid).setEmail(email).setEmailVerified(false));
+        } catch (FirebaseAuthException exception) {
+            if (exception.getAuthErrorCode() != null
+                    && "EMAIL_ALREADY_EXISTS".equals(exception.getAuthErrorCode().name())) {
+                throw new ConflictException("Já existe uma conta Firebase para este e-mail");
+            }
+            throw new IllegalStateException("Não foi possível atualizar o e-mail no Firebase", exception);
+        }
+    }
+
+    public void restoreEmail(String firebaseUid, EmailState previous) {
+        try {
+            firebaseAuth.updateUser(new UserRecord.UpdateRequest(firebaseUid)
+                    .setEmail(previous.email()).setEmailVerified(previous.verified()));
+        } catch (FirebaseAuthException exception) {
+            throw new IllegalStateException("Não foi possível compensar o e-mail no Firebase", exception);
+        }
+    }
+
+    public record EmailState(String email, boolean verified) { }
 }

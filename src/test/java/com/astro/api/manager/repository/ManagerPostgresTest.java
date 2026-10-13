@@ -40,6 +40,7 @@ class ManagerPostgresTest {
         if (jdbc != null) jdbc.execute("DROP SCHEMA " + SCHEMA + " CASCADE");
     }
     @BeforeEach void seed() {
+        org.mockito.Mockito.reset(context.getBean(com.astro.api.auth.service.FirebaseIdentityService.class));
         repository = context.getBean(ManagerRepository.class);
         jdbc.execute("TRUNCATE usuario, unidade, cargo, workspace CASCADE");
         jdbc.update("INSERT INTO workspace VALUES (1,'Astro','1'), (2,'Outro','2')");
@@ -105,6 +106,38 @@ class ManagerPostgresTest {
         }
         assertEquals("GESTOR", jdbc.queryForObject("SELECT tipo FROM usuario WHERE id_usuario=4", String.class));
     }
+    com.astro.api.manager.dto.request.UpdateManagerRequest update(long roleId, long unitId, String email, com.astro.api.user.model.UserStatus status) {
+        return new com.astro.api.manager.dto.request.UpdateManagerRequest("Gestor editado", "529.982.247-25", email,
+                roleId, unitId, com.astro.api.user.model.WorkModel.REMOTO, status);
+    }
+    @Test void fullUpdateValidatesTheDestinationAndKeepsOldInactiveLinks() {
+        var service = context.getBean(ManagerService.class);
+        service.update(2L, update(2, 2, "USER2@ASTRO.COM", com.astro.api.user.model.UserStatus.PRE_CADASTRADO), owner());
+        assertEquals("52998224725", jdbc.queryForObject("SELECT cpf FROM usuario WHERE id_usuario=2", String.class));
+        assertThrows(com.astro.api.common.exception.BusinessException.class,
+                () -> service.update(1L, update(1, 2, "user1@astro.com", com.astro.api.user.model.UserStatus.ATIVO), owner()));
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,
+                () -> service.update(1L, update(1, 3, "user1@astro.com", com.astro.api.user.model.UserStatus.ATIVO), owner()));
+        assertEquals(1L, jdbc.queryForObject("SELECT unidade_id FROM usuario WHERE id_usuario=1", Long.class));
+    }
+    @Test void updateRollsBackDatabaseChangesWhenFirebaseFailsAndContainsFailedCompensation() {
+        var service = context.getBean(ManagerService.class);
+        var firebase = context.getBean(com.astro.api.auth.service.FirebaseIdentityService.class);
+        var before = jdbc.queryForMap("SELECT * FROM usuario WHERE id_usuario=1");
+        var previous = new com.astro.api.auth.service.FirebaseIdentityService.EmailState("user1@astro.com", true);
+        org.mockito.Mockito.when(firebase.readEmailState("uid1")).thenReturn(previous);
+        org.mockito.Mockito.doThrow(new IllegalStateException("Firebase transport failure")).when(firebase).updateEmail("uid1", "new@astro.com");
+        assertThrows(IllegalStateException.class,
+                () -> service.update(1L, update(1, 1, "new@astro.com", com.astro.api.user.model.UserStatus.DESATIVADO), owner()));
+        assertEquals(before, jdbc.queryForMap("SELECT * FROM usuario WHERE id_usuario=1"));
+        org.mockito.Mockito.verify(firebase).restoreEmail("uid1", previous);
+        org.mockito.Mockito.doThrow(new IllegalStateException("compensation failure")).when(firebase).restoreEmail("uid1", previous);
+        assertThrows(IllegalStateException.class,
+                () -> service.update(1L, update(1, 1, "new@astro.com", com.astro.api.user.model.UserStatus.ATIVO), owner()));
+        assertEquals("DESATIVADO", jdbc.queryForObject("SELECT status FROM usuario WHERE id_usuario=1", String.class));
+        assertEquals("user1@astro.com", jdbc.queryForObject("SELECT email FROM usuario WHERE id_usuario=1", String.class));
+        assertEquals("GESTOR", jdbc.queryForObject("SELECT tipo FROM usuario WHERE id_usuario=1", String.class));
+    }
     static DriverManagerDataSource dataSource() {
         String url = System.getenv("MANAGER_TEST_DATABASE_URL");
         if (!url.matches("jdbc:postgresql://(localhost|127\\.0\\.0\\.1):[0-9]+/astro525")) {
@@ -119,7 +152,8 @@ class ManagerPostgresTest {
     }
     @Configuration
     @EnableTransactionManagement
-    @EnableJpaRepositories(basePackageClasses = {ManagerRepository.class, UserRepository.class})
+    @EnableJpaRepositories(basePackageClasses = {ManagerRepository.class, UserRepository.class,
+            com.astro.api.role.repository.RoleRepository.class, com.astro.api.unit.repository.UnitRepository.class})
     static class Config {
         @Bean DataSource source() { return dataSource(); }
         @Bean LocalContainerEntityManagerFactoryBean entityManagerFactory(DataSource source) {
@@ -131,8 +165,11 @@ class ManagerPostgresTest {
         }
         @Bean PlatformTransactionManager transactionManager(EntityManagerFactory factory) { return new JpaTransactionManager(factory); }
         @Bean ManagerMapper mapper() { return new ManagerMapper(); }
-        @Bean ManagerService service(ManagerRepository repository, UserRepository users, ManagerMapper mapper) {
-            return new ManagerService(repository, users, mapper);
+        @Bean com.astro.api.auth.service.FirebaseIdentityService firebase() { return org.mockito.Mockito.mock(com.astro.api.auth.service.FirebaseIdentityService.class); }
+        @Bean ManagerService service(ManagerRepository repository, UserRepository users, ManagerMapper mapper,
+                                    com.astro.api.role.repository.RoleRepository roles, com.astro.api.unit.repository.UnitRepository units,
+                                    com.astro.api.auth.service.FirebaseIdentityService firebase, PlatformTransactionManager transactions) {
+            return new ManagerService(repository, users, mapper, roles, units, firebase, new com.astro.api.manager.service.ManagerStatusPolicy(), transactions);
         }
     }
 }
