@@ -9,12 +9,12 @@ import com.astro.api.unit.model.Unit;
 import com.astro.api.user.dto.response.UserProfileResponse;
 import com.astro.api.user.mapper.UserMapper;
 import com.astro.api.user.model.User;
-import com.astro.api.user.model.UserProfilePhoto;
 import com.astro.api.user.model.WorkModel;
 import com.astro.api.user.repository.UserProfilePhotoRepository;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.user.repository.UserNrValidityProjection;
 import com.astro.api.user.service.UserService;
+import com.astro.api.user.service.UserAvatarService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -38,6 +38,7 @@ class ProfileServiceTest {
     private UserProfilePhotoRepository userProfilePhotoRepository;
     private UserService userService;
     private R2StorageService r2StorageService;
+    private UserAvatarService avatars;
 
     @BeforeEach
     void setUp() {
@@ -45,8 +46,9 @@ class ProfileServiceTest {
         nrDocumentRepository = mock(NrDocumentRepository.class);
         userProfilePhotoRepository = mock(UserProfilePhotoRepository.class);
         r2StorageService = mock(R2StorageService.class);
+        avatars = mock(UserAvatarService.class);
         userService = new UserService(userRepository, mock(org.springframework.data.redis.core.StringRedisTemplate.class),
-                nrDocumentRepository, userProfilePhotoRepository, new UserMapper(), r2StorageService);
+                nrDocumentRepository, userProfilePhotoRepository, new UserMapper(), r2StorageService, avatars);
     }
 
     @Test
@@ -59,10 +61,7 @@ class ProfileServiceTest {
         nr.setApplicability("Atividades acima de dois metros");
 
         when(userRepository.findByFirebaseUid("firebase-uid")).thenReturn(Optional.of(user));
-        UserProfilePhoto profilePhoto = new UserProfilePhoto();
-        profilePhoto.setObjectPath("usuarios/20/foto-perfil.jpg");
-        when(userProfilePhotoRepository.findById(20L)).thenReturn(Optional.of(profilePhoto));
-        when(r2StorageService.getDownloadUrl("usuarios/20/foto-perfil.jpg"))
+        when(avatars.findUrl(20L))
                 .thenReturn("https://r2.example.com/astro/usuarios/20/foto-perfil.jpg?X-Amz-Signature=signature");
         when(userRepository.findNrValiditiesByRoleIdAndUserId(10L, 20L))
                 .thenReturn(List.of(projection(35, LocalDate.of(2027, 10, 3))));
@@ -77,7 +76,8 @@ class ProfileServiceTest {
         assertEquals("bruno@astro.com", profile.email());
         assertEquals("https://r2.example.com/astro/usuarios/20/foto-perfil.jpg?X-Amz-Signature=signature",
                 profile.profilePhotoUrl());
-        verify(r2StorageService).getDownloadUrl("usuarios/20/foto-perfil.jpg");
+        verify(avatars).findUrl(20L);
+        verifyNoInteractions(r2StorageService, userProfilePhotoRepository);
         assertEquals(List.of(new UserProfileResponse.NrProfileResponse(
                 35,
                 LocalDate.of(2027, 10, 3),
@@ -110,7 +110,7 @@ class ProfileServiceTest {
 
         assertEquals("Usuário não encontrado", exception.getMessage());
         verify(userRepository).findByFirebaseUid("admin-uid");
-        verifyNoInteractions(nrDocumentRepository, userProfilePhotoRepository, r2StorageService);
+        verifyNoInteractions(nrDocumentRepository, userProfilePhotoRepository, r2StorageService, avatars);
     }
 
     private User userWithRole() {

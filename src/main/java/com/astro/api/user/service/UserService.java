@@ -43,6 +43,7 @@ public class UserService {
     private final UserProfilePhotoRepository userProfilePhotoRepository;
     private final UserMapper userMapper;
     private final R2StorageService r2StorageService;
+    private final UserAvatarService avatars;
 
     public UserService(
             UserRepository userRepository,
@@ -50,13 +51,15 @@ public class UserService {
             NrDocumentRepository nrDocumentRepository,
             UserProfilePhotoRepository userProfilePhotoRepository,
             UserMapper userMapper,
-            R2StorageService r2StorageService) {
+            R2StorageService r2StorageService,
+            UserAvatarService avatars) {
         this.userRepository = userRepository;
         this.redisTemplate = redisTemplate;
         this.nrDocumentRepository = nrDocumentRepository;
         this.userProfilePhotoRepository = userProfilePhotoRepository;
         this.userMapper = userMapper;
         this.r2StorageService = r2StorageService;
+        this.avatars = avatars;
     }
 
     public Optional<UserStatus> findStatusByFirebaseUid(String firebaseUid) {
@@ -106,10 +109,7 @@ public class UserService {
         User user = userRepository.findByFirebaseUid(firebaseUid)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
-        String profilePhotoPath = userProfilePhotoRepository.findById(user.getId())
-                .map(UserProfilePhoto::getObjectPath)
-                .orElse(null);
-        String profilePhotoUrl = r2StorageService.getDownloadUrl(profilePhotoPath);
+        String profilePhotoUrl = avatars.findUrl(user.getId());
         return userMapper.toProfile(user, profilePhotoUrl, findNrs(user));
     }
 
@@ -133,6 +133,7 @@ public class UserService {
             }
             throw exception;
         }
+        avatars.invalidate(user.getId());
         if (previousObjectPath != null && !previousObjectPath.isBlank()
                 && !previousObjectPath.equals(objectPath)) {
             r2StorageService.deleteObject(previousObjectPath);

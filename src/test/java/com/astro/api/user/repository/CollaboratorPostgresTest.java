@@ -13,6 +13,7 @@ import com.astro.api.user.dto.request.UpdateCollaboratorRequest;
 import com.astro.api.user.dto.request.CollaboratorStatusRequest;
 import com.astro.api.auth.service.FirebaseIdentityService;
 import com.astro.api.user.service.CollaboratorStatusPolicy;
+import com.astro.api.user.service.UserAvatarService;
 import com.astro.api.common.exception.ConflictException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,33 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Uses only an explicitly configured disposable database with the official SQL objects installed. */
 @EnabledIfEnvironmentVariable(named = "COLLABORATOR_TEST_JDBC_URL", matches = "jdbc:postgresql://(localhost|127\\.0\\.0\\.1):[0-9]+/scrum517")
 class CollaboratorPostgresTest {
+    @Test
+    void loadsProfilePhotosFromTheExistingTableOnlyAfterAuthorizingCollaborators() {
+        try (var context = new AnnotationConfigApplicationContext(Config.class)) {
+            var jdbc = new JdbcTemplate(context.getBean(DataSource.class));
+            var service = context.getBean(CollaboratorService.class);
+            var storage = context.getBean(com.astro.api.common.storage.R2StorageService.class);
+            org.mockito.Mockito.when(storage.getPresignedDownload(org.mockito.ArgumentMatchers.anyString()))
+                    .thenAnswer(invocation -> new com.astro.api.common.storage.R2StorageService.PresignedDownload(
+                            "https://r2.example.com/" + invocation.getArgument(0), java.time.Instant.now().plusSeconds(86400)));
+            new TransactionTemplate(context.getBean(JpaTransactionManager.class)).executeWithoutResult(transaction -> {
+                transaction.setRollbackOnly();
+                seed(jdbc);
+                jdbc.update("INSERT INTO usuario_foto_perfil(usuario_id,caminho_objeto) VALUES (91002,'usuarios/91002/foto.jpg'), (92002,'usuarios/92002/foto.jpg')");
+                var principal = new AuthenticatedUser("scrum517-manager", "scrum517-manager@example.com", Role.GESTOR);
+                var result = service.findAll(principal);
+                assertEquals("https://r2.example.com/usuarios/91002/foto.jpg", result.getFirst().profilePhotoUrl());
+                assertEquals("AT", result.getFirst().avatarInitials());
+                assertNull(result.get(1).profilePhotoUrl());
+                assertEquals("BT", result.get(1).avatarInitials());
+                assertEquals(result.getFirst().profilePhotoUrl(), service.findById(91002L, principal).profilePhotoUrl());
+                assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,
+                        () -> service.findById(92002L, principal));
+                org.mockito.Mockito.verify(storage, org.mockito.Mockito.never()).getPresignedDownload("usuarios/92002/foto.jpg");
+            });
+        }
+    }
+
     @Test
     void changesStatusThroughTheRealScopedRepositoryAndCannotTargetManagers() {
         try (var context = new AnnotationConfigApplicationContext(Config.class)) {
@@ -219,8 +247,21 @@ class CollaboratorPostgresTest {
     @org.springframework.transaction.annotation.EnableTransactionManagement
     @EnableJpaRepositories(basePackages = {"com.astro.api.user.repository",
             "com.astro.api.unit.repository", "com.astro.api.role.repository"})
-    @Import({CollaboratorService.class, CollaboratorMapper.class, CollaboratorStatusPolicy.class})
+    @Import({CollaboratorService.class, CollaboratorMapper.class, CollaboratorStatusPolicy.class, UserAvatarService.class})
     static class Config {
+        @Bean com.astro.api.common.storage.R2StorageService storage() {
+            return org.mockito.Mockito.mock(com.astro.api.common.storage.R2StorageService.class);
+        }
+        @Bean org.springframework.data.redis.core.StringRedisTemplate redisTemplate() {
+            var redis = org.mockito.Mockito.mock(org.springframework.data.redis.core.StringRedisTemplate.class,
+                    org.mockito.Mockito.RETURNS_DEEP_STUBS);
+            org.mockito.Mockito.when(redis.opsForValue().multiGet(org.mockito.ArgumentMatchers.any()))
+                    .thenAnswer(invocation -> {
+                        java.util.Collection<?> keys = invocation.getArgument(0);
+                        return new java.util.ArrayList<>(java.util.Collections.nCopies(keys.size(), null));
+                    });
+            return redis;
+        }
         @Bean FirebaseIdentityService firebaseIdentityService() { return org.mockito.Mockito.mock(FirebaseIdentityService.class); }
         @Bean DataSource dataSource() {
             return new DriverManagerDataSource(System.getenv("COLLABORATOR_TEST_JDBC_URL"), "postgres", "");

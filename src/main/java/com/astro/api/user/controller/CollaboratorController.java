@@ -39,7 +39,7 @@ public class CollaboratorController {
 
     @GetMapping
     @Operation(summary = "Lista colaboradores do escopo do gestor",
-            description = "Lista completa, ordenada por nome e ID, com os três status. Não expõe CPF nem dados de autenticação. Não exige filtros ou paginação.")
+            description = "Lista completa, ordenada por nome e ID, com os três status, URL de foto de perfil e iniciais para fallback. Não expõe CPF nem dados de autenticação. Não exige filtros ou paginação.")
     @ApiResponse(responseCode = "200", description = "Lista de colaboradores, possivelmente vazia")
     public ResponseEntity<ApiResult<List<CollaboratorSummaryResponse>>> findAll(
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
@@ -49,7 +49,7 @@ public class CollaboratorController {
 
     @GetMapping("/{collaboratorId}")
     @Operation(summary = "Consulta detalhes do colaborador para informações e edição",
-            description = "Inclui CPF e modalidade; restringe a consulta ao workspace e às unidades autorizadas. Não expõe dados de autenticação.")
+            description = "Inclui CPF, modalidade, URL de foto de perfil e iniciais; restringe a consulta ao workspace e às unidades autorizadas. Não expõe dados de autenticação.")
     @ApiResponses({@ApiResponse(responseCode = "200", description = "Detalhes do colaborador"),
             @ApiResponse(responseCode = "404", description = "Colaborador inexistente ou fora do escopo")})
     public ResponseEntity<ApiResult<CollaboratorDetailsResponse>> findById(

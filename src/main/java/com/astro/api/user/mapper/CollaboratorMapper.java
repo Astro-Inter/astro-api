@@ -13,6 +13,7 @@ import com.astro.api.user.model.UserType;
 import com.astro.api.role.model.Role;
 import com.astro.api.unit.model.Unit;
 import java.time.Instant;
+import java.util.Locale;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -40,22 +41,32 @@ public class CollaboratorMapper {
         return user;
     }
 
-    public CollaboratorDetailsResponse toDetails(User user) {
+    public CollaboratorDetailsResponse toDetails(User user, String profilePhotoUrl) {
         return new CollaboratorDetailsResponse(user.getId(), user.getName(), user.getCpf(), user.getEmail(),
                 user.getWorkModel(), user.getStatus(), user.getRole().getId(), user.getRole().getName(),
-                user.getUnit().id, user.getUnit().name, user.getUnit().workspace.id);
+                user.getUnit().id, user.getUnit().name, user.getUnit().workspace.id, profilePhotoUrl, initials(user.getName()));
     }
 
-    public CollaboratorDetailsResponse toDetails(CollaboratorDetailsProjection row) {
+    public CollaboratorDetailsResponse toDetails(CollaboratorDetailsProjection row, String profilePhotoUrl) {
         return new CollaboratorDetailsResponse(row.getId(), row.getName(), row.getCpf(), row.getEmail(),
                 row.getWorkModel() == null ? null : WorkModel.valueOf(row.getWorkModel()),
                 UserStatus.valueOf(row.getStatus()), row.getRoleId(), row.getRoleName(),
-                row.getUnitId(), row.getUnitName(), row.getWorkspaceId());
+                row.getUnitId(), row.getUnitName(), row.getWorkspaceId(), profilePhotoUrl, initials(row.getName()));
     }
 
-    public CollaboratorSummaryResponse toSummary(CollaboratorSummaryProjection row) {
+    public CollaboratorSummaryResponse toSummary(CollaboratorSummaryProjection row, String profilePhotoUrl) {
         return new CollaboratorSummaryResponse(row.getId(), row.getName(), row.getEmail(),
                 row.getRoleId(), row.getRoleName(), row.getUnitId(), row.getUnitName(),
-                UserStatus.valueOf(row.getStatus()));
+                UserStatus.valueOf(row.getStatus()), profilePhotoUrl, initials(row.getName()));
+    }
+
+    private String initials(String name) {
+        if (name == null || name.isBlank()) {
+            return "";
+        }
+        String[] parts = name.strip().split("\\s+");
+        String first = new String(Character.toChars(parts[0].codePointAt(0)));
+        String last = parts.length > 1 ? new String(Character.toChars(parts[parts.length - 1].codePointAt(0))) : "";
+        return (first + last).toUpperCase(Locale.ROOT);
     }
 }

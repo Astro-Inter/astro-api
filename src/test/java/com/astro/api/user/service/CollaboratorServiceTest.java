@@ -42,8 +42,9 @@ class CollaboratorServiceTest {
     final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     final FirebaseIdentityService identities = mock(FirebaseIdentityService.class);
     final PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
+    final UserAvatarService avatars = mock(UserAvatarService.class);
     final CollaboratorService service = new CollaboratorService(repository, users, new CollaboratorMapper(), roles, units,
-            events, identities, new CollaboratorStatusPolicy(), transactionManager);
+            events, identities, new CollaboratorStatusPolicy(), transactionManager, avatars);
     final AuthenticatedUser principal = new AuthenticatedUser("manager", "manager@example.com", Role.GESTOR);
     User manager;
     Workspace workspace;
@@ -87,6 +88,23 @@ class CollaboratorServiceTest {
         assertEquals(3, result.stream().map(response -> response.id()).distinct().count());
         assertEquals("Operador", result.getFirst().roleName());
         verify(repository).findAllInScope("manager", 3L);
+        verify(avatars).findUrls(List.of(2L, 3L, 4L));
+    }
+
+    @Test
+    void includesPhotosAndFallbackInitialsOnlyForTheAuthorizedList() {
+        var first = row(2L, "ATIVO");
+        var second = row(3L, "PRE_CADASTRADO");
+        when(first.getName()).thenReturn("Bruno Martins");
+        when(second.getName()).thenReturn("Ana Silva");
+        when(repository.findAllInScope("manager", 3L)).thenReturn(List.of(first, second));
+        when(avatars.findUrls(List.of(2L, 3L))).thenReturn(java.util.Map.of(2L, "https://r2.example.com/photo"));
+        var result = service.findAll(principal);
+        assertEquals("https://r2.example.com/photo", result.getFirst().profilePhotoUrl());
+        assertEquals("BM", result.getFirst().avatarInitials());
+        assertNull(result.get(1).profilePhotoUrl());
+        assertEquals("AS", result.get(1).avatarInitials());
+        verify(avatars, never()).findUrl(any());
     }
 
     @Test
@@ -106,7 +124,7 @@ class CollaboratorServiceTest {
         assertThrows(AccessDeniedException.class, () -> service.findAll(principal));
         manager.setType(UserType.GESTOR_WORKSPACE);
         assertThrows(AccessDeniedException.class, () -> service.findAll(principal));
-        verifyNoInteractions(repository);
+        verifyNoInteractions(repository, avatars);
     }
 
     private CollaboratorSummaryProjection row(Long id, String status) {
@@ -146,6 +164,7 @@ class CollaboratorServiceTest {
             assertEquals("Colaborador não encontrado", error.getMessage());
         }
         assertThrows(BusinessException.class, () -> service.findById(0L, principal));
+        verifyNoInteractions(avatars);
     }
 
     CreateCollaboratorRequest createBody() {

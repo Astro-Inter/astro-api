@@ -46,11 +46,12 @@ public class CollaboratorService {
     private final FirebaseIdentityService identities;
     private final CollaboratorStatusPolicy statusPolicy;
     private final TransactionTemplate transactions;
+    private final UserAvatarService avatars;
 
     public CollaboratorService(CollaboratorRepository repository, UserRepository users, CollaboratorMapper mapper,
                                RoleRepository roles, UnitRepository units, ApplicationEventPublisher events,
                                FirebaseIdentityService identities, CollaboratorStatusPolicy statusPolicy,
-                               PlatformTransactionManager transactionManager) {
+                               PlatformTransactionManager transactionManager, UserAvatarService avatars) {
         this.repository = repository;
         this.users = users;
         this.mapper = mapper;
@@ -61,13 +62,15 @@ public class CollaboratorService {
         this.statusPolicy = statusPolicy;
         this.transactions = new TransactionTemplate(transactionManager);
         this.transactions.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.avatars = avatars;
     }
 
     @Transactional(readOnly = true)
     public List<CollaboratorSummaryResponse> findAll(AuthenticatedUser principal) {
         User manager = requireManager(principal);
-        return repository.findAllInScope(principal.firebaseUid(), manager.getUnit().workspace.id)
-                .stream().map(mapper::toSummary).toList();
+        var rows = repository.findAllInScope(principal.firebaseUid(), manager.getUnit().workspace.id);
+        var urls = avatars.findUrls(rows.stream().map(row -> row.getId()).toList());
+        return rows.stream().map(row -> mapper.toSummary(row, urls.get(row.getId()))).toList();
     }
 
     private User requireManager(AuthenticatedUser principal) {
@@ -90,7 +93,7 @@ public class CollaboratorService {
         User manager = requireManager(principal);
         checkId(collaboratorId);
         return repository.findDetailsInScope(collaboratorId, principal.firebaseUid(), manager.getUnit().workspace.id)
-                .map(mapper::toDetails)
+                .map(row -> mapper.toDetails(row, avatars.findUrl(row.getId())))
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
     }
 
@@ -109,7 +112,7 @@ public class CollaboratorService {
         checkConflicts(body.cpf(), body.email(), null);
         User saved = persist(mapper.toNewUser(body, role, unit));
         events.publishEvent(new PreRegisteredCollaboratorsCreatedEvent(List.of(saved.getEmail())));
-        return mapper.toDetails(saved);
+        return mapper.toDetails(saved, null);
     }
 
     private Role requireRole(Long roleId, Long workspaceId, boolean requireActive) {
@@ -187,7 +190,7 @@ public class CollaboratorService {
                     emailChange[0] = new EmailChange(saved.getId(), saved.getFirebaseUid(), previous);
                     identities.updateEmail(saved.getFirebaseUid(), body.email());
                 }
-                return mapper.toDetails(saved);
+                return mapper.toDetails(saved, avatars.findUrl(saved.getId()));
             });
         } catch (RuntimeException exception) {
             EmailChange change = emailChange[0];
@@ -238,7 +241,7 @@ public class CollaboratorService {
             collaborator.setStatus(desired);
             persist(collaborator);
         }
-        return mapper.toDetails(collaborator);
+        return mapper.toDetails(collaborator, avatars.findUrl(collaborator.getId()));
     }
 
     private void validateStatus(User collaborator, UserStatus desired, Long workspaceId) {

@@ -19,7 +19,8 @@ Todas as consultas exigem também esse workspace. A view não autoriza o acesso.
 `GET /collaborators` retorna a lista completa, ordenada por nome e ID, incluindo
 `PRE_CADASTRADO`, `ATIVO` e `DESATIVADO`. Não exige busca, filtros ou paginação.
 O resultado em `data` contém `id_usuario`, `nome`, `email`, `cargo_id`, `cargo`,
-`unidade_id`, `unidade` e `status`. Cada colaborador aparece uma vez. A ausência
+`unidade_id`, `unidade`, `status`, `profilePhotoUrl` e `avatarInitials`.
+Cada colaborador aparece uma vez. A ausência
 de colaboradores autorizados resulta em `data: []`. CPF, senha e Firebase UID
 não fazem parte desse contrato.
 
@@ -111,6 +112,47 @@ A [view vw_colaboradores](https://github.com/Astro-Inter/banco-de-dados/pull/32)
 e a função existente `fn_seleciona_unidades(TEXT)` precisam estar implantadas no
 PostgreSQL conectado à API. Esta entrega não cria objetos SQL.
 
+## Fotos e cache de avatares
+
+Listagem, detalhes, edição e alteração de status incluem `profilePhotoUrl` e
+`avatarInitials`. O cadastro retorna URL nula, pois o novo usuário ainda não tem
+foto. A origem das imagens é `usuario_foto_perfil`: `usuario_id` identifica o
+usuário e `caminho_objeto` identifica o arquivo no bucket Cloudflare R2. O mesmo
+`UserAvatarService` atende essas consultas e o perfil mobile `GET /user/me`.
+
+Depois de autorizar os colaboradores, a listagem consulta as chaves do Redis em
+um único `MGET`. As fotos ausentes do cache são consultadas no PostgreSQL em lote
+com `findAllById`, evitando uma consulta por colaborador. As URLs são assinadas
+pelo presigner R2 existente e gravadas em pipeline. A assinatura ocorre localmente;
+o navegador usa a URL para carregar o arquivo no Cloudflare.
+
+Cada chave `user:avatar:{id_usuario}` contém apenas uma string com a URL. A
+expiração absoluta da chave coincide com a expiração da assinatura, usando
+`SET PXAT`; o tempo de geração e de comunicação não prolonga a validade no cache.
+O período segue `R2_PRESIGNED_URL_DURATION` (padrão `1d`, por exemplo `3d`, máximo
+`7d`), sem configuração duplicada. Consultar uma URL em cache não renova seu TTL.
+Depois da expiração, a próxima consulta gera uma nova URL. Falhas de leitura ou
+gravação no Redis permitem consultar o banco e devolver uma URL recém-gerada.
+
+O upload em `PUT /user/me/profile-photo` invalida a chave depois de persistir a
+nova foto e antes de excluir o objeto antigo. Se a persistência falhar, o cache
+anterior é preservado e o novo objeto é removido conforme o fluxo existente.
+Falhas ao invalidar a chave são reportadas pelo tratamento de erros da API.
+
+Sem foto, `profilePhotoUrl` é `null`; nenhuma URL de placeholder é armazenada no
+Redis. `avatarInitials` contém as iniciais do primeiro e do último nome, em
+maiúsculas (`Bruno Martins` → `BM`; nome único → uma inicial). O frontend deve
+usar a imagem quando houver URL e mostrar essas iniciais no círculo existente
+quando a URL for nula, incluindo o fallback se a imagem falhar ao carregar.
+
+`UserAvatarRedisTest` usa somente Redis descartável em loopback quando
+`AVATAR_TEST_REDIS_PORT` é informada. Verifica o tipo string, TTL, reutilização,
+invalidação e regeneração após expiração real, sem usar Redis compartilhado.
+Nesta máquina Windows, a validação usa
+`-DargLine=-Djdk.net.unixdomain.tmpdir=target/unavailable-unix-socket-directory`,
+com esse diretório ausente, para que o JDK use seu fallback TCP nos sockets
+internos do seletor. Esse ajuste é apenas do comando local de testes.
+
 ## Erros
 
 Os erros seguem o tratamento global da API: parâmetros e dados inválidos retornam
@@ -138,7 +180,7 @@ fazem rollback, e os testes de atualização removem seus registros em `finally`
 A validação desta entrega usou PostgreSQL 17 isolado com esses objetos oficiais,
 incluindo consultas, projections, constraints únicas, preservação de campos,
 edição, status e rollback diante de falha simulada do Firebase. O build final
-executou 188 testes: nenhuma falha/erro e um teste de contexto já desabilitado
+executou 206 testes: nenhuma falha/erro e um teste de contexto já desabilitado
 no projeto. A verificação somente de leitura no banco configurado confirmou a
 existência da view e da função; não executou alterações nem validou os endpoints
 novos nesse ambiente. Os endpoints precisam ser implantados antes de testes HTTP

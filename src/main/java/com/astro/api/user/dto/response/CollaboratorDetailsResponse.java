@@ -15,5 +15,7 @@ public record CollaboratorDetailsResponse(
         @JsonProperty("cargo") String roleName,
         @JsonProperty("unidade_id") Long unitId,
         @JsonProperty("unidade") String unitName,
-        @JsonProperty("workspace_id") Long workspaceId) {
+        @JsonProperty("workspace_id") Long workspaceId,
+        String profilePhotoUrl,
+        String avatarInitials) {
 }

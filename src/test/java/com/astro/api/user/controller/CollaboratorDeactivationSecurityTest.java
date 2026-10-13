@@ -96,6 +96,7 @@ class CollaboratorDeactivationSecurityTest {
         @Bean UserService userService() { return mock(UserService.class); }
         @Bean UserRepository userRepository() { return mock(UserRepository.class); }
         @Bean CollaboratorRepository collaboratorRepository() { return mock(CollaboratorRepository.class); }
+        @Bean UserAvatarService userAvatarService() { return mock(UserAvatarService.class); }
         @Bean RoleRepository roleRepository() { return mock(RoleRepository.class); }
         @Bean UnitRepository unitRepository() { return mock(UnitRepository.class); }
         @Bean FirebaseIdentityService firebaseIdentityService() { return mock(FirebaseIdentityService.class); }

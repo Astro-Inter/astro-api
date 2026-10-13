@@ -11,5 +11,7 @@ public record CollaboratorSummaryResponse(
         @JsonProperty("cargo") String roleName,
         @JsonProperty("unidade_id") Long unitId,
         @JsonProperty("unidade") String unitName,
-        UserStatus status) {
+        UserStatus status,
+        String profilePhotoUrl,
+        String avatarInitials) {
 }
