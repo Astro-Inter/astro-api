@@ -16,6 +16,7 @@ import java.util.List;
 import java.net.URI;
 import jakarta.validation.Valid;
 import com.astro.api.conformity.dto.request.CreateConformityRequest;
+import com.astro.api.conformity.dto.request.UpdateConformityRequest;
 
 @RestController
 @RequestMapping("/conformities")
@@ -27,6 +28,19 @@ import com.astro.api.conformity.dto.request.CreateConformityRequest;
 public class ConformityController {
     private final ConformityService service;
     public ConformityController(ConformityService service) { this.service = service; }
+
+    @PutMapping("/{conformityId}")
+    @Operation(summary = "Edita NR e validade de um registro",
+            description = "Exige nrId e expiresAt no corpo; expiresAt nulo remove a validade e campo ausente é inválido. Mantém colaborador, ID, origem, aplicabilidade e conclusão. Ao trocar NR de aplicável, rejeita conflitos; a nova NR não pode estar revogada. NR de evento deve corresponder à conclusão vinculada. Não altera conclusao_evento. Retorna pelo ID editado, mesmo fora da representação da view.")
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "Conformidade atualizada"),
+            @ApiResponse(responseCode = "404", description = "Conformidade fora do escopo ou NR inexistente"),
+            @ApiResponse(responseCode = "409", description = "Outra conformidade aplicável da NR de destino")})
+    public ResponseEntity<ApiResult<ConformityResponse>> update(@PathVariable Long conformityId,
+            @Valid @RequestBody UpdateConformityRequest body,
+            @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
+        return ResponseEntity.ok(ApiResult.success("Conformidade atualizada com sucesso",
+                service.update(conformityId, body, principal), request.getRequestURI()));
+    }
 
     @PostMapping
     @Operation(summary = "Cadastra uma conformidade manual",

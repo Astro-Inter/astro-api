@@ -1,5 +1,7 @@
 # Conformidades — SCRUM-536
 
+`PUT /conformities/{id}` exige `nrId` e a presença de `expiresAt`. Campo ausente causa 400; `expiresAt: null` remove a validade. O colaborador, o ID, a origem, a aplicabilidade e a conclusão permanecem. Trocar a NR de um aplicável exige ausência de outro aplicável na NR de destino. Uma NR nova não pode estar revogada; manter a NR histórica é permitido. Edição de histórico de colaborador inativo é permitida. A NR deve corresponder à conclusão vinculada; `conclusao_evento.data_validade` não é alterada. A resposta usa o ID editado, mesmo quando outro registro continua representando o par na view.
+
 O módulo Java é `com.astro.api.conformity`. A renomeação atualiza imports e testes; a rota pública `/nrs` e seus campos permanecem compatíveis. `/collaborators` retorna os colaboradores autorizados e `/nrs` retorna código/título das NRs para seleção. O catálogo inclui NRs revogadas; uma nova vinculação revogada é rejeitada pela API.
 
 Todos os endpoints exigem autenticação Firebase validada e perfil GESTOR ou GESTOR_WORKSPACE ativo. O workspace vem do usuário autenticado e as unidades vêm de `fn_seleciona_unidades`. Na versão oficial consultada, ambos os perfis acessam todas as unidades de seu workspace. Identificadores enviados para outro workspace recebem 404. As respostas usam `ApiResult` e DTOs sem senha ou Firebase UID.

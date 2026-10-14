@@ -9,6 +9,27 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ConformityRepository extends JpaRepository<Conformity, Long> {
+    @Query(value = """
+            SELECT c.* FROM conformidade c
+            JOIN usuario u ON u.id_usuario = c.usuario_id AND u.tipo = 'COLABORADOR'
+            JOIN unidade un ON un.id_unidade = u.unidade_id
+            WHERE c.id_conformidade = :conformityId AND un.workspace_id = :workspaceId
+              AND u.unidade_id IN (SELECT id_unidade FROM fn_seleciona_unidades(:firebaseUid))
+            """, nativeQuery = true)
+    Optional<Conformity> findRecordInScope(@Param("conformityId") Long conformityId,
+            @Param("firebaseUid") String firebaseUid, @Param("workspaceId") Long workspaceId);
+
+    @Query(value = """
+            SELECT EXISTS (SELECT 1 FROM conclusao_evento ce
+            JOIN turma_funcionario tf ON tf.id_turma_funcionario = ce.turma_funcionario_id
+            JOIN turma t ON t.id_turma = tf.turma_id
+            JOIN evento e ON e.id_evento = t.evento_id
+            WHERE ce.id_conclusao_evento = :eventCompletionId
+              AND tf.usuario_id = :collaboratorId AND e.nr_id = :nrId)
+            """, nativeQuery = true)
+    boolean completionMatchesNr(@Param("eventCompletionId") Long eventCompletionId,
+            @Param("collaboratorId") Long collaboratorId, @Param("nrId") Integer nrId);
+
     // Serializes check-and-write against all PostgreSQL DML, including writers outside this API.
     // Readers remain concurrent. Acquire before locking collaborators or conformities.
     @Modifying

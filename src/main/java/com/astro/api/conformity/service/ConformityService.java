@@ -5,6 +5,8 @@ import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.exception.ConflictException;
 import com.astro.api.conformity.dto.request.CreateConformityRequest;
+import com.astro.api.conformity.dto.request.UpdateConformityRequest;
+import com.astro.api.conformity.model.Conformity;
 import com.astro.api.conformity.repository.NrCatalogRepository;
 import com.astro.api.user.repository.CollaboratorRepository;
 import com.astro.api.conformity.dto.response.ConformityResponse;
@@ -65,6 +67,33 @@ public class ConformityService {
     private User requireCollaborator(Long collaboratorId, AuthenticatedUser principal, User manager) {
         return collaboratorRepository.findForUpdateInScope(collaboratorId, principal.firebaseUid(), manager.getUnit().workspace.id)
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
+    }
+
+    @Transactional
+    public ConformityResponse update(Long conformityId, UpdateConformityRequest request, AuthenticatedUser principal) {
+        User manager = requireManager(principal);
+        checkId(conformityId);
+        repository.lockWrites();
+        Conformity entity = requireRecord(conformityId, principal, manager);
+        requireCollaborator(entity.getCollaboratorId(), principal, manager);
+        boolean changedNr = !request.nrId().equals(entity.getNrId());
+        requireNr(request.nrId(), changedNr);
+        if (changedNr && entity.isApplicable()) checkConflict(entity.getCollaboratorId(), request.nrId(), conformityId);
+        if (entity.getEventCompletionId() != null
+                && !repository.completionMatchesNr(entity.getEventCompletionId(), entity.getCollaboratorId(), request.nrId())) {
+            throw new BusinessException("A NR deve corresponder à conclusão do evento vinculada");
+        }
+        if (changedNr && entity.getEventCompletionId() == null && "CONCLUSAO_EVENTO".equals(entity.getOrigin())) {
+            throw new BusinessException("A conclusão do evento deve estar vinculada para alterar a NR");
+        }
+        mapper.applyUpdate(entity, request);
+        repository.saveAndFlush(entity);
+        return details(conformityId, principal, manager);
+    }
+
+    private Conformity requireRecord(Long conformityId, AuthenticatedUser principal, User manager) {
+        return repository.findRecordInScope(conformityId, principal.firebaseUid(), manager.getUnit().workspace.id)
+                .orElseThrow(() -> new ResourceNotFoundException("Conformidade não encontrada"));
     }
 
     private void requireActiveCollaborator(User collaborator) {

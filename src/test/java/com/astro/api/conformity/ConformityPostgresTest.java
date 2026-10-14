@@ -140,6 +140,43 @@ class ConformityPostgresTest {
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM conformidade WHERE aplicavel", Integer.class));
     }
 
+    @Test void updatesOnlyTheRequestedIdAndRejectsApplicableNrConflicts() {
+        jdbc.update("""
+                INSERT INTO conformidade(id_conformidade,usuario_id,nr_id,aplicavel,data_validade,origem)
+                VALUES (10,2,10,true,'2027-01-01','IMPORTADA'),(11,2,10,true,'2030-01-01','MANUAL'),
+                       (12,2,11,true,'2030-01-01','MANUAL'),(13,2,10,false,'2027-01-01','MANUAL')
+                """);
+        var result = service.update(10L, new com.astro.api.conformity.dto.request.UpdateConformityRequest(10, null), principal);
+        assertEquals(10L, result.id()); assertNull(result.expiresAt()); assertEquals("IMPORTADA", result.origin());
+        assertTrue(result.applicable()); assertEquals(2L, result.collaboratorId());
+        assertEquals(11L, service.findAll(principal).getFirst().id());
+        assertThrows(com.astro.api.common.exception.ConflictException.class, () -> service.update(10L,
+                new com.astro.api.conformity.dto.request.UpdateConformityRequest(11, null), principal));
+        assertEquals(11, service.update(13L,
+                new com.astro.api.conformity.dto.request.UpdateConformityRequest(11, null), principal).nrId());
+        assertFalse(service.findById(13L, principal).applicable());
+        assertEquals(4, jdbc.queryForObject("SELECT count(*) FROM conformidade", Integer.class));
+    }
+
+    void seedCompletion() {
+        jdbc.update("INSERT INTO evento(id_evento,gestor_id,nr_id,titulo,descricao,modo_conclusao,evidencia_obrigatoria,status) VALUES (1,1,10,'Evento','Treinamento','GESTOR',false,'ATIVO')");
+        jdbc.update("INSERT INTO turma(id_turma,evento_id,nome,data_inicial,data_termino) VALUES (1,1,'Turma',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP + interval '1 hour')");
+        jdbc.update("INSERT INTO turma_funcionario(id_turma_funcionario,turma_id,usuario_id) VALUES (1,1,2)");
+        jdbc.update("INSERT INTO conclusao_evento(id_conclusao_evento,turma_funcionario_id,status,data_conclusao,data_validacao,data_validade) VALUES (1,1,'CONCLUIDO',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'2027-01-01')");
+        jdbc.update("INSERT INTO conformidade(id_conformidade,usuario_id,nr_id,aplicavel,data_validade,origem,conclusao_evento_id) VALUES (20,2,10,true,'2027-01-01','CONCLUSAO_EVENTO',1)");
+    }
+
+    @Test void keepsEventNrAndCompletionValidityConsistentDuringEdits() {
+        seedCompletion();
+        var result = service.update(20L, new com.astro.api.conformity.dto.request.UpdateConformityRequest(10, null), principal);
+        assertNull(result.expiresAt()); assertEquals(1L, result.eventCompletionId());
+        assertEquals("CONCLUSAO_EVENTO", result.origin());
+        assertEquals(java.sql.Date.valueOf("2027-01-01"), jdbc.queryForObject("SELECT data_validade FROM conclusao_evento WHERE id_conclusao_evento=1", java.sql.Date.class));
+        assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.update(20L,
+                new com.astro.api.conformity.dto.request.UpdateConformityRequest(11, null), principal));
+        assertEquals(10, service.findById(20L, principal).nrId());
+    }
+
     @Configuration
     @EnableTransactionManagement
     @EnableJpaRepositories(basePackages = {"com.astro.api.user.repository", "com.astro.api.conformity.repository"},

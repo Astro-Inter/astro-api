@@ -4,10 +4,14 @@ import com.astro.api.conformity.dto.response.ConformityResponse;
 import com.astro.api.conformity.repository.ConformityProjection;
 import com.astro.api.conformity.model.Conformity;
 import com.astro.api.conformity.dto.request.CreateConformityRequest;
+import com.astro.api.conformity.dto.request.UpdateConformityRequest;
 import org.springframework.stereotype.Component;
 
 @Component
 public class ConformityMapper {
+    public void applyUpdate(Conformity entity, UpdateConformityRequest request) {
+        entity.setNrId(request.nrId()); entity.setExpiresAt(request.expiresAt());
+    }
     public Conformity toNewManual(CreateConformityRequest request) {
         Conformity entity = new Conformity();
         entity.setCollaboratorId(request.collaboratorId()); entity.setNrId(request.nrId());
