@@ -13,6 +13,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.net.URI;
+import jakarta.validation.Valid;
+import com.astro.api.conformity.dto.request.CreateConformityRequest;
 
 @RestController
 @RequestMapping("/conformities")
@@ -24,6 +27,19 @@ import java.util.List;
 public class ConformityController {
     private final ConformityService service;
     public ConformityController(ConformityService service) { this.service = service; }
+
+    @PostMapping
+    @Operation(summary = "Cadastra uma conformidade manual",
+            description = "Recebe collaboratorId, nrId e expiresAt opcional/nulo. Exige colaborador ATIVO no escopo e NR existente não revogada. Cria MANUAL, aplicável, sem conclusão vinculada. Rejeita qualquer registro aplicável do par; mantém os anteriores não aplicáveis. Usa transação com bloqueio de escrita.")
+    @ApiResponses({@ApiResponse(responseCode = "201", description = "Conformidade criada"),
+            @ApiResponse(responseCode = "404", description = "Colaborador fora do escopo ou NR inexistente"),
+            @ApiResponse(responseCode = "409", description = "Registro aplicável já existente")})
+    public ResponseEntity<ApiResult<ConformityResponse>> create(@Valid @RequestBody CreateConformityRequest body,
+            @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
+        var result = service.create(body, principal);
+        return ResponseEntity.created(URI.create("/conformities/" + result.id()))
+                .body(ApiResult.success("Conformidade criada com sucesso", result, request.getRequestURI()));
+    }
 
     @GetMapping("/{conformityId}")
     @Operation(summary = "Consulta um registro de conformidade pelo ID",

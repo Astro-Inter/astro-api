@@ -56,4 +56,18 @@ class ConformityControllerTest {
                 .andExpect(jsonPath("$.message").value("Conformidade não encontrada"));
         mvc.perform(get("/conformities/invalid")).andExpect(status().isBadRequest());
     }
+
+    @Test void createsWithLocationAndRejectsInvalidRequests() throws Exception {
+        when(service.create(any(), eq(principal))).thenReturn(response());
+        mvc.perform(post("/conformities").contentType("application/json")
+                        .content("{\"collaboratorId\":3,\"nrId\":10,\"expiresAt\":null,\"origin\":\"FAKE\",\"workspaceId\":999}"))
+                .andExpect(status().isCreated()).andExpect(header().string("Location", "/conformities/2"));
+        verify(service).create(new com.astro.api.conformity.dto.request.CreateConformityRequest(3L, 10, null), principal);
+        clearInvocations(service);
+        for (String body : List.of("{}", "{\"collaboratorId\":0,\"nrId\":10}",
+                "{\"collaboratorId\":3,\"nrId\":-1}", "{\"collaboratorId\":3,\"nrId\":10,\"expiresAt\":\"bad\"}")) {
+            mvc.perform(post("/conformities").contentType("application/json").content(body)).andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(service);
+    }
 }

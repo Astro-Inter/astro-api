@@ -3,6 +3,10 @@ package com.astro.api.conformity.service;
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ResourceNotFoundException;
+import com.astro.api.common.exception.ConflictException;
+import com.astro.api.conformity.dto.request.CreateConformityRequest;
+import com.astro.api.conformity.repository.NrCatalogRepository;
+import com.astro.api.user.repository.CollaboratorRepository;
 import com.astro.api.conformity.dto.response.ConformityResponse;
 import com.astro.api.conformity.mapper.ConformityMapper;
 import com.astro.api.conformity.repository.ConformityRepository;
@@ -20,11 +24,16 @@ public class ConformityService {
     private final ConformityRepository repository;
     private final UserRepository userRepository;
     private final ConformityMapper mapper;
+    private final CollaboratorRepository collaboratorRepository;
+    private final NrCatalogRepository nrRepository;
 
-    public ConformityService(ConformityRepository repository, UserRepository userRepository, ConformityMapper mapper) {
+    public ConformityService(ConformityRepository repository, UserRepository userRepository, ConformityMapper mapper,
+                             CollaboratorRepository collaboratorRepository, NrCatalogRepository nrRepository) {
         this.repository = repository;
         this.userRepository = userRepository;
         this.mapper = mapper;
+        this.collaboratorRepository = collaboratorRepository;
+        this.nrRepository = nrRepository;
     }
 
     @Transactional(readOnly = true)
@@ -39,6 +48,43 @@ public class ConformityService {
         User manager = requireManager(principal);
         checkId(conformityId);
         return details(conformityId, principal, manager);
+    }
+
+    @Transactional
+    public ConformityResponse create(CreateConformityRequest request, AuthenticatedUser principal) {
+        User manager = requireManager(principal);
+        repository.lockWrites();
+        User collaborator = requireCollaborator(request.collaboratorId(), principal, manager);
+        requireActiveCollaborator(collaborator);
+        requireNr(request.nrId(), true);
+        checkConflict(request.collaboratorId(), request.nrId(), null);
+        var saved = repository.saveAndFlush(mapper.toNewManual(request));
+        return details(saved.getId(), principal, manager);
+    }
+
+    private User requireCollaborator(Long collaboratorId, AuthenticatedUser principal, User manager) {
+        return collaboratorRepository.findForUpdateInScope(collaboratorId, principal.firebaseUid(), manager.getUnit().workspace.id)
+                .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
+    }
+
+    private void requireActiveCollaborator(User collaborator) {
+        if (collaborator.getStatus() != UserStatus.ATIVO) {
+            throw new BusinessException("O colaborador deve estar ativo para incluir ou reativar uma conformidade");
+        }
+    }
+
+    private void requireNr(Integer nrId, boolean requireCurrent) {
+        var nr = nrRepository.findForShare(nrId)
+                .orElseThrow(() -> new ResourceNotFoundException("NR não encontrada"));
+        if (requireCurrent && nr.isRevoked()) {
+            throw new BusinessException("A NR não pode estar revogada para uma nova vinculação ou reativação");
+        }
+    }
+
+    private void checkConflict(Long collaboratorId, Integer nrId, Long excludedId) {
+        if (repository.hasApplicableConflict(collaboratorId, nrId, excludedId)) {
+            throw new ConflictException("Já existe uma conformidade aplicável para este colaborador e NR");
+        }
     }
 
     private ConformityResponse details(Long conformityId, AuthenticatedUser principal, User manager) {

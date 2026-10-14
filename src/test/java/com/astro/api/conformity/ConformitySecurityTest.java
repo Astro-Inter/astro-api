@@ -53,6 +53,11 @@ class ConformitySecurityTest {
                 when(authorization.getRole("manager")).thenReturn(Optional.of(role));
                 mvc.perform(get("/conformities").header("Authorization", "Bearer valid"))
                         .andExpect(status().isForbidden());
+                mvc.perform(get("/conformities/2").header("Authorization", "Bearer valid"))
+                        .andExpect(status().isForbidden());
+                mvc.perform(post("/conformities").header("Authorization", "Bearer valid")
+                                .contentType("application/json").content("{\"collaboratorId\":2,\"nrId\":10}"))
+                        .andExpect(status().isForbidden());
             }
             verifyNoInteractions(service);
             for (Role role : List.of(Role.GESTOR, Role.GESTOR_WORKSPACE)) {

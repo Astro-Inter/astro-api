@@ -104,6 +104,42 @@ class ConformityPostgresTest {
         assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> service.findAll(principal));
     }
 
+    @Test void createsManualWithNullValidityPreservesHistoryAndRejectsInvalidLinks() {
+        jdbc.update("INSERT INTO conformidade(usuario_id,nr_id,aplicavel,origem) VALUES (2,10,false,'MANUAL')");
+        var request = new com.astro.api.conformity.dto.request.CreateConformityRequest(2L, 10, null);
+        var result = service.create(request, principal);
+        assertEquals("MANUAL", result.origin()); assertTrue(result.applicable());
+        assertNull(result.eventCompletionId()); assertNull(result.expiresAt());
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM conformidade", Integer.class));
+        assertThrows(com.astro.api.common.exception.ConflictException.class, () -> service.create(request, principal));
+        assertThrows(ResourceNotFoundException.class, () -> service.create(
+                new com.astro.api.conformity.dto.request.CreateConformityRequest(4L, 10, null), principal));
+        assertThrows(ResourceNotFoundException.class, () -> service.create(
+                new com.astro.api.conformity.dto.request.CreateConformityRequest(1L, 10, null), principal));
+        assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.create(
+                new com.astro.api.conformity.dto.request.CreateConformityRequest(3L, 10, null), principal));
+        assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.create(
+                new com.astro.api.conformity.dto.request.CreateConformityRequest(2L, 12, null), principal));
+        assertThrows(ResourceNotFoundException.class, () -> service.create(
+                new com.astro.api.conformity.dto.request.CreateConformityRequest(2L, 999, null), principal));
+    }
+
+    @Test void serializesConcurrentManualCreatesWithoutLosingHistory() throws Exception {
+        var request = new com.astro.api.conformity.dto.request.CreateConformityRequest(2L, 10, null);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            java.util.concurrent.Callable<String> action = () -> {
+                start.await();
+                try { service.create(request, principal); return "created"; }
+                catch (com.astro.api.common.exception.ConflictException conflict) { return "conflict"; }
+            };
+            var first = executor.submit(action); var second = executor.submit(action); start.countDown();
+            assertEquals(Set.of("created", "conflict"), Set.of(first.get(15, java.util.concurrent.TimeUnit.SECONDS),
+                    second.get(15, java.util.concurrent.TimeUnit.SECONDS)));
+        }
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM conformidade WHERE aplicavel", Integer.class));
+    }
+
     @Configuration
     @EnableTransactionManagement
     @EnableJpaRepositories(basePackages = {"com.astro.api.user.repository", "com.astro.api.conformity.repository"},

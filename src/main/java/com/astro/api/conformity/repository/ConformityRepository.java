@@ -3,11 +3,26 @@ package com.astro.api.conformity.repository;
 import com.astro.api.conformity.model.Conformity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
 public interface ConformityRepository extends JpaRepository<Conformity, Long> {
+    // Serializes check-and-write against all PostgreSQL DML, including writers outside this API.
+    // Readers remain concurrent. Acquire before locking collaborators or conformities.
+    @Modifying
+    @Query(value = "LOCK TABLE conformidade IN SHARE ROW EXCLUSIVE MODE", nativeQuery = true)
+    void lockWrites();
+
+    @Query(value = """
+            SELECT EXISTS (SELECT 1 FROM conformidade WHERE usuario_id = :collaboratorId
+                AND nr_id = :nrId AND aplicavel = TRUE
+                AND (:excludedId IS NULL OR id_conformidade <> :excludedId))
+            """, nativeQuery = true)
+    boolean hasApplicableConflict(@Param("collaboratorId") Long collaboratorId, @Param("nrId") Integer nrId,
+                                  @Param("excludedId") Long excludedId);
+
     String DETAILS = """
             SELECT c.id_conformidade AS id, c.usuario_id AS "collaboratorId",
                    u.nome AS "collaboratorName", u.email AS "collaboratorEmail",
