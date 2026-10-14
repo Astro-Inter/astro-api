@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Size;
 import org.hibernate.validator.constraints.CodePointLength;
 
 public record CancelEventRequest(
+        @io.swagger.v3.oas.annotations.media.Schema(example = "Treinamento reagendado")
         @NotBlank(message = "{event.cancellation.reason.notBlank}")
         @Size(min = 3, max = 1000, message = "{event.cancellation.reason.size}")
         @CodePointLength(min = 3, message = "{event.cancellation.reason.size}") String reason

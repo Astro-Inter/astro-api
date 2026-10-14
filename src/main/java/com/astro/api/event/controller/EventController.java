@@ -13,7 +13,6 @@ import com.astro.api.event.service.EventService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -52,8 +51,7 @@ public class EventController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Turmas retornadas no envelope ApiResult, lista vazia se não houver resultados",
                     content = @Content(mediaType = "application/json",
-                            schema = @Schema(ref = "#/components/schemas/ApiResultListEventCalendarResponse"),
-                            examples = @ExampleObject(name = "Exemplo", value = EventApiExamples.CALENDAR))),
+                            schema = @Schema(ref = "#/components/schemas/ApiResultListEventCalendarResponse"))),
             @ApiResponse(responseCode = "400", description = "Datas obrigatórias, formato ou intervalo inválido"),
             @ApiResponse(responseCode = "401", description = "Não autenticado"),
             @ApiResponse(responseCode = "403", description = "Não autorizado")
@@ -82,8 +80,7 @@ public class EventController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Detalhe no envelope ApiResult",
                     content = @Content(mediaType = "application/json",
-                            schema = @Schema(ref = "#/components/schemas/ApiResultEventResponse"),
-                            examples = @ExampleObject(name = "Exemplo", value = EventApiExamples.DETAIL))),
+                            schema = @Schema(ref = "#/components/schemas/ApiResultEventResponse"))),
             @ApiResponse(responseCode = "400", description = "Identificador inválido"),
             @ApiResponse(responseCode = "401", description = "Não autenticado"),
             @ApiResponse(responseCode = "403", description = "Gestor ativo necessário"),
@@ -121,8 +118,7 @@ public class EventController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Colaboradores retornados com sucesso",
                     content = @Content(mediaType = "application/json",
-                            schema = @Schema(ref = "#/components/schemas/ApiResultListEventCandidateResponse"),
-                            examples = @ExampleObject(name = "Exemplo", value = EventApiExamples.CANDIDATES))),
+                            schema = @Schema(ref = "#/components/schemas/ApiResultListEventCandidateResponse"))),
             @ApiResponse(responseCode = "400", description = "Identificador da NR inválido"),
             @ApiResponse(responseCode = "404", description = "NR não encontrada"),
             @ApiResponse(responseCode = "401", description = "Não autenticado"),
@@ -147,8 +143,7 @@ public class EventController {
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Detalhe persistido no envelope ApiResult",
                     content = @Content(mediaType = "application/json",
-                            schema = @Schema(ref = "#/components/schemas/ApiResultEventResponse"),
-                            examples = @ExampleObject(name = "Exemplo", value = EventApiExamples.CREATE))),
+                            schema = @Schema(ref = "#/components/schemas/ApiResultEventResponse"))),
             @ApiResponse(responseCode = "404", description = "NR ou participante não encontrado no workspace"),
             @ApiResponse(responseCode = "409", description = "Conflito de integridade dos dados"),
             @ApiResponse(responseCode = "400", description = "Dados ou regras de negócio inválidos"),
@@ -156,8 +151,6 @@ public class EventController {
             @ApiResponse(responseCode = "403", description = "Não autorizado")
     })
     public ResponseEntity<ApiResult<EventResponse>> create(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(mediaType = "application/json",
-                    examples = @ExampleObject(name = "Exemplo", value = EventApiExamples.CREATE_REQUEST)))
             @Valid @RequestBody CreateEventRequest body,
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             HttpServletRequest request) {
@@ -173,8 +166,7 @@ public class EventController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Detalhe atualizado no envelope ApiResult",
                     content = @Content(mediaType = "application/json",
-                            schema = @Schema(ref = "#/components/schemas/ApiResultEventResponse"),
-                            examples = @ExampleObject(name = "Exemplo", value = EventApiExamples.UPDATE))),
+                            schema = @Schema(ref = "#/components/schemas/ApiResultEventResponse"))),
             @ApiResponse(responseCode = "401", description = "Não autenticado"),
             @ApiResponse(responseCode = "409", description = "Conflito de integridade dos dados"),
             @ApiResponse(responseCode = "400", description = "Evento ou turma não pode ser alterado"),
@@ -184,8 +176,6 @@ public class EventController {
     public ResponseEntity<ApiResult<EventResponse>> update(
             @Parameter(description = "ID persistido do evento no workspace autenticado", example = "1", schema = @Schema(minimum = "1"))
             @PathVariable Long eventId,
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(mediaType = "application/json",
-                    examples = @ExampleObject(name = "Exemplo", value = EventApiExamples.UPDATE_REQUEST)))
             @Valid @RequestBody UpdateEventRequest body,
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             HttpServletRequest request) {
@@ -201,8 +191,7 @@ public class EventController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Detalhe cancelado no envelope ApiResult, com permissões falsas",
                     content = @Content(mediaType = "application/json",
-                            schema = @Schema(ref = "#/components/schemas/ApiResultEventResponse"),
-                            examples = @ExampleObject(name = "Exemplo", value = EventApiExamples.CANCEL))),
+                            schema = @Schema(ref = "#/components/schemas/ApiResultEventResponse"))),
             @ApiResponse(responseCode = "401", description = "Não autenticado"),
             @ApiResponse(responseCode = "400", description = "Evento concluído ou já cancelado"),
             @ApiResponse(responseCode = "404", description = "Evento não encontrado no Workspace"),
@@ -211,8 +200,6 @@ public class EventController {
     public ResponseEntity<ApiResult<EventResponse>> cancel(
             @Parameter(description = "ID persistido do evento no workspace autenticado", example = "1", schema = @Schema(minimum = "1"))
             @PathVariable Long eventId,
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(mediaType = "application/json",
-                    examples = @ExampleObject(name = "Exemplo", value = EventApiExamples.CANCEL_REQUEST)))
             @Valid @RequestBody CancelEventRequest body,
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             HttpServletRequest request) {

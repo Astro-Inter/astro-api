@@ -101,7 +101,9 @@ Cancelamento repetido ou de evento concluído retorna 400.
 
 ## Exemplos e verificação
 
-Swagger inclui exemplos de requisição e de `ApiResult` nos seis endpoints.
+Swagger usa os schemas dos próprios DTOs para gerar exemplos de requisição e de
+`ApiResult`. Títulos, nomes de turma, datas e motivo têm exemplos curtos nas
+anotações dos campos; não há uma classe com respostas JSON manuais duplicadas.
 `EventOpenApiTest` gera `/v3/api-docs` localmente e verifica operações, respostas,
 envelopes, exemplos e schemas. Os dados dos exemplos são fictícios.
 

@@ -43,11 +43,11 @@ class EventOpenApiTest {
                 assertFalse(content.path("schema").path("$ref").asText().isBlank(),operation[0]+" response envelope: "+content.path("schema"));
                 String name=content.path("schema").path("$ref").asText().substring("#/components/schemas/".length());
                 assertTrue(root.path("components").path("schemas").path(name).path("properties").has("data"));
-                var examples=content.path("examples"); assertFalse(examples.isEmpty(),operation[0]+" examples");
-                var example=examples.elements().next().path("value");
-                assertTrue(example.path("success").asBoolean());assertFalse(example.path("data").isMissingNode());
-                assertFalse(example.path("path").asText().isBlank());
+
             }
+            assertEquals("Treinamento NR 10",root.path("components").path("schemas").path("CreateEventRequest").path("properties").path("title").path("example").asText());
+            assertEquals("2026-11-05T08:00:00",root.path("components").path("schemas").path("CreateEventClassRequest").path("properties").path("startDate").path("example").asText());
+            assertEquals("Treinamento reagendado",root.path("components").path("schemas").path("CancelEventRequest").path("properties").path("reason").path("example").asText());
             var required=root.path("components").path("schemas").path("UpdateEventRequest").path("required");
             assertTrue(required.toString().contains("eventClasses"));
             var properties=root.path("components").path("schemas").path("UpdateEventRequest").path("properties");

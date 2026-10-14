@@ -13,9 +13,11 @@ import org.hibernate.validator.constraints.CodePointLength;
 import java.util.List;
 
 public record CreateEventRequest(
+        @io.swagger.v3.oas.annotations.media.Schema(example = "Treinamento NR 10")
         @NotBlank(message = "{event.title.notBlank}")
         @Size(min = 3, max = 255, message = "{event.title.size}")
         @CodePointLength(min = 3, message = "{event.title.size}") String title,
+        @io.swagger.v3.oas.annotations.media.Schema(example = "Orientações do treinamento")
         @NotBlank(message = "{event.description.notBlank}")
         @Size(min = 3, message = "{event.description.size}")
         @CodePointLength(min = 3, message = "{event.description.size}") String description,
