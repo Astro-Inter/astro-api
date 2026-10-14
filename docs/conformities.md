@@ -1,5 +1,7 @@
 # Conformidades — SCRUM-536
 
+`PATCH /conformities/{id}/applicability` exige `applicable` como booleano. Repetir o valor atual é idempotente. A operação modifica somente o registro indicado, sem excluir dados. Reativar exige colaborador ATIVO, NR não revogada e nenhum outro aplicável do par. Desativar pode revelar outro aplicável na view. Não desativa automaticamente o restante do histórico.
+
 `PUT /conformities/{id}` exige `nrId` e a presença de `expiresAt`. Campo ausente causa 400; `expiresAt: null` remove a validade. O colaborador, o ID, a origem, a aplicabilidade e a conclusão permanecem. Trocar a NR de um aplicável exige ausência de outro aplicável na NR de destino. Uma NR nova não pode estar revogada; manter a NR histórica é permitido. Edição de histórico de colaborador inativo é permitida. A NR deve corresponder à conclusão vinculada; `conclusao_evento.data_validade` não é alterada. A resposta usa o ID editado, mesmo quando outro registro continua representando o par na view.
 
 O módulo Java é `com.astro.api.conformity`. A renomeação atualiza imports e testes; a rota pública `/nrs` e seus campos permanecem compatíveis. `/collaborators` retorna os colaboradores autorizados e `/nrs` retorna código/título das NRs para seleção. O catálogo inclui NRs revogadas; uma nova vinculação revogada é rejeitada pela API.

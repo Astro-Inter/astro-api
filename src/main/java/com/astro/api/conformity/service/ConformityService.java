@@ -6,6 +6,7 @@ import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.exception.ConflictException;
 import com.astro.api.conformity.dto.request.CreateConformityRequest;
 import com.astro.api.conformity.dto.request.UpdateConformityRequest;
+import com.astro.api.conformity.dto.request.ConformityApplicabilityRequest;
 import com.astro.api.conformity.model.Conformity;
 import com.astro.api.conformity.repository.NrCatalogRepository;
 import com.astro.api.user.repository.CollaboratorRepository;
@@ -94,6 +95,26 @@ public class ConformityService {
     private Conformity requireRecord(Long conformityId, AuthenticatedUser principal, User manager) {
         return repository.findRecordInScope(conformityId, principal.firebaseUid(), manager.getUnit().workspace.id)
                 .orElseThrow(() -> new ResourceNotFoundException("Conformidade não encontrada"));
+    }
+
+    @Transactional
+    public ConformityResponse changeApplicability(Long conformityId, ConformityApplicabilityRequest request,
+                                                 AuthenticatedUser principal) {
+        User manager = requireManager(principal);
+        checkId(conformityId);
+        repository.lockWrites();
+        Conformity entity = requireRecord(conformityId, principal, manager);
+        User collaborator = requireCollaborator(entity.getCollaboratorId(), principal, manager);
+        if (request.applicable() != entity.isApplicable()) {
+            if (request.applicable()) {
+                requireActiveCollaborator(collaborator);
+                requireNr(entity.getNrId(), true);
+                checkConflict(entity.getCollaboratorId(), entity.getNrId(), conformityId);
+            }
+            entity.setApplicable(request.applicable());
+            repository.saveAndFlush(entity);
+        }
+        return details(conformityId, principal, manager);
     }
 
     private void requireActiveCollaborator(User collaborator) {

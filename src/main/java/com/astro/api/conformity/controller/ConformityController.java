@@ -17,6 +17,7 @@ import java.net.URI;
 import jakarta.validation.Valid;
 import com.astro.api.conformity.dto.request.CreateConformityRequest;
 import com.astro.api.conformity.dto.request.UpdateConformityRequest;
+import com.astro.api.conformity.dto.request.ConformityApplicabilityRequest;
 
 @RestController
 @RequestMapping("/conformities")
@@ -28,6 +29,19 @@ import com.astro.api.conformity.dto.request.UpdateConformityRequest;
 public class ConformityController {
     private final ConformityService service;
     public ConformityController(ConformityService service) { this.service = service; }
+
+    @PatchMapping("/{conformityId}/applicability")
+    @Operation(summary = "Define explicitamente a aplicabilidade",
+            description = "Recebe applicable obrigatório (true/false). Repetir o valor é idempotente. Atualiza somente aplicavel, preservando validade, origem, conclusão e histórico. Reativação exige colaborador ATIVO, NR não revogada e ausência de outro aplicável do par. Desativar o ID pode revelar outro registro aplicável do histórico na próxima listagem.")
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "Aplicabilidade definida"),
+            @ApiResponse(responseCode = "404", description = "Conformidade inexistente ou fora do escopo"),
+            @ApiResponse(responseCode = "409", description = "Outra conformidade aplicável do par")})
+    public ResponseEntity<ApiResult<ConformityResponse>> changeApplicability(@PathVariable Long conformityId,
+            @Valid @RequestBody ConformityApplicabilityRequest body,
+            @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
+        return ResponseEntity.ok(ApiResult.success("Aplicabilidade atualizada com sucesso",
+                service.changeApplicability(conformityId, body, principal), request.getRequestURI()));
+    }
 
     @PutMapping("/{conformityId}")
     @Operation(summary = "Edita NR e validade de um registro",

@@ -61,6 +61,9 @@ class ConformitySecurityTest {
                 mvc.perform(put("/conformities/2").header("Authorization", "Bearer valid")
                                 .contentType("application/json").content("{\"nrId\":10,\"expiresAt\":null}"))
                         .andExpect(status().isForbidden());
+                mvc.perform(patch("/conformities/2/applicability").header("Authorization", "Bearer valid")
+                                .contentType("application/json").content("{\"applicable\":false}"))
+                        .andExpect(status().isForbidden());
             }
             verifyNoInteractions(service);
             for (Role role : List.of(Role.GESTOR, Role.GESTOR_WORKSPACE)) {

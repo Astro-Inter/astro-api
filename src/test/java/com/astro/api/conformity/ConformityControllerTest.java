@@ -82,4 +82,21 @@ class ConformityControllerTest {
         }
         verifyNoInteractions(service);
     }
+
+    @Test void patchRequiresAnExplicitBooleanAndMapsConflicts() throws Exception {
+        when(service.changeApplicability(eq(2L), any(), eq(principal))).thenReturn(response());
+        mvc.perform(patch("/conformities/2/applicability").contentType("application/json").content("{\"applicable\":false}"))
+                .andExpect(status().isOk());
+        verify(service).changeApplicability(2L, new com.astro.api.conformity.dto.request.ConformityApplicabilityRequest(false), principal);
+        clearInvocations(service);
+        for (String body : List.of("{}", "{\"applicable\":null}", "{\"applicable\":\"invalid\"}",
+                "{\"applicable\":\"true\"}", "{\"applicable\":1}")) {
+            mvc.perform(patch("/conformities/2/applicability").contentType("application/json").content(body)).andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(service);
+        when(service.changeApplicability(eq(2L), any(), eq(principal))).thenThrow(
+                new com.astro.api.common.exception.ConflictException("Já existe uma conformidade aplicável para este colaborador e NR"));
+        mvc.perform(patch("/conformities/2/applicability").contentType("application/json").content("{\"applicable\":true}"))
+                .andExpect(status().isConflict());
+    }
 }

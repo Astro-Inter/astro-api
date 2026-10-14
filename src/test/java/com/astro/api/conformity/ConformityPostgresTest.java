@@ -177,6 +177,29 @@ class ConformityPostgresTest {
         assertEquals(10, service.findById(20L, principal).nrId());
     }
 
+    @Test void togglesOnlyTheSpecifiedRecordAndReactivationChecksPolicyAndConflicts() {
+        seedCompletion();
+        jdbc.update("INSERT INTO conformidade(id_conformidade,usuario_id,nr_id,aplicavel,data_validade,origem) VALUES (21,2,10,true,'2030-01-01','MANUAL')");
+        var inactive = new com.astro.api.conformity.dto.request.ConformityApplicabilityRequest(false);
+        var active = new com.astro.api.conformity.dto.request.ConformityApplicabilityRequest(true);
+        var result = service.changeApplicability(21L, inactive, principal);
+        assertFalse(result.applicable()); assertFalse(service.changeApplicability(21L, inactive, principal).applicable());
+        assertEquals(20L, service.findAll(principal).getFirst().id());
+        assertThrows(com.astro.api.common.exception.ConflictException.class, () -> service.changeApplicability(21L, active, principal));
+        var event = service.changeApplicability(20L, inactive, principal);
+        assertEquals("CONCLUSAO_EVENTO", event.origin()); assertEquals(1L, event.eventCompletionId());
+        assertEquals(java.time.LocalDate.of(2027,1,1), event.expiresAt());
+        assertTrue(service.changeApplicability(21L, active, principal).applicable());
+        assertTrue(service.changeApplicability(21L, active, principal).applicable());
+        service.changeApplicability(21L, inactive, principal);
+        jdbc.update("UPDATE usuario SET status='DESATIVADO' WHERE id_usuario=2");
+        assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.changeApplicability(21L, active, principal));
+        jdbc.update("UPDATE usuario SET status='ATIVO' WHERE id_usuario=2");
+        jdbc.update("UPDATE nr_catalogo SET revogada=true WHERE codigo_nr=10");
+        assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.changeApplicability(21L, active, principal));
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM conformidade", Integer.class));
+    }
+
     @Configuration
     @EnableTransactionManagement
     @EnableJpaRepositories(basePackages = {"com.astro.api.user.repository", "com.astro.api.conformity.repository"},
