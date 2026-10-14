@@ -34,12 +34,14 @@ class UserProfilePhotoServiceTest {
     private UserService userService;
     private R2StorageService storage;
     private MultipartFile file;
+    private UserAvatarService avatars;
 
     @BeforeEach
     void setUp() {
         userRepository = mock(UserRepository.class);
         userProfilePhotoRepository = mock(UserProfilePhotoRepository.class);
         storage = mock(R2StorageService.class);
+        avatars = mock(UserAvatarService.class);
         file = new MockMultipartFile("file", "foto.jpg", "image/jpeg", new byte[]{1});
         when(storage.uploadProfilePhoto(20L, file)).thenReturn("usuarios/20/foto-nova.jpg");
         userService = new UserService(
@@ -47,7 +49,7 @@ class UserProfilePhotoServiceTest {
                 mock(StringRedisTemplate.class),
                 mock(NrDocumentRepository.class),
                 userProfilePhotoRepository,
-                new UserMapper(), storage);
+                new UserMapper(), storage, avatars);
     }
 
     @Test
@@ -66,6 +68,7 @@ class UserProfilePhotoServiceTest {
         verify(storage, never()).deleteObject(any());
         assertEquals(20L, photoCaptor.getValue().getUserId());
         assertEquals("usuarios/20/foto-nova.jpg", photoCaptor.getValue().getObjectPath());
+        verify(avatars).invalidate(20L);
     }
 
     @Test
@@ -82,9 +85,10 @@ class UserProfilePhotoServiceTest {
 
         verify(userProfilePhotoRepository).saveAndFlush(existingPhoto);
         assertEquals("usuarios/20/foto-nova.jpg", existingPhoto.getObjectPath());
-        var order = inOrder(userProfilePhotoRepository, storage);
+        var order = inOrder(userProfilePhotoRepository, storage, avatars);
         order.verify(storage).uploadProfilePhoto(20L, file);
         order.verify(userProfilePhotoRepository).saveAndFlush(existingPhoto);
+        order.verify(avatars).invalidate(20L);
         order.verify(storage).deleteObject("usuarios/20/foto-antiga.jpg");
     }
 
@@ -96,7 +100,7 @@ class UserProfilePhotoServiceTest {
                 () -> userService.updateProfilePhoto("unknown-uid", file));
 
         assertEquals("Usuário não encontrado", exception.getMessage());
-        verifyNoInteractions(userProfilePhotoRepository, storage);
+        verifyNoInteractions(userProfilePhotoRepository, storage, avatars);
     }
 
     @Test
@@ -108,6 +112,26 @@ class UserProfilePhotoServiceTest {
 
         assertThrows(IllegalStateException.class, () -> userService.updateProfilePhoto("firebase-uid", file));
         verify(userProfilePhotoRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(avatars);
+    }
+
+    @Test
+    void shouldReportInvalidationFailureWithoutDeletingThePreviouslyCachedPhotoObject() {
+        User user = new User();
+        user.setId(20L);
+        UserProfilePhoto previous = new UserProfilePhoto();
+        previous.setUserId(20L);
+        previous.setObjectPath("usuarios/20/foto-antiga.jpg");
+        when(userRepository.findByFirebaseUid("firebase-uid")).thenReturn(Optional.of(user));
+        when(userProfilePhotoRepository.findById(20L)).thenReturn(Optional.of(previous));
+        var failure = new org.springframework.data.redis.RedisConnectionFailureException("Redis indisponível");
+        doThrow(failure).when(avatars).invalidate(20L);
+
+        assertEquals(failure, assertThrows(org.springframework.data.redis.RedisConnectionFailureException.class,
+                () -> userService.updateProfilePhoto("firebase-uid", file)));
+
+        verify(userProfilePhotoRepository).saveAndFlush(previous);
+        verify(storage, never()).deleteObject(any());
     }
 
     @Test
@@ -125,6 +149,7 @@ class UserProfilePhotoServiceTest {
         assertThrows(IllegalStateException.class, () -> userService.updateProfilePhoto("firebase-uid", file));
         verify(storage).deleteObject("usuarios/20/foto-nova.jpg");
         verify(storage, never()).deleteObject("usuarios/20/foto-antiga.jpg");
+        verifyNoInteractions(avatars);
     }
 
     @Test

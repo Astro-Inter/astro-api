@@ -134,7 +134,7 @@ public class SpreadsheetImportService {
         units.forEach(unit -> unitsByName.put(normalized(unit.name), unit));
         users.forEach(user -> {
             user.setUnit(unitsByName.get(normalized(user.getUnit().name)));
-            user.setCargo(rolesByName.get(normalized(user.getCargo().getName())));
+            user.setRole(rolesByName.get(normalized(user.getRole().getName())));
         });
     }
 
@@ -178,7 +178,7 @@ public class SpreadsheetImportService {
             User user = new User();
             user.setName(row.name().trim()); user.setEmail(normalizedEmail); user.setCpf(normalizedCpf);
             user.setType(UserType.COLABORADOR); user.setStatus(UserStatus.PRE_CADASTRADO);
-            user.setWorkModel(workModel); user.setUnit(unit); user.setCargo(role); user.setCreatedAt(Instant.now());
+            user.setWorkModel(workModel); user.setUnit(unit); user.setRole(role); user.setCreatedAt(Instant.now());
             validUsers.add(user);
         }
         return new ImportProcessingResult(validUsers, errors);

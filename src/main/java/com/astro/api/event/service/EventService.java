@@ -120,8 +120,8 @@ public class EventService {
             validateNrExists(nrId);
             Set<Long> eligibleRoleIds = findEligibleRoleIds(nrId, eligibleUsers);
             eligibleUsers = eligibleUsers.stream()
-                    .filter(user -> user.getCargo() != null
-                            && eligibleRoleIds.contains(user.getCargo().getId()))
+                    .filter(user -> user.getRole() != null
+                            && eligibleRoleIds.contains(user.getRole().getId()))
                     .toList();
         }
         return eligibleUsers.stream().map(eventMapper::toCandidateResponse).toList();
@@ -426,15 +426,15 @@ public class EventService {
         if (manager.getId().equals(participant.getId())) {
             throw new BusinessException("Gestor criador não pode participar do próprio evento");
         }
-        if (nrId != null && (participant.getCargo() == null
-                || !eligibleRoleIds.contains(participant.getCargo().getId()))) {
+        if (nrId != null && (participant.getRole() == null
+                || !eligibleRoleIds.contains(participant.getRole().getId()))) {
             throw new BusinessException("Participante não elegível para a NR");
         }
     }
 
     private Set<Long> findEligibleRoleIds(Integer nrId, Collection<User> users) {
         List<Long> roleIds = users.stream()
-                .map(User::getCargo)
+                .map(User::getRole)
                 .filter(Objects::nonNull)
                 .map(role -> role.getId())
                 .distinct()

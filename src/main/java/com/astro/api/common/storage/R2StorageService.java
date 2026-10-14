@@ -16,6 +16,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.UUID;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Service
 public class R2StorageService {
@@ -83,14 +85,23 @@ public class R2StorageService {
     }
 
     public String getDownloadUrl(String objectPath) {
+        PresignedDownload download = getPresignedDownload(objectPath);
+        return download == null ? null : download.url();
+    }
+
+    public PresignedDownload getPresignedDownload(String objectPath) {
         if (objectPath == null || objectPath.isBlank()) {
             return null;
         }
         properties.validate();
         GetObjectPresignRequest request = GetObjectPresignRequest.builder()
-                .signatureDuration(properties.presignedUrlDuration())
+                .signatureDuration(properties.presignedUrlDuration().truncatedTo(ChronoUnit.SECONDS))
                 .getObjectRequest(builder -> builder.bucket(properties.bucket()).key(objectPath))
                 .build();
-        return presigner.getObject().presignGetObject(request).url().toExternalForm();
+        var signed = presigner.getObject().presignGetObject(request);
+        // The signature in the URL has second precision; cache expiration must not exceed it.
+        return new PresignedDownload(signed.url().toExternalForm(), signed.expiration().truncatedTo(ChronoUnit.SECONDS));
     }
+
+    public record PresignedDownload(String url, Instant expiresAt) { }
 }

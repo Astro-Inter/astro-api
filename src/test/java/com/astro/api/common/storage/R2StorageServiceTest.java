@@ -9,6 +9,10 @@ import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignReques
 
 import java.net.URI;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,8 +42,9 @@ class R2StorageServiceTest {
                 return signedRequest;
             });
 
-            URI url = URI.create(new R2StorageService(provider, properties, null)
-                    .getDownloadUrl("usuarios/20/foto com acento-é+1.jpg"));
+            var download = new R2StorageService(provider, properties, null)
+                    .getPresignedDownload("usuarios/20/foto com acento-é+1.jpg");
+            URI url = URI.create(download.url());
 
             assertEquals("photos", captured.get().getObjectRequest().bucket());
             assertEquals("usuarios/20/foto com acento-é+1.jpg", captured.get().getObjectRequest().key());
@@ -51,6 +56,11 @@ class R2StorageServiceTest {
             assertTrue(url.getQuery().contains("X-Amz-Expires=86400"));
             assertTrue(url.getQuery().contains("X-Amz-Signature="));
             assertTrue(url.getQuery().contains("/auto/s3/aws4_request"));
+            String signatureDate = Arrays.stream(url.getQuery().split("&"))
+                    .filter(parameter -> parameter.startsWith("X-Amz-Date="))
+                    .findFirst().orElseThrow().substring("X-Amz-Date=".length());
+            var format = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC);
+            assertEquals(Instant.from(format.parse(signatureDate)).plusSeconds(86400), download.expiresAt());
         }
     }
 

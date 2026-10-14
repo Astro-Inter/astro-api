@@ -3,12 +3,13 @@ package com.astro.api.home.service;
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.security.Role;
 import com.astro.api.common.exception.ResourceNotFoundException;
-import com.astro.api.common.viewed.ViewedService;
+import com.astro.api.common.service.ViewedService;
 import com.astro.api.form.model.Form;
 import com.astro.api.form.service.FormService;
 import com.astro.api.home.dto.response.ManagerHomeResponse;
 import com.astro.api.home.repository.HomeRepository;
 import com.astro.api.home.repository.HomeUserIdProjection;
+import com.astro.api.notification.service.NotificationService;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -27,7 +28,7 @@ class ManagerHomeServiceTest {
     private final FormService formService = mock(FormService.class);
     private final ViewedService viewedService = mock(ViewedService.class);
     private final HomeService service = new HomeService(homeRepository, JsonMapper.builder().build(),
-            formService, viewedService);
+            mock(NotificationService.class), viewedService, formService);
     private final AuthenticatedUser manager = new AuthenticatedUser("manager", "manager@astro.com", Role.GESTOR);
 
     @Test
