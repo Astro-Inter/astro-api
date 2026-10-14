@@ -226,6 +226,17 @@ class EventControllerIntegrationTest {
         verify(eventService).cancel(anyLong(), any(CancelEventRequest.class), anyString());
     }
 
+    @Test
+    void cancellationRequiresNormalizedReasonAndResolvesPortugueseMessages() throws Exception {
+        for(String reason:List.of(""," "," ab ","x".repeat(1001))) {
+            var result=mockMvc.perform(patch("/events/1/cancellation").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(new CancelEventRequest(reason))))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Erro de validação")).andReturn();
+            org.junit.jupiter.api.Assertions.assertFalse(result.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8).contains("{event."));
+        }
+        mockMvc.perform(patch("/events/1/cancellation").contentType(MediaType.APPLICATION_JSON).content("{}" )).andExpect(status().isBadRequest());
+        org.mockito.Mockito.verifyNoInteractions(eventService);
+    }
+
     private CreateEventRequest createRequest() {
         CreateEventClassRequest eventClass = new CreateEventClassRequest(
                 "Grupo 1",

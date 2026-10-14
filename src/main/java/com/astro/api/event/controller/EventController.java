@@ -150,9 +150,11 @@ public class EventController {
 
     @PatchMapping("/{eventId}/cancellation")
     @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
-    @Operation(summary = "Cancela definitivamente um evento")
+    @Operation(summary = "Cancela definitivamente um evento",
+            description = "A ação Inativar do web corresponde ao cancelamento definitivo. Somente o criador de evento ATIVO no workspace pode cancelar. Justificativa obrigatória (3–1000 caracteres após trim); registra status, instante e motivo. Preserva turmas, participações, conclusões e evidências; não permite reativação. Operação atômica e serializada com a edição.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Evento cancelado com sucesso"),
+            @ApiResponse(responseCode = "200", description = "Detalhe cancelado no envelope ApiResult, com permissões falsas"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado"),
             @ApiResponse(responseCode = "400", description = "Evento concluído ou já cancelado"),
             @ApiResponse(responseCode = "404", description = "Evento não encontrado no Workspace"),
             @ApiResponse(responseCode = "403", description = "Não autorizado")

@@ -213,7 +213,7 @@ class EventServiceTest {
                 event,
                 LocalDateTime.now().plusDays(1),
                 LocalDateTime.now().plusDays(1).plusHours(1));
-        when(eventRepository.findByIdAndManager_Unit_Workspace(30L, workspace))
+        when(eventRepository.findLockedInWorkspace(30L, workspace))
                 .thenReturn(Optional.of(event));
         when(eventClassRepository.findByEventOrderByStartDate(event)).thenReturn(List.of(eventClass));
         when(eventClassParticipantRepository.findByEventClassIn(List.of(eventClass))).thenReturn(List.of());
@@ -378,6 +378,22 @@ class EventServiceTest {
         verify(eventClassParticipantRepository).deleteAll(List.of());
         verify(eventClassParticipantRepository).saveAll(List.of());
         verify(eventClassParticipantRepository,never()).hasConclusions(any());
+    }
+
+    @Test
+    void cancellationNormalizesAndValidatesReasonBeforeChangingEvent() {
+        Event event=createEvent(EventStatus.ATIVO);
+        when(eventRepository.findLockedInWorkspace(30L,workspace)).thenReturn(Optional.of(event));
+        for(String reason:java.util.Arrays.asList(null," "," ab ","x".repeat(1001))) {
+            assertThrows(BusinessException.class,()->service.cancel(30L,new CancelEventRequest(reason),"manager"));
+            assertEquals(EventStatus.ATIVO,event.getStatus());
+        }
+        var response=service.cancel(30L,new CancelEventRequest("  Motivo válido  "),"manager");
+        assertEquals("Motivo válido",response.cancellationReason());
+        assertEquals(java.time.Instant.parse("2026-10-14T12:00:00Z"),response.cancellationDate());
+        org.junit.jupiter.api.Assertions.assertFalse(response.canEdit());org.junit.jupiter.api.Assertions.assertFalse(response.canCancel());
+        assertThrows(BusinessException.class,()->service.cancel(30L,new CancelEventRequest("Outro motivo"),"manager"));
+        verify(eventClassParticipantRepository,never()).deleteAll(any());verify(eventClassRepository,never()).deleteAll(any());
     }
 
     private CreateEventRequest createRequest(Integer nrId, List<Long> participantIds) {

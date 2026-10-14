@@ -213,6 +213,41 @@ class EventPostgresTest {
         assertEquals(created.eventClasses().getFirst().participants().getFirst().participationId(),after.eventClasses().getFirst().participants().getFirst().participationId());
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM turma_funcionario",Integer.class));
     }
+    @Test void cancellationIsDefinitiveAndKeepsAllHistoricalRowsAndIds() {
+        var created=service.create(createRequest(List.of(createClass("A",2))),"uid1");
+        long participation=created.eventClasses().getFirst().participants().getFirst().participationId();
+        long conclusion=jdbc.queryForObject("INSERT INTO conclusao_evento(turma_funcionario_id,status) VALUES (?,'CONCLUIDO') RETURNING id_conclusao_evento",Long.class,participation);
+        jdbc.update("INSERT INTO evidencia(conclusao_evento_id,caminho_objeto) VALUES (?,'example.pdf')",conclusion);
+        var cancelled=service.cancel(created.id(),new com.astro.api.event.dto.request.CancelEventRequest("  Reagendado  "),"uid1");
+        assertEquals("Reagendado",cancelled.cancellationReason());assertEquals(Instant.parse("2026-10-14T12:00:00Z"),cancelled.cancellationDate());
+        assertFalse(cancelled.canEdit());assertFalse(cancelled.canCancel());assertFalse(cancelled.detailsEditable());assertFalse(cancelled.eventClasses().getFirst().editable());
+        assertEquals(created.eventClasses().getFirst().id(),cancelled.eventClasses().getFirst().id());
+        assertEquals(participation,cancelled.eventClasses().getFirst().participants().getFirst().participationId());
+        assertEquals(cancelled,service.findById(created.id(),"uid1"));
+        assertEquals(com.astro.api.event.model.EventStatus.CANCELADO,service.findAll(LocalDateTime.of(2026,10,15,0,0),LocalDateTime.of(2026,10,16,0,0),"uid1").getFirst().status());
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM conclusao_evento",Integer.class));assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM evidencia",Integer.class));
+        assertThrows(com.astro.api.common.exception.BusinessException.class,()->service.cancel(created.id(),new com.astro.api.event.dto.request.CancelEventRequest("Outro motivo"),"uid1"));
+    }
+    @Test void cancellationRejectsBadReasonsFinalStatesAndOtherCreatorsWithoutChanges() {
+        long id=event(1,"ATIVO");
+        for(String reason:java.util.Arrays.asList(null," "," ab ","x".repeat(1001))) assertThrows(com.astro.api.common.exception.BusinessException.class,()->service.cancel(id,new com.astro.api.event.dto.request.CancelEventRequest(reason),"uid1"));
+        assertEquals(com.astro.api.event.model.EventStatus.ATIVO,service.findById(id,"uid1").status());
+        var reason=new com.astro.api.event.dto.request.CancelEventRequest("Motivo válido");
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,()->service.cancel(id,reason,"uid3"));
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,()->service.cancel(id,reason,"uid5"));
+        long completed=event(1,"CONCLUIDO");assertThrows(com.astro.api.common.exception.BusinessException.class,()->service.cancel(completed,reason,"uid1"));
+        var boundary=service.cancel(id,new com.astro.api.event.dto.request.CancelEventRequest("  "+"x".repeat(1000)+"  "),"uid1");
+        assertEquals(1000,boundary.cancellationReason().length());
+    }
+    @Test void twoConcurrentCancellationsCommitOnlyOneReason() throws Exception {
+        long id=event(1,"ATIVO");var ready=new java.util.concurrent.CountDownLatch(2);var start=new java.util.concurrent.CountDownLatch(1);
+        try(var executor=java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            java.util.concurrent.Callable<Boolean> cancel=()->{ready.countDown();assertTrue(start.await(10,java.util.concurrent.TimeUnit.SECONDS));try{service.cancel(id,new com.astro.api.event.dto.request.CancelEventRequest("Cancelamento"),"uid1");return true;}catch(com.astro.api.common.exception.BusinessException exception){return false;}};
+            var a=executor.submit(cancel);var b=executor.submit(cancel);assertTrue(ready.await(10,java.util.concurrent.TimeUnit.SECONDS));start.countDown();
+            assertNotEquals(a.get(20,java.util.concurrent.TimeUnit.SECONDS),b.get(20,java.util.concurrent.TimeUnit.SECONDS));
+        }
+        assertEquals(com.astro.api.event.model.EventStatus.CANCELADO,service.findById(id,"uid1").status());
+    }
     static DriverManagerDataSource dataSource() {
         String url=System.getenv("MANAGER_TEST_DATABASE_URL");
         if (!url.matches("jdbc:postgresql://(localhost|127\\.0\\.0\\.1):[0-9]+/astro525")) throw new IllegalArgumentException("Local disposable astro525 database required");

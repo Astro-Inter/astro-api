@@ -226,13 +226,16 @@ public class EventService {
     @Transactional
     public EventResponse cancel(Long eventId, CancelEventRequest request, String firebaseUid) {
         User manager = findAuthenticatedManager(firebaseUid);
-        Event event = findEventInWorkspace(eventId, getWorkspace(manager));
+        Event event = findLockedEventInWorkspace(eventId, getWorkspace(manager));
         ensureManagerAndEditable(event, manager);
 
+        if (request.reason() == null || request.reason().length() < 3 || request.reason().length() > 1000) {
+            throw new BusinessException("Motivo do cancelamento deve ter entre 3 e 1000 caracteres");
+        }
         event.setStatus(EventStatus.CANCELADO);
         event.setCancellationDate(clock.instant());
-        event.setCancellationReason(request.reason().trim());
-        eventRepository.save(event);
+        event.setCancellationReason(request.reason());
+        eventRepository.saveAndFlush(event);
         return toResponse(event, eventClassRepository.findByEventOrderByStartDate(event), manager);
     }
 
