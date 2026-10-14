@@ -384,7 +384,7 @@ class EventServiceTest {
     void cancellationNormalizesAndValidatesReasonBeforeChangingEvent() {
         Event event=createEvent(EventStatus.ATIVO);
         when(eventRepository.findLockedInWorkspace(30L,workspace)).thenReturn(Optional.of(event));
-        for(String reason:java.util.Arrays.asList(null," "," ab ","x".repeat(1001))) {
+        for(String reason:java.util.Arrays.asList(null," "," ab ","😀😀","x".repeat(1001))) {
             assertThrows(BusinessException.class,()->service.cancel(30L,new CancelEventRequest(reason),"manager"));
             assertEquals(EventStatus.ATIVO,event.getStatus());
         }

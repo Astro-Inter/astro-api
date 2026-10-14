@@ -6,12 +6,14 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Pattern;
+import org.hibernate.validator.constraints.CodePointLength;
 
 import java.util.List;
 
 public record UpdateEventRequest(
         @NotBlank(message = "{event.title.notBlank}")
-        @Size(min = 3, max = 255, message = "{event.title.size}") String title,
+        @Size(min = 3, max = 255, message = "{event.title.size}")
+        @CodePointLength(min = 3, message = "{event.title.size}") String title,
         @NotBlank(message = "{event.description.notBlank}")
         @Size(min = 3, message = "{event.description.size}")
         @Pattern(regexp = "(?s)^ *[^ ].+[^ ] *$", message = "{event.description.size}") String description,

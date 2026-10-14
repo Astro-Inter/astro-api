@@ -229,7 +229,9 @@ public class EventService {
         Event event = findLockedEventInWorkspace(eventId, getWorkspace(manager));
         ensureManagerAndEditable(event, manager);
 
-        if (request.reason() == null || request.reason().length() < 3 || request.reason().length() > 1000) {
+        if (request.reason() == null
+                || request.reason().codePointCount(0, request.reason().length()) < 3
+                || request.reason().length() > 1000) {
             throw new BusinessException("Motivo do cancelamento deve ter entre 3 e 1000 caracteres");
         }
         event.setStatus(EventStatus.CANCELADO);

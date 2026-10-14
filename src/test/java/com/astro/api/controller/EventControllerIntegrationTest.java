@@ -155,7 +155,7 @@ class EventControllerIntegrationTest {
         base.put("title","Evento");base.put("description","Descrição");base.put("completionMode","GESTOR");base.put("mandatoryEvidence",false);
         var item=new java.util.LinkedHashMap<String,Object>();item.put("name","Grupo");item.put("startDate","2026-10-15T08:00:00");item.put("endDate","2026-10-15T09:00:00");item.put("participantIds",List.of(2));
         base.put("eventClasses",List.of(item));
-        for (var invalid:List.of(java.util.Map.entry("title","  ab  "),java.util.Map.entry("title","x".repeat(256)),
+        for (var invalid:List.of(java.util.Map.entry("title","😀😀"),java.util.Map.entry("description","😀a"),java.util.Map.entry("title","  ab  "),java.util.Map.entry("title","x".repeat(256)),
                 java.util.Map.entry("description","  "),java.util.Map.entry("description","ab"),
                 java.util.Map.entry("externalLink","ftp://example.com"),java.util.Map.entry("externalLink","https://exa mple.com"),
                 java.util.Map.entry("externalLink","https://example.com/"+"x".repeat(2048)))) {
@@ -228,7 +228,7 @@ class EventControllerIntegrationTest {
 
     @Test
     void cancellationRequiresNormalizedReasonAndResolvesPortugueseMessages() throws Exception {
-        for(String reason:List.of(""," "," ab ","x".repeat(1001))) {
+        for(String reason:List.of(""," "," ab ","😀😀","x".repeat(1001))) {
             var result=mockMvc.perform(patch("/events/1/cancellation").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(new CancelEventRequest(reason))))
                     .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Erro de validação")).andReturn();
             org.junit.jupiter.api.Assertions.assertFalse(result.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8).contains("{event."));
