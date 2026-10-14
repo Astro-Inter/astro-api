@@ -9,4 +9,6 @@ public record ManagerSummaryResponse(
         String email,
         @JsonProperty("unidade_id") Long unitId,
         @JsonProperty("unidade") String unitName,
-        UserStatus status) { }
+        UserStatus status,
+        String profilePhotoUrl,
+        String avatarInitials) { }

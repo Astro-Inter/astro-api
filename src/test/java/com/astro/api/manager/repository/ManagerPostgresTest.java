@@ -197,7 +197,8 @@ class ManagerPostgresTest {
         @Bean ManagerService service(ManagerRepository repository, UserRepository users, ManagerMapper mapper,
                                     com.astro.api.role.repository.RoleRepository roles, com.astro.api.unit.repository.UnitRepository units,
                                     com.astro.api.auth.service.FirebaseIdentityService firebase, PlatformTransactionManager transactions) {
-            return new ManagerService(repository, users, mapper, roles, units, firebase, new com.astro.api.manager.service.ManagerStatusPolicy(), transactions);
+            return new ManagerService(repository, users, mapper, roles, units, firebase, new com.astro.api.manager.service.ManagerStatusPolicy(), transactions,
+                    org.mockito.Mockito.mock(com.astro.api.user.service.UserAvatarService.class));
         }
     }
 }

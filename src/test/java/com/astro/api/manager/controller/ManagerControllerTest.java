@@ -41,12 +41,15 @@ class ManagerControllerTest {
 
     @Test void listsPortugueseJsonFieldsWithoutSensitiveData() throws Exception {
         when(service.findAll(principal)).thenReturn(List.of(new ManagerSummaryResponse(1L, "Gestor",
-                "manager@astro.com", 10L, "Unidade", UserStatus.PRE_CADASTRADO)));
+                "manager@astro.com", 10L, "Unidade", UserStatus.PRE_CADASTRADO,
+                "https://r2.example.com/photo?signature=abc&expires=123", "G")));
         mvc.perform(get("/managers").param("workspaceId", "999").param("firebase_uid", "attacker"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].id_usuario").value(1))
                 .andExpect(jsonPath("$.data[0].unidade_id").value(10))
                 .andExpect(jsonPath("$.data[0].status").value("PRE_CADASTRADO"))
+                .andExpect(jsonPath("$.data[0].profilePhotoUrl").value("https://r2.example.com/photo?signature=abc&expires=123"))
+                .andExpect(jsonPath("$.data[0].avatarInitials").value("G"))
                 .andExpect(jsonPath("$.data[0].cpf").doesNotExist())
                 .andExpect(jsonPath("$.data[0].password").doesNotExist())
                 .andExpect(jsonPath("$.data[0].firebase_uid").doesNotExist());
@@ -55,10 +58,12 @@ class ManagerControllerTest {
     @Test void detailsExposeOnlyAdministrativeFieldsAndReturnStandardErrors() throws Exception {
         when(service.findById(1L, principal)).thenReturn(new com.astro.api.manager.dto.response.ManagerDetailsResponse(
                 1L, "Gestor", "12345678900", "manager@astro.com", null, UserStatus.ATIVO,
-                2L, "Cargo", 10L, "Unidade", 3L));
+                2L, "Cargo", 10L, "Unidade", 3L, null, "G"));
         mvc.perform(get("/managers/1")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.cpf").value("12345678900"))
                 .andExpect(jsonPath("$.data.cargo_id").value(2)).andExpect(jsonPath("$.data.workspace_id").value(3))
+                .andExpect(jsonPath("$.data.profilePhotoUrl").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.avatarInitials").value("G"))
                 .andExpect(jsonPath("$.data.firebase_uid").doesNotExist()).andExpect(jsonPath("$.data.senha").doesNotExist());
         when(service.findById(99L, principal)).thenThrow(new com.astro.api.common.exception.ResourceNotFoundException("Gestor não encontrado"));
         mvc.perform(get("/managers/99")).andExpect(status().isNotFound()).andExpect(jsonPath("$.message").value("Gestor não encontrado"));
@@ -66,10 +71,13 @@ class ManagerControllerTest {
     }
     @Test void promotionValidatesItsContractAndReturnsTheSameUserLocation() throws Exception {
         when(service.promote(any(), eq(principal))).thenReturn(new com.astro.api.manager.dto.response.ManagerDetailsResponse(
-                4L, "Gestor", "12345678900", "user@astro.com", null, UserStatus.DESATIVADO, 2L, "Cargo", 10L, "Unidade", 3L));
+                4L, "Gestor", "12345678900", "user@astro.com", null, UserStatus.DESATIVADO, 2L, "Cargo", 10L, "Unidade", 3L,
+                "https://r2.example.com/collaborator", "G"));
         mvc.perform(post("/managers").contentType("application/json").content("{\"collaboratorId\":4,\"status\":\"DESATIVADO\"}"))
                 .andExpect(status().isCreated()).andExpect(header().string("Location", "/managers/4"))
-                .andExpect(jsonPath("$.data.status").value("DESATIVADO"));
+                .andExpect(jsonPath("$.data.status").value("DESATIVADO"))
+                .andExpect(jsonPath("$.data.profilePhotoUrl").value("https://r2.example.com/collaborator"))
+                .andExpect(jsonPath("$.data.avatarInitials").value("G"));
         clearInvocations(service);
         for (String body : List.of("{}", "{\"collaboratorId\":0,\"status\":\"ATIVO\"}",
                 "{\"collaboratorId\":4,\"status\":\"PRE_CADASTRADO\"}")) {

@@ -22,6 +22,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.astro.api.manager.mapper.ManagerMapper;
 import com.astro.api.manager.repository.ManagerRepository;
+import com.astro.api.manager.repository.ManagerSummaryProjection;
+import com.astro.api.user.service.UserAvatarService;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
@@ -30,6 +32,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class ManagerService {
@@ -42,11 +45,12 @@ public class ManagerService {
     private final FirebaseIdentityService firebaseIdentityService;
     private final ManagerStatusPolicy statusPolicy;
     private final TransactionTemplate transactionTemplate;
+    private final UserAvatarService userAvatarService;
 
     public ManagerService(ManagerRepository managerRepository, UserRepository userRepository, ManagerMapper managerMapper,
                           RoleRepository roleRepository, UnitRepository unitRepository,
                           FirebaseIdentityService firebaseIdentityService, ManagerStatusPolicy statusPolicy,
-                          PlatformTransactionManager transactionManager) {
+                          PlatformTransactionManager transactionManager, UserAvatarService userAvatarService) {
         this.managerRepository = managerRepository;
         this.userRepository = userRepository;
         this.managerMapper = managerMapper;
@@ -54,6 +58,7 @@ public class ManagerService {
         this.unitRepository = unitRepository;
         this.firebaseIdentityService = firebaseIdentityService;
         this.statusPolicy = statusPolicy;
+        this.userAvatarService = userAvatarService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -61,14 +66,17 @@ public class ManagerService {
     @Transactional(readOnly = true)
     public List<ManagerSummaryResponse> findAll(AuthenticatedUser principal) {
         Long workspaceId = requireWorkspaceManager(principal).getUnit().workspace.id;
-        return managerRepository.findAllInWorkspace(workspaceId).stream().map(managerMapper::toSummary).toList();
+        List<ManagerSummaryProjection> rows = managerRepository.findAllInWorkspace(workspaceId);
+        Map<Long, String> urls = userAvatarService.findUrls(rows.stream().map(ManagerSummaryProjection::getId).toList());
+        return rows.stream().map(row -> managerMapper.toSummary(row, urls.get(row.getId()))).toList();
     }
 
     @Transactional(readOnly = true)
     public ManagerDetailsResponse findById(Long managerId, AuthenticatedUser principal) {
         Long workspaceId = requireWorkspaceManager(principal).getUnit().workspace.id;
         checkId(managerId);
-        return managerRepository.findDetailsInWorkspace(managerId, workspaceId).map(managerMapper::toDetails)
+        return managerRepository.findDetailsInWorkspace(managerId, workspaceId)
+                .map(row -> managerMapper.toDetails(row, userAvatarService.findUrl(row.getId())))
                 .orElseThrow(() -> new ResourceNotFoundException("Gestor não encontrado"));
     }
 
@@ -92,7 +100,8 @@ public class ManagerService {
         requireActiveLinks(collaborator, workspaceId);
         collaborator.setType(UserType.GESTOR);
         collaborator.setStatus(body.status().toUserStatus());
-        return managerMapper.toDetails(managerRepository.saveAndFlush(collaborator));
+        User saved = managerRepository.saveAndFlush(collaborator);
+        return managerMapper.toDetails(saved, userAvatarService.findUrl(saved.getId()));
     }
 
     private void requireActiveLinks(User user, Long workspaceId) {
@@ -137,7 +146,7 @@ public class ManagerService {
                     emailChange[0] = new EmailChange(saved.getId(), saved.getFirebaseUid(), previous);
                     firebaseIdentityService.updateEmail(saved.getFirebaseUid(), body.email());
                 }
-                return managerMapper.toDetails(saved);
+                return managerMapper.toDetails(saved, userAvatarService.findUrl(saved.getId()));
             });
         } catch (RuntimeException exception) {
             if (emailChange[0] != null) compensateEmail(emailChange[0], exception);
@@ -160,7 +169,7 @@ public class ManagerService {
         UserStatus previous = manager.getStatus();
         applyStatus(manager, desired, workspaceId);
         if (desired != previous) persist(manager);
-        return managerMapper.toDetails(manager);
+        return managerMapper.toDetails(manager, userAvatarService.findUrl(manager.getId()));
     }
 
     private void applyStatus(User manager, UserStatus desired, Long workspaceId) {

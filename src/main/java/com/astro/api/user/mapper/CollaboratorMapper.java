@@ -13,7 +13,7 @@ import com.astro.api.user.model.UserType;
 import com.astro.api.role.model.Role;
 import com.astro.api.unit.model.Unit;
 import java.time.Instant;
-import java.util.Locale;
+import static com.astro.api.user.mapper.UserAvatarMapper.initials;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -60,13 +60,4 @@ public class CollaboratorMapper {
                 UserStatus.valueOf(row.getStatus()), profilePhotoUrl, initials(row.getName()));
     }
 
-    private String initials(String name) {
-        if (name == null || name.isBlank()) {
-            return "";
-        }
-        String[] parts = name.strip().split("\\s+");
-        String first = new String(Character.toChars(parts[0].codePointAt(0)));
-        String last = parts.length > 1 ? new String(Character.toChars(parts[parts.length - 1].codePointAt(0))) : "";
-        return (first + last).toUpperCase(Locale.ROOT);
-    }
 }
