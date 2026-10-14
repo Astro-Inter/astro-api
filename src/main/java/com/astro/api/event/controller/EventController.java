@@ -85,10 +85,12 @@ public class EventController {
 
     @GetMapping("/eligible-candidates")
     @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
-    @Operation(summary = "Lista colaboradores elegíveis para compor as turmas")
+    @Operation(summary = "Lista usuários elegíveis para compor as turmas",
+            description = "Usuários ativos do workspace autenticado, incluindo outros gestores e excluindo o solicitante. nrId é o ID persistido do catálogo; filtra a associação Role/NR. Retorna unidade e modalidade canônica, incluindo HIBRIDO; ordenado por nome e ID.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Colaboradores retornados com sucesso"),
-            @ApiResponse(responseCode = "400", description = "NR inválida"),
+            @ApiResponse(responseCode = "400", description = "Identificador da NR inválido"),
+            @ApiResponse(responseCode = "404", description = "NR não encontrada"),
             @ApiResponse(responseCode = "401", description = "Não autenticado"),
             @ApiResponse(responseCode = "403", description = "Não autorizado")
     })

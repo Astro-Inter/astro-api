@@ -20,6 +20,7 @@ import com.astro.api.event.model.EventStatus;
 import com.astro.api.event.repository.EventClassParticipantRepository;
 import com.astro.api.event.repository.EventClassRepository;
 import com.astro.api.event.repository.EventRepository;
+import com.astro.api.event.repository.EventCandidateRepository;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.model.UserStatus;
@@ -52,6 +53,7 @@ public class EventService {
     private final NrCatalogRepository nrCatalogRepository;
     private final EventMapper eventMapper;
     private final Clock clock;
+    private final EventCandidateRepository candidateRepository;
 
     public EventService(
             EventRepository eventRepository,
@@ -60,7 +62,8 @@ public class EventService {
             UserRepository userRepository,
             RoleRepository roleRepository,
             NrCatalogRepository nrCatalogRepository,
-            EventMapper eventMapper, @Qualifier("eventClock") Clock clock) {
+            EventMapper eventMapper, @Qualifier("eventClock") Clock clock,
+            EventCandidateRepository candidateRepository) {
         this.eventRepository = eventRepository;
         this.eventClassRepository = eventClassRepository;
         this.eventClassParticipantRepository = eventClassParticipantRepository;
@@ -69,6 +72,7 @@ public class EventService {
         this.nrCatalogRepository = nrCatalogRepository;
         this.eventMapper = eventMapper;
         this.clock = clock;
+        this.candidateRepository = candidateRepository;
     }
 
     @Transactional
@@ -111,23 +115,14 @@ public class EventService {
                 .map(eventMapper::toCalendarResponse).toList();
     }
 
+    @Transactional(readOnly = true)
     public List<EventCandidateResponse> findEligibleCandidates(Integer nrId, String firebaseUid) {
         User manager = findAuthenticatedManager(firebaseUid);
         Workspace workspace = getWorkspace(manager);
-        List<User> eligibleUsers = userRepository
-                .findByUnit_WorkspaceAndStatus(workspace, UserStatus.ATIVO)
-                .stream()
-                .filter(user -> !user.getId().equals(manager.getId()))
-                .toList();
-        if (nrId != null) {
-            validateNrExists(nrId);
-            Set<Long> eligibleRoleIds = findEligibleRoleIds(nrId, eligibleUsers);
-            eligibleUsers = eligibleUsers.stream()
-                    .filter(user -> user.getRole() != null
-                            && eligibleRoleIds.contains(user.getRole().getId()))
-                    .toList();
-        }
-        return eligibleUsers.stream().map(eventMapper::toCandidateResponse).toList();
+        if (nrId != null && nrId <= 0) throw new BusinessException("Identificador da NR deve ser positivo");
+        validateNrExists(nrId);
+        return candidateRepository.findEligibleCandidates(workspace.id, manager.getId(), nrId).stream()
+                .map(eventMapper::toCandidateResponse).toList();
     }
 
     @Transactional

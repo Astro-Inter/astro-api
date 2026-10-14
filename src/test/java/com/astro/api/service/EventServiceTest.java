@@ -47,6 +47,7 @@ class EventServiceTest {
     private RoleRepository roleRepository;
     private NrCatalogRepository nrCatalogRepository;
     private EventService service;
+    private com.astro.api.event.repository.EventCandidateRepository candidateRepository;
     private User manager;
     private Workspace workspace;
 
@@ -58,6 +59,7 @@ class EventServiceTest {
         userRepository = mock(UserRepository.class);
         roleRepository = mock(RoleRepository.class);
         nrCatalogRepository = mock(NrCatalogRepository.class);
+        candidateRepository = mock(com.astro.api.event.repository.EventCandidateRepository.class);
         service = new EventService(
                 eventRepository,
                 eventClassRepository,
@@ -66,7 +68,8 @@ class EventServiceTest {
                 roleRepository,
                 nrCatalogRepository,
                 new EventMapper(), java.time.Clock.fixed(
-                        java.time.Instant.parse("2026-10-14T12:00:00Z"), java.time.ZoneOffset.UTC));
+                        java.time.Instant.parse("2026-10-14T12:00:00Z"), java.time.ZoneOffset.UTC),
+                candidateRepository);
         workspace = new Workspace();
         workspace.id = 10L;
         manager = createUser(1L, UserStatus.ATIVO, workspace);
@@ -289,6 +292,23 @@ class EventServiceTest {
         assertThrows(BusinessException.class, () -> service.findAll(start, null, "manager"));
         assertThrows(BusinessException.class, () -> service.findAll(start, start, "manager"));
         org.junit.jupiter.api.Assertions.assertTrue(service.findAll(start, end, "manager").isEmpty());
+    }
+
+    @Test
+    void candidatesUseWorkspaceCreatorAndNrFiltersAndCanonicalWorkModel() {
+        var row = mock(com.astro.api.event.repository.EventCandidateProjection.class);
+        when(row.getId()).thenReturn(3L); when(row.getRoleId()).thenReturn(103L);
+        when(row.getUnitId()).thenReturn(7L); when(row.getUnitName()).thenReturn("Sede");
+        when(row.getWorkModel()).thenReturn("HIBRIDO");
+        when(nrCatalogRepository.existsById(10)).thenReturn(true);
+        when(candidateRepository.findEligibleCandidates(10L,1L,10)).thenReturn(List.of(row));
+        var response = service.findEligibleCandidates(10,"manager").getFirst();
+        assertEquals(7L,response.unitId()); assertEquals("Sede",response.unitName());
+        assertEquals(com.astro.api.user.model.WorkModel.HIBRIDO,response.workModel());
+        verify(candidateRepository).findEligibleCandidates(10L,1L,10);
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,()->service.findEligibleCandidates(99,"manager"));
+        assertThrows(BusinessException.class,()->service.findEligibleCandidates(0,"manager"));
+        org.junit.jupiter.api.Assertions.assertTrue(service.findEligibleCandidates(null,"manager").isEmpty());
     }
 
     private CreateEventRequest createRequest(Integer nrId, List<Long> participantIds) {

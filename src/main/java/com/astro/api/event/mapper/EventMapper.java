@@ -9,6 +9,9 @@ import com.astro.api.event.model.Event;
 import com.astro.api.event.model.EventClass;
 import com.astro.api.event.model.EventClassParticipant;
 import com.astro.api.user.model.User;
+import com.astro.api.user.model.WorkModel;
+import com.astro.api.event.repository.EventCandidateProjection;
+import com.astro.api.event.repository.EventCalendarProjection;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -57,14 +60,15 @@ public class EventMapper {
                 classResponses);
     }
 
-    public EventCandidateResponse toCandidateResponse(User user) {
-        Long roleId = user.getRole() == null ? null : user.getRole().getId();
-        String roleName = user.getRole() == null ? null : user.getRole().getName();
-        return new EventCandidateResponse(user.getId(), user.getName(), user.getEmail(), roleId, roleName);
+    public EventCandidateResponse toCandidateResponse(
+            EventCandidateProjection row) {
+        return new EventCandidateResponse(row.getId(), row.getName(), row.getEmail(), row.getRoleId(),
+                row.getRoleName(), row.getUnitId(), row.getUnitName(), row.getWorkModel() == null ? null
+                : WorkModel.valueOf(row.getWorkModel()));
     }
 
     public EventCalendarResponse toCalendarResponse(
-            com.astro.api.event.repository.EventCalendarProjection row) {
+            EventCalendarProjection row) {
         return new EventCalendarResponse(row.getEventId(), row.getEventTitle(), row.getEventClassId(),
                 row.getClassName(), row.getStartDate(), row.getEndDate(), row.getStatus());
     }

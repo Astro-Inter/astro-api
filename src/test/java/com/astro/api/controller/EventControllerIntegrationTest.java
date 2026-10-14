@@ -100,15 +100,25 @@ class EventControllerIntegrationTest {
                 "Maria",
                 "maria@astro.com",
                 4L,
-                "Eletricista");
+                "Eletricista", 7L, "Sede", com.astro.api.user.model.WorkModel.HIBRIDO);
         when(eventService.findEligibleCandidates(anyInt(), anyString())).thenReturn(List.of(candidate));
 
         mockMvc.perform(get("/events/eligible-candidates").param("nrId", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data[0].name").value("Maria"));
+                .andExpect(jsonPath("$.data[0].name").value("Maria"))
+                .andExpect(jsonPath("$.data[0].unitId").value(7))
+                .andExpect(jsonPath("$.data[0].workModel").value("HIBRIDO"));
 
         verify(eventService).findEligibleCandidates(anyInt(), anyString());
+    }
+
+    @Test
+    void missingNrIsNotFoundAndMalformedNrIsBadRequest() throws Exception {
+        when(eventService.findEligibleCandidates(99,"integration-manager"))
+                .thenThrow(new com.astro.api.common.exception.ResourceNotFoundException("NR não encontrada"));
+        mockMvc.perform(get("/events/eligible-candidates").param("nrId","99")).andExpect(status().isNotFound());
+        mockMvc.perform(get("/events/eligible-candidates").param("nrId","NR 35")).andExpect(status().isBadRequest());
     }
 
     @Test

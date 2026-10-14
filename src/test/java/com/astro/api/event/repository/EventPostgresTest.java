@@ -88,6 +88,15 @@ class EventPostgresTest {
         assertFalse(service.findById(own,"uid3").canEdit());
         assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,()->service.findById(foreign,"uid1"));
     }
+    @Test void candidatesExcludeInactiveForeignAndCreatorButIncludeOtherManagers() {
+        var rows=service.findEligibleCandidates(10,"uid1");
+        assertEquals(List.of(2L,3L),rows.stream().map(com.astro.api.event.dto.response.EventCandidateResponse::id).toList());
+        assertTrue(rows.stream().allMatch(row -> row.unitId()==1L && row.workModel()==com.astro.api.user.model.WorkModel.HIBRIDO));
+        jdbc.update("DELETE FROM cargo_nr"); assertTrue(service.findEligibleCandidates(10,"uid1").isEmpty());
+        assertEquals(2,service.findEligibleCandidates(null,"uid1").size());
+        jdbc.update("UPDATE usuario SET modalidade=null WHERE id_usuario=2");
+        assertNull(service.findEligibleCandidates(null,"uid1").getFirst().workModel());
+    }
     static DriverManagerDataSource dataSource() {
         String url=System.getenv("MANAGER_TEST_DATABASE_URL");
         if (!url.matches("jdbc:postgresql://(localhost|127\\.0\\.0\\.1):[0-9]+/astro525")) throw new IllegalArgumentException("Local disposable astro525 database required");
@@ -106,8 +115,8 @@ class EventPostgresTest {
         @Bean PlatformTransactionManager transactionManager(EntityManagerFactory factory) { return new JpaTransactionManager(factory); }
         @Bean EventMapper mapper() { return new EventMapper(); }
         @Bean EventService service(EventRepository events,EventClassRepository classes,EventClassParticipantRepository participants,
-                                   UserRepository users,RoleRepository roles,NrCatalogRepository nrs,EventMapper mapper) {
-            return new EventService(events,classes,participants,users,roles,nrs,mapper,Clock.fixed(Instant.parse("2026-10-14T12:00:00Z"),ZoneOffset.UTC));
+                                   UserRepository users,RoleRepository roles,NrCatalogRepository nrs,EventMapper mapper,EventCandidateRepository candidates) {
+            return new EventService(events,classes,participants,users,roles,nrs,mapper,Clock.fixed(Instant.parse("2026-10-14T12:00:00Z"),ZoneOffset.UTC),candidates);
         }
     }
 }
