@@ -27,8 +27,8 @@ public class ManagerMapper {
     }
 
     public ManagerDetailsResponse toDetails(User user) {
-        var role = user.getRole();
-        var unit = user.getUnit();
+        Role role = user.getRole();
+        Unit unit = user.getUnit();
         return new ManagerDetailsResponse(user.getId(), user.getName(), user.getCpf(), user.getEmail(),
                 user.getWorkModel(), user.getStatus(), role == null ? null : role.getId(),
                 role == null ? null : role.getName(), unit == null ? null : unit.id,

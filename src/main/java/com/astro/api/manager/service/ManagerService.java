@@ -1,7 +1,6 @@
 package com.astro.api.manager.service;
 
 import com.astro.api.auth.security.AuthenticatedUser;
-import com.astro.api.auth.security.Role;
 import com.astro.api.manager.dto.response.ManagerSummaryResponse;
 import com.astro.api.manager.dto.response.ManagerDetailsResponse;
 import com.astro.api.common.exception.BusinessException;
@@ -11,7 +10,9 @@ import com.astro.api.manager.dto.request.PromoteManagerRequest;
 import com.astro.api.manager.dto.request.UpdateManagerRequest;
 import com.astro.api.manager.dto.request.ManagerStatusRequest;
 import com.astro.api.auth.service.FirebaseIdentityService;
+import com.astro.api.role.model.Role;
 import com.astro.api.role.repository.RoleRepository;
+import com.astro.api.unit.model.Unit;
 import com.astro.api.unit.repository.UnitRepository;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -33,22 +34,22 @@ import java.util.List;
 @Service
 public class ManagerService {
     private static final Logger LOGGER = LoggerFactory.getLogger(ManagerService.class);
-    private final ManagerRepository repository;
+    private final ManagerRepository managerRepository;
     private final UserRepository userRepository;
-    private final ManagerMapper mapper;
+    private final ManagerMapper managerMapper;
     private final RoleRepository roleRepository;
     private final UnitRepository unitRepository;
     private final FirebaseIdentityService firebaseIdentityService;
     private final ManagerStatusPolicy statusPolicy;
     private final TransactionTemplate transactionTemplate;
 
-    public ManagerService(ManagerRepository repository, UserRepository userRepository, ManagerMapper mapper,
+    public ManagerService(ManagerRepository managerRepository, UserRepository userRepository, ManagerMapper managerMapper,
                           RoleRepository roleRepository, UnitRepository unitRepository,
                           FirebaseIdentityService firebaseIdentityService, ManagerStatusPolicy statusPolicy,
                           PlatformTransactionManager transactionManager) {
-        this.repository = repository;
+        this.managerRepository = managerRepository;
         this.userRepository = userRepository;
-        this.mapper = mapper;
+        this.managerMapper = managerMapper;
         this.roleRepository = roleRepository;
         this.unitRepository = unitRepository;
         this.firebaseIdentityService = firebaseIdentityService;
@@ -60,14 +61,14 @@ public class ManagerService {
     @Transactional(readOnly = true)
     public List<ManagerSummaryResponse> findAll(AuthenticatedUser principal) {
         Long workspaceId = requireWorkspaceManager(principal).getUnit().workspace.id;
-        return repository.findAllInWorkspace(workspaceId).stream().map(mapper::toSummary).toList();
+        return managerRepository.findAllInWorkspace(workspaceId).stream().map(managerMapper::toSummary).toList();
     }
 
     @Transactional(readOnly = true)
     public ManagerDetailsResponse findById(Long managerId, AuthenticatedUser principal) {
         Long workspaceId = requireWorkspaceManager(principal).getUnit().workspace.id;
         checkId(managerId);
-        return repository.findDetailsInWorkspace(managerId, workspaceId).map(mapper::toDetails)
+        return managerRepository.findDetailsInWorkspace(managerId, workspaceId).map(managerMapper::toDetails)
                 .orElseThrow(() -> new ResourceNotFoundException("Gestor não encontrado"));
     }
 
@@ -79,7 +80,7 @@ public class ManagerService {
     public ManagerDetailsResponse promote(PromoteManagerRequest body, AuthenticatedUser principal) {
         Long workspaceId = requireWorkspaceManager(principal).getUnit().workspace.id;
         checkId(body.collaboratorId());
-        User collaborator = repository.findUserForUpdateInWorkspace(body.collaboratorId(), workspaceId)
+        User collaborator = managerRepository.findUserForUpdateInWorkspace(body.collaboratorId(), workspaceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
         if (collaborator.getType() != UserType.COLABORADOR) {
             throw new ConflictException("Somente colaboradores podem ser promovidos a gestor");
@@ -91,13 +92,13 @@ public class ManagerService {
         requireActiveLinks(collaborator, workspaceId);
         collaborator.setType(UserType.GESTOR);
         collaborator.setStatus(body.status().toUserStatus());
-        return mapper.toDetails(repository.saveAndFlush(collaborator));
+        return managerMapper.toDetails(managerRepository.saveAndFlush(collaborator));
     }
 
     private void requireActiveLinks(User user, Long workspaceId) {
         if (user.getRole() == null || user.getUnit() == null
-                || !Boolean.TRUE.equals(repository.lockRoleActive(user.getRole().getId(), workspaceId))
-                || !Boolean.TRUE.equals(repository.lockUnitActive(user.getUnit().id, workspaceId))) {
+                || !Boolean.TRUE.equals(managerRepository.lockRoleActive(user.getRole().getId(), workspaceId))
+                || !Boolean.TRUE.equals(managerRepository.lockUnitActive(user.getUnit().id, workspaceId))) {
             throw new BusinessException("Cargo e unidade devem estar ativos no workspace");
         }
     }
@@ -109,34 +110,34 @@ public class ManagerService {
             return transactionTemplate.execute(transaction -> {
                 Long workspaceId = requireWorkspaceManager(principal).getUnit().workspace.id;
                 User manager = requireManager(managerId, workspaceId);
-                var role = roleRepository.findById(body.roleId())
+                Role role = roleRepository.findById(body.roleId())
                         .filter(value -> value.getWorkspace() != null && workspaceId.equals(value.getWorkspace().id))
                         .orElseThrow(() -> new ResourceNotFoundException("Cargo não encontrado no workspace"));
-                var unit = unitRepository.findById(body.unitId())
+                Unit unit = unitRepository.findById(body.unitId())
                         .filter(value -> value.workspace != null && workspaceId.equals(value.workspace.id))
                         .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada no workspace"));
                 boolean newRole = manager.getRole() == null || !body.roleId().equals(manager.getRole().getId());
                 boolean newUnit = manager.getUnit() == null || !body.unitId().equals(manager.getUnit().id);
-                if (newRole && !Boolean.TRUE.equals(repository.lockRoleActive(body.roleId(), workspaceId))) {
+                if (newRole && !Boolean.TRUE.equals(managerRepository.lockRoleActive(body.roleId(), workspaceId))) {
                     throw new BusinessException("O cargo deve estar ativo para uma nova vinculação");
                 }
-                if (newUnit && !Boolean.TRUE.equals(repository.lockUnitActive(body.unitId(), workspaceId))) {
+                if (newUnit && !Boolean.TRUE.equals(managerRepository.lockUnitActive(body.unitId(), workspaceId))) {
                     throw new BusinessException("A unidade deve estar ativa para uma nova vinculação");
                 }
                 checkConflicts(body, managerId);
                 String previousEmail = manager.getEmail();
-                mapper.applyUpdate(manager, body, role, unit);
+                managerMapper.applyUpdate(manager, body, role, unit);
                 applyStatus(manager, body.status(), workspaceId);
                 User saved = persist(manager);
                 if (saved.getFirebaseUid() != null && !saved.getFirebaseUid().isBlank() && !body.email().equals(previousEmail)) {
-                    var previous = firebaseIdentityService.readEmailState(saved.getFirebaseUid());
+                    FirebaseIdentityService.EmailState previous = firebaseIdentityService.readEmailState(saved.getFirebaseUid());
                     if (previous.email() == null || !previousEmail.equalsIgnoreCase(previous.email())) {
                         throw new ConflictException("O e-mail da autenticação precisa ser reconciliado antes da edição");
                     }
                     emailChange[0] = new EmailChange(saved.getId(), saved.getFirebaseUid(), previous);
                     firebaseIdentityService.updateEmail(saved.getFirebaseUid(), body.email());
                 }
-                return mapper.toDetails(saved);
+                return managerMapper.toDetails(saved);
             });
         } catch (RuntimeException exception) {
             if (emailChange[0] != null) compensateEmail(emailChange[0], exception);
@@ -146,7 +147,7 @@ public class ManagerService {
 
     private User requireManager(Long managerId, Long workspaceId) {
         checkId(managerId);
-        return repository.findUserForUpdateInWorkspace(managerId, workspaceId)
+        return managerRepository.findUserForUpdateInWorkspace(managerId, workspaceId)
                 .filter(user -> user.getType() == UserType.GESTOR)
                 .orElseThrow(() -> new ResourceNotFoundException("Gestor não encontrado"));
     }
@@ -159,7 +160,7 @@ public class ManagerService {
         UserStatus previous = manager.getStatus();
         applyStatus(manager, desired, workspaceId);
         if (desired != previous) persist(manager);
-        return mapper.toDetails(manager);
+        return managerMapper.toDetails(manager);
     }
 
     private void applyStatus(User manager, UserStatus desired, Long workspaceId) {
@@ -169,12 +170,12 @@ public class ManagerService {
     }
 
     private void checkConflicts(UpdateManagerRequest body, Long managerId) {
-        if (repository.cpfExists(body.cpf(), managerId)) throw new ConflictException("Já existe um usuário com este CPF");
-        if (repository.emailExists(body.email(), managerId)) throw new ConflictException("Já existe um usuário com este e-mail");
+        if (managerRepository.cpfExists(body.cpf(), managerId)) throw new ConflictException("Já existe um usuário com este CPF");
+        if (managerRepository.emailExists(body.email(), managerId)) throw new ConflictException("Já existe um usuário com este e-mail");
     }
 
     private User persist(User manager) {
-        try { return repository.saveAndFlush(manager); }
+        try { return managerRepository.saveAndFlush(manager); }
         catch (DataIntegrityViolationException exception) {
             for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
                 if (cause instanceof org.hibernate.exception.ConstraintViolationException violation) {
@@ -192,7 +193,7 @@ public class ManagerService {
             original.addSuppressed(compensationFailure);
             try {
                 transactionTemplate.executeWithoutResult(transaction -> {
-                    if (repository.deactivateAfterEmailFailure(change.managerId(), change.firebaseUid()) != 1) {
+                    if (managerRepository.deactivateAfterEmailFailure(change.managerId(), change.firebaseUid()) != 1) {
                         throw new IllegalStateException("Gestor não encontrado para contenção da falha");
                     }
                 });
@@ -202,10 +203,8 @@ public class ManagerService {
         }
     }
 
-    private record EmailChange(Long managerId, String firebaseUid, FirebaseIdentityService.EmailState previous) { }
-
     private User requireWorkspaceManager(AuthenticatedUser principal) {
-        if (principal == null || principal.role() != Role.GESTOR_WORKSPACE
+        if (principal == null || principal.role() != com.astro.api.auth.security.Role.GESTOR_WORKSPACE
                 || principal.firebaseUid() == null || principal.firebaseUid().isBlank()) {
             throw new AccessDeniedException("Gestor de workspace autenticado necessário");
         }

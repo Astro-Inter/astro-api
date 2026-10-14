@@ -46,7 +46,7 @@ public class ManagerController {
     @Operation(summary = "Promove um colaborador ativo a gestor, preservando a conta existente")
     public ResponseEntity<ApiResult<ManagerDetailsResponse>> promote(@Valid @RequestBody PromoteManagerRequest body,
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
-        var manager = service.promote(body, principal);
+        ManagerDetailsResponse manager = service.promote(body, principal);
         return ResponseEntity.created(URI.create("/managers/" + manager.id())).body(ApiResult.success(
                 "Colaborador promovido a gestor com sucesso", manager, request.getRequestURI()));
     }
