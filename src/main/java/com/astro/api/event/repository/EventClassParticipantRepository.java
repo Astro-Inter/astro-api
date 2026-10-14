@@ -10,4 +10,6 @@ import java.util.List;
 @Repository
 public interface EventClassParticipantRepository extends JpaRepository<EventClassParticipant, Long> {
     List<EventClassParticipant> findByEventClassIn(List<EventClass> eventClasses);
+
+    List<EventClassParticipant> findByUser_IdOrderByEventClass_StartDateAsc(Long userId);
 }
