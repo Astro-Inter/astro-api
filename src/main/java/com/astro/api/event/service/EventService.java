@@ -3,6 +3,7 @@ package com.astro.api.event.service;
 import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ResourceNotFoundException;
+import com.astro.api.common.service.ViewedService;
 import com.astro.api.conformidade.repository.NrCatalogRepository;
 import com.astro.api.event.dto.request.CancelEventRequest;
 import com.astro.api.event.dto.request.CreateEventClassRequest;
@@ -11,6 +12,7 @@ import com.astro.api.event.dto.request.UpdateEventClassRequest;
 import com.astro.api.event.dto.request.UpdateEventRequest;
 import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventCalendarResponse;
+import com.astro.api.event.dto.response.CollaboratorEventResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.mapper.EventMapper;
 import com.astro.api.event.model.Event;
@@ -45,6 +47,7 @@ import java.util.stream.Collectors;
 
 @Service
 public class EventService {
+    private static final String EVENTS_RESOURCE = "events";
     private final EventRepository eventRepository;
     private final EventClassRepository eventClassRepository;
     private final EventClassParticipantRepository eventClassParticipantRepository;
@@ -54,6 +57,7 @@ public class EventService {
     private final EventMapper eventMapper;
     private final Clock clock;
     private final EventCandidateRepository candidateRepository;
+    private final ViewedService viewedService;
 
     public EventService(
             EventRepository eventRepository,
@@ -63,7 +67,7 @@ public class EventService {
             RoleRepository roleRepository,
             NrCatalogRepository nrCatalogRepository,
             EventMapper eventMapper, @Qualifier("eventClock") Clock clock,
-            EventCandidateRepository candidateRepository) {
+            EventCandidateRepository candidateRepository, ViewedService viewedService) {
         this.eventRepository = eventRepository;
         this.eventClassRepository = eventClassRepository;
         this.eventClassParticipantRepository = eventClassParticipantRepository;
@@ -73,6 +77,7 @@ public class EventService {
         this.eventMapper = eventMapper;
         this.clock = clock;
         this.candidateRepository = candidateRepository;
+        this.viewedService = viewedService;
     }
 
     @Transactional
@@ -123,6 +128,27 @@ public class EventService {
         validateNrExists(nrId);
         return candidateRepository.findEligibleCandidates(workspace.id, manager.getId(), nrId).stream()
                 .map(eventMapper::toCandidateResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CollaboratorEventResponse> findForCollaborator(String firebaseUid) {
+        User user = findAuthenticatedUser(firebaseUid);
+        List<EventClassParticipant> participations = eventClassParticipantRepository
+                .findByUser_IdOrderByEventClass_StartDateAsc(user.getId());
+        if (participations.isEmpty()) {
+            return List.of();
+        }
+        Set<String> viewedEvents = viewedService.findViewed(user.getId(), EVENTS_RESOURCE,
+                participations.stream()
+                        .map(participation -> participation.getEventClass().getEvent().getId())
+                        .toList());
+        LocalDateTime now = LocalDateTime.now();
+        return participations.stream()
+                .map(participation -> eventMapper.toCollaboratorEventResponse(
+                        participation,
+                        viewedEvents.contains(participation.getEventClass().getEvent().getId().toString()),
+                        classStatus(participation.getEventClass(), now)))
+                .toList();
     }
 
     @Transactional
@@ -498,6 +524,11 @@ public class EventService {
                 .orElseThrow(() -> new AccessDeniedException("Gestor ativo necessário"));
     }
 
+    private User findAuthenticatedUser(String firebaseUid) {
+        return userRepository.findByFirebaseUid(firebaseUid)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário autenticado não encontrado"));
+    }
+
     private Workspace getWorkspace(User user) {
         if (user.getUnit() == null || user.getUnit().workspace == null) {
             throw new BusinessException("Usuário autenticado não pertence a um Workspace");
@@ -564,6 +595,13 @@ public class EventService {
         if (startDate == null || endDate == null || !endDate.isAfter(startDate)) {
             throw new BusinessException("Data final deve ser posterior à data inicial");
         }
+    }
+
+    private String classStatus(EventClass eventClass, LocalDateTime now) {
+        if (eventClass.getEvent().getStatus() == EventStatus.CANCELADO) {
+            return "CANCELADO";
+        }
+        return eventClass.getEndDate().isBefore(now) ? "CONCLUIDO" : "PENDENTE";
     }
 
     private EventResponse toResponse(Event event, List<EventClass> eventClasses, User manager) {

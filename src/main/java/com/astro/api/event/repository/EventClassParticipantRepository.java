@@ -18,4 +18,6 @@ public interface EventClassParticipantRepository extends JpaRepository<EventClas
     // Conclusions and evidence remain owned by their existing modules/database contracts.
     @Query(value = "select exists (select 1 from conclusao_evento where turma_funcionario_id in (:ids))", nativeQuery = true)
     boolean hasConclusions(@Param("ids") Collection<Long> ids);
+
+    List<EventClassParticipant> findByUser_IdOrderByEventClass_StartDateAsc(Long userId);
 }

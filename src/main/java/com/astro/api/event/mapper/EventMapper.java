@@ -2,6 +2,7 @@ package com.astro.api.event.mapper;
 
 import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventCalendarResponse;
+import com.astro.api.event.dto.response.CollaboratorEventResponse;
 import com.astro.api.event.dto.response.EventClassResponse;
 import com.astro.api.event.dto.response.EventParticipantResponse;
 import com.astro.api.event.dto.response.EventResponse;
@@ -71,6 +72,21 @@ public class EventMapper {
             EventCalendarProjection row) {
         return new EventCalendarResponse(row.getEventId(), row.getEventTitle(), row.getEventClassId(),
                 row.getClassName(), row.getStartDate(), row.getEndDate(), row.getStatus());
+    }
+
+    public CollaboratorEventResponse toCollaboratorEventResponse(
+            EventClassParticipant participation,
+            boolean viewed,
+            String classStatus) {
+        EventClass eventClass = participation.getEventClass();
+        Event event = eventClass.getEvent();
+        return new CollaboratorEventResponse(
+                event.getTitle(),
+                eventClass.getEndDate(),
+                viewed,
+                classStatus,
+                eventClass.getName(),
+                event.getStatus());
     }
 
     private EventParticipantResponse toParticipantResponse(EventClassParticipant classParticipant) {

@@ -278,7 +278,7 @@ class EventPostgresTest {
         @Bean EventMapper mapper() { return new EventMapper(); }
         @Bean EventService service(EventRepository events,EventClassRepository classes,EventClassParticipantRepository participants,
                                    UserRepository users,RoleRepository roles,NrCatalogRepository nrs,EventMapper mapper,EventCandidateRepository candidates) {
-            return new EventService(events,classes,participants,users,roles,nrs,mapper,Clock.fixed(Instant.parse("2026-10-14T12:00:00Z"),ZoneOffset.UTC),candidates);
+            return new EventService(events,classes,participants,users,roles,nrs,mapper,Clock.fixed(Instant.parse("2026-10-14T12:00:00Z"),ZoneOffset.UTC),candidates,org.mockito.Mockito.mock(com.astro.api.common.service.ViewedService.class));
         }
     }
 }
