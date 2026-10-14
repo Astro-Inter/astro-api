@@ -4,6 +4,9 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.response.ApiResult;
 import com.astro.api.conformity.dto.response.ConformityResponse;
 import com.astro.api.conformity.service.ConformityService;
+import com.astro.api.conformity.service.ConformityImportService;
+import com.astro.api.conformity.dto.response.ConformityImportResponse;
+import org.springframework.web.multipart.MultipartFile;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -28,7 +31,20 @@ import com.astro.api.conformity.dto.request.ConformityApplicabilityRequest;
         @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")})
 public class ConformityController {
     private final ConformityService service;
-    public ConformityController(ConformityService service) { this.service = service; }
+    private final ConformityImportService importService;
+    public ConformityController(ConformityService service, ConformityImportService importService) {
+        this.service = service; this.importService = importService;
+    }
+
+    @PostMapping(value = "/import", consumes = "multipart/form-data")
+    @Operation(summary = "Importa conformidades de uma planilha Excel",
+            description = "Parte multipart file: XLS/XLSX até 10 MB, primeira aba, cabeçalhos CPF, NR e Data de validade. Aceita datas reais do Excel ou dd/MM/yyyy e yyyy-MM-dd; data vazia e fórmulas são rejeitadas. Normaliza CPF com zeros à esquerda. A primeira linha válida confirmada do CPF/NR prevalece; repetições são rejeitadas. Sem aplicável, cria MANUAL; com aplicáveis, atualiza somente a validade do representante (maior validade, nulos por último, maior ID). Cada linha usa transação independente; retorna totais e rejeições por linha. Novas inclusões exigem colaborador ATIVO e NR não revogada; atualização de histórico autorizado preserva origem, aplicabilidade e conclusão.")
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "Resultado do lote, inclusive rejeições"),
+            @ApiResponse(responseCode = "413", description = "Arquivo maior que 10 MB ou requisição maior que 11 MB")})
+    public ResponseEntity<ApiResult<ConformityImportResponse>> importFile(@RequestPart("file") MultipartFile file,
+            @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
+        return ResponseEntity.ok(ApiResult.success("Importação processada", importService.importFile(file, principal), request.getRequestURI()));
+    }
 
     @PatchMapping("/{conformityId}/applicability")
     @Operation(summary = "Define explicitamente a aplicabilidade",

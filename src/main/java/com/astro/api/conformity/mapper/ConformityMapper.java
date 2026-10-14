@@ -5,10 +5,16 @@ import com.astro.api.conformity.repository.ConformityProjection;
 import com.astro.api.conformity.model.Conformity;
 import com.astro.api.conformity.dto.request.CreateConformityRequest;
 import com.astro.api.conformity.dto.request.UpdateConformityRequest;
+import com.astro.api.conformity.model.ConformityImportRow;
+import com.astro.api.conformity.dto.response.ConformityImportResponse.RejectedRow;
 import org.springframework.stereotype.Component;
 
 @Component
 public class ConformityMapper {
+    public RejectedRow toRejectedRow(ConformityImportRow row, String reason) {
+        return new RejectedRow(
+                row.row(), row.cpfText(), row.nrText(), reason);
+    }
     public void applyUpdate(Conformity entity, UpdateConformityRequest request) {
         entity.setNrId(request.nrId()); entity.setExpiresAt(request.expiresAt());
     }

@@ -10,6 +10,14 @@ import java.util.Optional;
 
 public interface ConformityRepository extends JpaRepository<Conformity, Long> {
     @Query(value = """
+            SELECT c.* FROM conformidade c WHERE c.usuario_id = :collaboratorId AND c.nr_id = :nrId
+              AND c.aplicavel = TRUE
+            ORDER BY c.data_validade DESC NULLS LAST, c.id_conformidade DESC LIMIT 1
+            """, nativeQuery = true)
+    Optional<Conformity> findApplicableRepresentative(@Param("collaboratorId") Long collaboratorId,
+                                                     @Param("nrId") Integer nrId);
+
+    @Query(value = """
             SELECT c.* FROM conformidade c
             JOIN usuario u ON u.id_usuario = c.usuario_id AND u.tipo = 'COLABORADOR'
             JOIN unidade un ON un.id_unidade = u.unidade_id

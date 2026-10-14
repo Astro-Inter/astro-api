@@ -18,10 +18,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class ConformityControllerTest {
     final ConformityService service = mock(ConformityService.class);
+    final com.astro.api.conformity.service.ConformityImportService importer = mock(com.astro.api.conformity.service.ConformityImportService.class);
     final AuthenticatedUser principal = new AuthenticatedUser("manager", "manager@example.com", Role.GESTOR);
     MockMvc mvc;
     @BeforeEach void setUp() {
-        mvc = MockMvcBuilders.standaloneSetup(new ConformityController(service))
+        mvc = MockMvcBuilders.standaloneSetup(new ConformityController(service, importer))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver()).build();
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal, null, List.of()));
@@ -98,5 +99,16 @@ class ConformityControllerTest {
                 new com.astro.api.common.exception.ConflictException("Já existe uma conformidade aplicável para este colaborador e NR"));
         mvc.perform(patch("/conformities/2/applicability").contentType("application/json").content("{\"applicable\":true}"))
                 .andExpect(status().isConflict());
+    }
+
+    @Test void importsMultipartWithTotalsAndRequiresTheFilePart() throws Exception {
+        var file = ConformityTestSpreadsheets.file(false, new Object[]{"00000000002", 10, "2030-01-01"});
+        when(importer.importFile(any(), eq(principal))).thenReturn(
+                new com.astro.api.conformity.dto.response.ConformityImportResponse(1,1,0,0,List.of()));
+        mvc.perform(multipart("/conformities/import").file(file)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.processed").value(1)).andExpect(jsonPath("$.data.inserted").value(1));
+        mvc.perform(multipart("/conformities/import")).andExpect(status().isBadRequest());
+        when(importer.importFile(any(), eq(principal))).thenThrow(new org.springframework.web.multipart.MaxUploadSizeExceededException(10L*1024*1024));
+        mvc.perform(multipart("/conformities/import").file(file)).andExpect(status().isPayloadTooLarge());
     }
 }

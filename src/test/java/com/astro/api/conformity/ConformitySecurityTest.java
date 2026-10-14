@@ -64,6 +64,10 @@ class ConformitySecurityTest {
                 mvc.perform(patch("/conformities/2/applicability").header("Authorization", "Bearer valid")
                                 .contentType("application/json").content("{\"applicable\":false}"))
                         .andExpect(status().isForbidden());
+                mvc.perform(multipart("/conformities/import")
+                                .file(new org.springframework.mock.web.MockMultipartFile("file", "test.xlsx", "application/octet-stream", new byte[]{1}))
+                                .header("Authorization", "Bearer valid"))
+                        .andExpect(status().isForbidden());
             }
             verifyNoInteractions(service);
             for (Role role : List.of(Role.GESTOR, Role.GESTOR_WORKSPACE)) {
@@ -79,6 +83,7 @@ class ConformitySecurityTest {
     @org.springframework.web.servlet.config.annotation.EnableWebMvc
     @Import({SecurityConfig.class, CorsConfig.class, com.astro.api.conformity.controller.ConformityController.class, GlobalExceptionHandler.class})
     static class Config {
+        @Bean com.astro.api.conformity.service.ConformityImportService conformityImportService() { return mock(com.astro.api.conformity.service.ConformityImportService.class); }
         @Bean FirebaseTokenService firebaseTokenService() { return mock(FirebaseTokenService.class); }
         @Bean AuthorizationService authorizationService() { return mock(AuthorizationService.class); }
         @Bean ConformityService conformityService() { return mock(ConformityService.class); }

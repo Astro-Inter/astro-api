@@ -43,6 +43,9 @@ public class SpreadsheetImportService {
     }
 
     public List<SpreadsheetRow> read(MultipartFile file) {
+        if (file != null && file.getSize() > 5L * 1024 * 1024) {
+            throw new org.springframework.web.multipart.MaxUploadSizeExceededException(5L * 1024 * 1024);
+        }
         if (file == null || file.isEmpty()) {
             throw new BusinessException("A planilha de colaboradores é obrigatória");
         }

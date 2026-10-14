@@ -1,7 +1,7 @@
 ALTER TABLE workspace
-    ALTER COLUMN id_workspace SET NOT NULL, 
-    ALTER COLUMN nome SET NOT NULL,         
-    ALTER COLUMN cnpj SET NOT NULL;        
+    ALTER COLUMN id_workspace SET NOT NULL,
+    ALTER COLUMN nome SET NOT NULL,
+    ALTER COLUMN cnpj SET NOT NULL;
 
 ALTER TABLE workspace
     ADD CONSTRAINT pk_workspace PRIMARY KEY (id_workspace),
@@ -19,7 +19,7 @@ ALTER TABLE conta
 
 ALTER TABLE cargo
     ALTER COLUMN id_cargo SET NOT NULL,
-    ALTER COLUMN workspace_id SET NOT NULL, 
+    ALTER COLUMN workspace_id SET NOT NULL,
     ALTER COLUMN nome SET NOT NULL,
     ALTER COLUMN ativo SET DEFAULT TRUE;
 
@@ -31,7 +31,7 @@ ALTER TABLE cargo
 
 ALTER TABLE unidade
     ALTER COLUMN id_unidade SET NOT NULL,
-    ALTER COLUMN workspace_id SET NOT NULL, 
+    ALTER COLUMN workspace_id SET NOT NULL,
     ALTER COLUMN nome SET NOT NULL,
     ALTER COLUMN ativo SET DEFAULT TRUE;
 
@@ -63,8 +63,8 @@ ALTER TABLE usuario
     ALTER COLUMN id_usuario SET NOT NULL,
     ALTER COLUMN nome SET NOT NULL,
     ALTER COLUMN tipo SET NOT NULL,
-    ALTER COLUMN cargo_id SET NOT NULL,   
-    ALTER COLUMN unidade_id SET NOT NULL, 
+    ALTER COLUMN cargo_id SET NOT NULL,
+    ALTER COLUMN unidade_id SET NOT NULL,
     ALTER COLUMN status SET DEFAULT 'PRE_CADASTRADO',
     ALTER COLUMN status SET NOT NULL,
     ALTER COLUMN criado_em SET DEFAULT CURRENT_TIMESTAMP;
@@ -158,7 +158,7 @@ ALTER TABLE evento
         (status <> 'CANCELADO'
             AND data_cancelamento IS NULL
             AND motivo_cancelamento IS NULL)
-    ); 
+    );
 
 ALTER TABLE turma
     ALTER COLUMN id_turma SET NOT NULL,
@@ -256,7 +256,7 @@ ALTER TABLE unidade
 ALTER TABLE unidade_endereco
     ADD CONSTRAINT fk_unidade_endereco_unidade FOREIGN KEY (unidade_id)
         REFERENCES unidade (id_unidade)
-        ON UPDATE CASCADE ON DELETE CASCADE; 
+        ON UPDATE CASCADE ON DELETE CASCADE;
 
 ALTER TABLE usuario
     ADD CONSTRAINT fk_usuario_cargo FOREIGN KEY (cargo_id)

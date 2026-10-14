@@ -20,6 +20,8 @@ import com.astro.api.user.repository.UserRepository;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -162,5 +164,30 @@ public class ConformityService {
             throw new AccessDeniedException("Gestor ativo com workspace necessário");
         }
         return manager;
+    }
+
+    @Transactional(readOnly = true)
+    public void authorizeImport(AuthenticatedUser principal) { requireManager(principal); }
+
+    /** Called through the service proxy by the importer: each successful row commits independently. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean importRow(String cpf, Integer nrId, LocalDate expiresAt, AuthenticatedUser principal) {
+        User manager = requireManager(principal);
+        repository.lockWrites();
+        Long collaboratorId = collaboratorRepository.findIdByCpfInScope(cpf, principal.firebaseUid(), manager.getUnit().workspace.id)
+                .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado no escopo autorizado"));
+        User collaborator = requireCollaborator(collaboratorId, principal, manager);
+        var representative = repository.findApplicableRepresentative(collaboratorId, nrId);
+        requireNr(nrId, representative.isEmpty());
+        if (representative.isPresent()) {
+            Conformity entity = representative.get();
+            entity.setExpiresAt(expiresAt);
+            repository.saveAndFlush(entity);
+            return false;
+        }
+        requireActiveCollaborator(collaborator);
+        checkConflict(collaboratorId, nrId, null);
+        repository.saveAndFlush(mapper.toNewManual(new CreateConformityRequest(collaboratorId, nrId, expiresAt)));
+        return true;
     }
 }
