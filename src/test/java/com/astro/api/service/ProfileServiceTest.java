@@ -52,7 +52,7 @@ class ProfileServiceTest {
     }
 
     @Test
-    void shouldReturnAuthenticatedUsersProfileAndActiveNrsFromTheirCargo() {
+    void shouldReturnAuthenticatedUsersProfileAndActiveNrsFromTheirRole() {
         User user = userWithRole();
         NrDocument nr = new NrDocument();
         nr.setId(35);
@@ -88,7 +88,7 @@ class ProfileServiceTest {
     }
 
     @Test
-    void shouldReturnNoNrsWhenUserHasNoCargo() {
+    void shouldReturnNoNrsWhenUserHasNoRole() {
         User user = new User();
         user.setName("Bruno Baptista");
         user.setEmail("bruno@astro.com");
