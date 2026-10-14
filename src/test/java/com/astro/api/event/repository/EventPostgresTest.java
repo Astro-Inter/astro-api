@@ -97,6 +97,36 @@ class EventPostgresTest {
         jdbc.update("UPDATE usuario SET modalidade=null WHERE id_usuario=2");
         assertNull(service.findEligibleCandidates(null,"uid1").getFirst().workModel());
     }
+    com.astro.api.event.dto.request.CreateEventRequest createRequest(List<com.astro.api.event.dto.request.CreateEventClassRequest> classes) {
+        return new com.astro.api.event.dto.request.CreateEventRequest("Evento","Descrição",10,"https://example.com",com.astro.api.event.model.CompletionMode.GESTOR,true,classes);
+    }
+    com.astro.api.event.dto.request.CreateEventClassRequest createClass(String name,long userId) {
+        return new com.astro.api.event.dto.request.CreateEventClassRequest(name,LocalDateTime.of(2026,10,15,8,0),LocalDateTime.of(2026,10,15,9,0),List.of(userId));
+    }
+    @Test void creationPersistsTheWholeAggregateAndDeterminesCreator() {
+        var response=service.create(createRequest(List.of(createClass("A",2),createClass("B",3))),"uid1");
+        assertEquals(1L,response.managerId());assertEquals(10,response.nrId());assertTrue(response.mandatoryEvidence());
+        assertEquals(2,response.eventClasses().size());
+        assertTrue(response.eventClasses().stream().allMatch(row->row.participants().getFirst().participationId()!=null));
+        assertEquals(response,service.findById(response.id(),"uid1"));
+    }
+    @Test void creationRollsBackEarlierInsertsWhenParticipantPersistenceFails() {
+        jdbc.execute("ALTER TABLE turma_funcionario ADD CONSTRAINT test_failure CHECK(usuario_id<>3)");
+        try {
+            assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->service.create(createRequest(List.of(createClass("A",2),createClass("B",3))),"uid1"));
+            assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM evento",Integer.class));
+            assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM turma",Integer.class));
+            assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM turma_funcionario",Integer.class));
+        } finally { jdbc.execute("ALTER TABLE turma_funcionario DROP CONSTRAINT test_failure"); }
+    }
+    @Test void creationRejectsForeignWorkspaceAndPartiallyOverlappingParticipants() {
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,()->service.create(createRequest(List.of(createClass("A",5))),"uid1"));
+        var start=LocalDateTime.of(2026,10,15,8,0);
+        var a=new com.astro.api.event.dto.request.CreateEventClassRequest("A",start,start.plusHours(1),List.of(2L,3L));
+        var b=new com.astro.api.event.dto.request.CreateEventClassRequest("B",start,start.plusHours(1),List.of(3L,4L));
+        assertThrows(com.astro.api.common.exception.BusinessException.class,()->service.create(createRequest(List.of(a,b)),"uid1"));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM evento",Integer.class));
+    }
     static DriverManagerDataSource dataSource() {
         String url=System.getenv("MANAGER_TEST_DATABASE_URL");
         if (!url.matches("jdbc:postgresql://(localhost|127\\.0\\.0\\.1):[0-9]+/astro525")) throw new IllegalArgumentException("Local disposable astro525 database required");

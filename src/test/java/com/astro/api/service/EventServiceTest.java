@@ -81,7 +81,7 @@ class EventServiceTest {
     @Test
     void createsEventWithoutNrUsingBatchOperations() {
         User participant = createUser(2L, UserStatus.ATIVO, workspace);
-        when(userRepository.findAllById(any())).thenReturn(List.of(participant));
+        when(userRepository.findEventParticipantsInWorkspace(any(), eq(workspace))).thenReturn(List.of(participant));
         when(eventRepository.save(any(Event.class))).thenAnswer(invocation -> {
             Event event = invocation.getArgument(0);
             event.setId(11L);
@@ -99,7 +99,7 @@ class EventServiceTest {
 
         assertEquals(EventStatus.ATIVO, response.status());
         assertEquals(1, response.eventClasses().size());
-        verify(userRepository).findAllById(any());
+        verify(userRepository).findEventParticipantsInWorkspace(any(), eq(workspace));
         verify(eventClassRepository).saveAll(any());
         verify(eventClassParticipantRepository).saveAll(any());
     }
@@ -142,13 +142,13 @@ class EventServiceTest {
                 List.of(firstClass, secondClass));
 
         assertThrows(BusinessException.class, () -> service.create(request, "manager"));
-        verify(userRepository, never()).findAllById(any());
+        verify(userRepository, never()).findEventParticipantsInWorkspace(any(), eq(workspace));
     }
 
     @Test
     void rejectsInactiveParticipant() {
         User participant = createUser(2L, UserStatus.DESATIVADO, workspace);
-        when(userRepository.findAllById(any())).thenReturn(List.of(participant));
+        when(userRepository.findEventParticipantsInWorkspace(any(), eq(workspace))).thenReturn(List.of(participant));
 
         assertThrows(BusinessException.class, () -> service.create(
                 createRequest(null, List.of(2L)), "manager"));
@@ -157,7 +157,7 @@ class EventServiceTest {
 
     @Test
     void rejectsManagerAsParticipant() {
-        when(userRepository.findAllById(any())).thenReturn(List.of(manager));
+        when(userRepository.findEventParticipantsInWorkspace(any(), eq(workspace))).thenReturn(List.of(manager));
 
         assertThrows(BusinessException.class, () -> service.create(
                 createRequest(null, List.of(1L)), "manager"));
@@ -167,7 +167,7 @@ class EventServiceTest {
     void rejectsParticipantWithoutEligibleRoleForNr() {
         User participant = createUser(2L, UserStatus.ATIVO, workspace);
         when(nrCatalogRepository.existsById(10)).thenReturn(true);
-        when(userRepository.findAllById(any())).thenReturn(List.of(participant));
+        when(userRepository.findEventParticipantsInWorkspace(any(), eq(workspace))).thenReturn(List.of(participant));
         when(roleRepository.findIdsAssociatedWithNr(eq(10), any())).thenReturn(List.of());
 
         assertThrows(BusinessException.class, () -> service.create(
@@ -309,6 +309,40 @@ class EventServiceTest {
         assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,()->service.findEligibleCandidates(99,"manager"));
         assertThrows(BusinessException.class,()->service.findEligibleCandidates(0,"manager"));
         org.junit.jupiter.api.Assertions.assertTrue(service.findEligibleCandidates(null,"manager").isEmpty());
+    }
+
+    @Test
+    void rejectsPartiallyOverlappingParticipantsAndDuplicateNormalizedClassNames() {
+        var start=LocalDateTime.of(2026,10,15,8,0);
+        var a=new CreateEventClassRequest("A",start,start.plusHours(1),List.of(2L,3L));
+        var b=new CreateEventClassRequest("B",start,start.plusHours(1),List.of(3L,4L));
+        var request=new CreateEventRequest("Evento","Descrição",null,null,CompletionMode.GESTOR,false,List.of(a,b));
+        assertThrows(BusinessException.class,()->service.create(request,"manager"));
+        var duplicateName=new CreateEventClassRequest(" A ",start,start.plusHours(1),List.of(4L));
+        assertThrows(BusinessException.class,()->service.create(new CreateEventRequest("Evento","Descrição",null,null,CompletionMode.GESTOR,false,List.of(a,duplicateName)),"manager"));
+        verify(userRepository,never()).findEventParticipantsInWorkspace(any(),any());
+        verifyNoInteractions(eventRepository);
+    }
+
+    @Test
+    void rejectsNullClassesAndNullNonpositiveRepeatedOrEmptyParticipants() {
+        var start=LocalDateTime.of(2026,10,15,8,0);
+        for (List<Long> ids : java.util.Arrays.asList(null,List.<Long>of(),java.util.Arrays.asList((Long)null),List.of(0L),List.of(-1L),List.of(2L,2L))) {
+            var item=new CreateEventClassRequest("A",start,start.plusHours(1),ids);
+            assertThrows(BusinessException.class,()->service.create(new CreateEventRequest("Evento","Descrição",null,null,CompletionMode.GESTOR,false,List.of(item)),"manager"));
+        }
+        assertThrows(BusinessException.class,()->service.create(new CreateEventRequest("Evento","Descrição",null,null,CompletionMode.GESTOR,false,java.util.Arrays.asList((CreateEventClassRequest)null)),"manager"));
+        verifyNoInteractions(eventRepository);
+    }
+
+    @Test
+    void rejectsMissingParticipantsAndInvalidClassDates() {
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,()->service.create(createRequest(null,List.of(999L)),"manager"));
+        var start=LocalDateTime.of(2026,10,15,8,0);
+        for (LocalDateTime end:List.of(start,start.minusHours(1))) {
+            var item=new CreateEventClassRequest("A",start,end,List.of(2L));
+            assertThrows(BusinessException.class,()->service.create(new CreateEventRequest("Evento","Descrição",null,null,CompletionMode.GESTOR,false,List.of(item)),"manager"));
+        }
     }
 
     private CreateEventRequest createRequest(Integer nrId, List<Long> participantIds) {

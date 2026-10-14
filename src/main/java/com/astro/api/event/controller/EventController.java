@@ -107,9 +107,12 @@ public class EventController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
-    @Operation(summary = "Cria um evento completo com turmas e participantes")
+    @Operation(summary = "Cria um evento completo com turmas e participantes",
+            description = "Criação atômica como ATIVO, com criador e workspace derivados da autenticação. Título: 3–255; descrição: mínimo 3; link HTTP(S): máximo 2048. Ao menos uma turma e um participante ativo/elegível por turma; nomes únicos e participantes sem repetição em todo o evento. Datas locais, término posterior ao início; datas passadas continuam permitidas.")
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Evento criado com sucesso"),
+            @ApiResponse(responseCode = "201", description = "Detalhe persistido no envelope ApiResult"),
+            @ApiResponse(responseCode = "404", description = "NR ou participante não encontrado no workspace"),
+            @ApiResponse(responseCode = "409", description = "Conflito de integridade dos dados"),
             @ApiResponse(responseCode = "400", description = "Dados ou regras de negócio inválidos"),
             @ApiResponse(responseCode = "401", description = "Não autenticado"),
             @ApiResponse(responseCode = "403", description = "Não autorizado")

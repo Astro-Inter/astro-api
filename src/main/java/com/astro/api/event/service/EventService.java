@@ -366,20 +366,35 @@ public class EventService {
             throw new BusinessException("Evento deve possuir ao menos uma turma");
         }
         Set<Long> allParticipantIds = new HashSet<>();
+        Set<String> classNames = new HashSet<>();
         for (CreateEventClassRequest classRequest : classRequests) {
+            if (classRequest == null) throw new BusinessException("Turma não pode ser nula");
+            validateClassName(classRequest.name(), classNames);
             if (classRequest.participantIds() == null || classRequest.participantIds().isEmpty()) {
                 throw new BusinessException("Turma deve possuir ao menos um participante");
             }
             validateDates(classRequest.startDate(), classRequest.endDate());
             Set<Long> classParticipantIds = new HashSet<>(classRequest.participantIds());
             validateUniqueParticipants(classRequest.participantIds(), classParticipantIds);
-            if (!allParticipantIds.addAll(classParticipantIds)) {
-                throw new BusinessException("Participante repetido em duas turmas do evento");
+            for (Long participantId : classParticipantIds) {
+                if (!allParticipantIds.add(participantId)) {
+                    throw new BusinessException("Participante repetido em duas turmas do evento");
+                }
             }
         }
     }
 
+    private void validateClassName(String name, Set<String> names) {
+        if (name == null || name.isBlank() || name.length() > 255) {
+            throw new BusinessException("Nome da turma deve ter entre 1 e 255 caracteres");
+        }
+        if (!names.add(name.trim())) throw new BusinessException("Nome de turma repetido no evento");
+    }
+
     private void validateUniqueParticipants(List<Long> requestedIds, Set<Long> uniqueIds) {
+        if (requestedIds == null || uniqueIds.stream().anyMatch(id -> id == null || id <= 0)) {
+            throw new BusinessException("Identificador do participante deve ser positivo");
+        }
         if (uniqueIds.size() != requestedIds.size()) {
             throw new BusinessException("Participante repetido na turma");
         }
@@ -393,7 +408,7 @@ public class EventService {
             Workspace workspace,
             User manager,
             Integer nrId) {
-        List<User> participants = userRepository.findAllById(participantIds);
+        List<User> participants = userRepository.findEventParticipantsInWorkspace(participantIds, workspace);
         Map<Long, User> usersById = participants.stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
         if (usersById.size() != participantIds.size()) {

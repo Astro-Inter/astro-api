@@ -24,6 +24,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     List<User> findByUnit_WorkspaceAndStatus(Workspace workspace, UserStatus status);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"role", "role.workspace", "unit", "unit.workspace", "unit.address"})
+    @Query("select u from User u where u.id in :ids and u.unit.workspace = :workspace")
+    List<User> findEventParticipantsInWorkspace(@Param("ids") Collection<Long> ids,
+                                               @Param("workspace") Workspace workspace);
+
     @Query(value = "SELECT fn_retornar_tipo_conta(:email)", nativeQuery = true)
     String findAccountTypeByEmail(@Param("email") String email);
 
