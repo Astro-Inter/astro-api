@@ -1,6 +1,6 @@
 package com.astro.api.unit.repository;
 
-import com.astro.api.conformidade.model.NrDocument;
+import com.astro.api.conformity.model.NrDocument;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;

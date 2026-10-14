@@ -1,6 +1,6 @@
-package com.astro.api.conformidade.repository;
+package com.astro.api.conformity.repository;
 
-import com.astro.api.conformidade.model.NrCatalog;
+import com.astro.api.conformity.model.NrCatalog;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

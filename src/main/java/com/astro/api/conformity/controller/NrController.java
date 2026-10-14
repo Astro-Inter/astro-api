@@ -1,8 +1,8 @@
-package com.astro.api.conformidade.controller;
+package com.astro.api.conformity.controller;
 
 import com.astro.api.common.response.ApiResult;
-import com.astro.api.conformidade.dto.response.NrResponse;
-import com.astro.api.conformidade.repository.NrCatalogRepository;
+import com.astro.api.conformity.dto.response.NrResponse;
+import com.astro.api.conformity.repository.NrCatalogRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;

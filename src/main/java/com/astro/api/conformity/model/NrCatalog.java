@@ -1,4 +1,4 @@
-package com.astro.api.conformidade.model;
+package com.astro.api.conformity.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
