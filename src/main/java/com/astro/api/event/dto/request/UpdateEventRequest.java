@@ -13,7 +13,8 @@ public record UpdateEventRequest(
         @NotBlank(message = "{event.title.notBlank}")
         @Size(min = 3, max = 255, message = "{event.title.size}") String title,
         @NotBlank(message = "{event.description.notBlank}")
-        @Size(min = 3, message = "{event.description.size}") String description,
+        @Size(min = 3, message = "{event.description.size}")
+        @Pattern(regexp = "(?s)^ *[^ ].+[^ ] *$", message = "{event.description.size}") String description,
         @Size(max = 2048, message = "{event.externalLink.size}")
         @Pattern(regexp = "(?i)^https?://\\S+$", message = "{event.externalLink.invalid}") String externalLink,
         @NotEmpty(message = "{event.classes.notEmpty}") @io.swagger.v3.oas.annotations.media.Schema(description = "Conjunto desejado de turmas; omissão remove somente futuras. Turmas iniciadas devem permanecer inalteradas.")
@@ -21,7 +22,6 @@ public record UpdateEventRequest(
 ) {
     public UpdateEventRequest {
         title = title == null ? null : title.trim();
-        description = description == null ? null : description.trim();
         externalLink = externalLink == null || externalLink.isBlank() ? null : externalLink.trim();
     }
 }

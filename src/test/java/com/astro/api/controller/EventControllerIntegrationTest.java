@@ -237,6 +237,14 @@ class EventControllerIntegrationTest {
         org.mockito.Mockito.verifyNoInteractions(eventService);
     }
 
+    @Test
+    void updateRejectsDescriptionBelowTheDatabaseMinimumAfterTrimming() throws Exception {
+        var body=new UpdateEventRequest("Evento","  ab  ",null,List.of(new UpdateEventClassRequest(2L,"Grupo",LocalDateTime.of(2026,10,15,8,0),LocalDateTime.of(2026,10,15,9,0),List.of(3L))));
+        mockMvc.perform(patch("/events/1").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Erro de validação"));
+        org.mockito.Mockito.verifyNoInteractions(eventService);
+    }
+
     private CreateEventRequest createRequest() {
         CreateEventClassRequest eventClass = new CreateEventClassRequest(
                 "Grupo 1",

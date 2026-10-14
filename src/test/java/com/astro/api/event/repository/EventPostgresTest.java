@@ -248,6 +248,17 @@ class EventPostgresTest {
         }
         assertEquals(com.astro.api.event.model.EventStatus.CANCELADO,service.findById(id,"uid1").status());
     }
+    @Test void editingFutureClassesPreservesTheExactDescriptionOfHistoricalEvents() {
+        var created=service.create(createRequest(List.of(createClass("A",2),createClass("B",3))),"uid1");
+        long started=created.eventClasses().getFirst().id(),future=created.eventClasses().getLast().id();
+        jdbc.update("UPDATE evento SET descricao='  Descrição histórica  ' WHERE id_evento=?",created.id());
+        jdbc.update("UPDATE turma SET data_inicial='2026-10-14 12:00',data_termino='2026-10-14 13:00' WHERE id_turma=?",started);
+        var historical=service.findById(created.id(),"uid1");
+        var unchanged=new com.astro.api.event.dto.request.UpdateEventClassRequest(started,"A",LocalDateTime.of(2026,10,14,12,0),LocalDateTime.of(2026,10,14,13,0),List.of(2L));
+        var body=new com.astro.api.event.dto.request.UpdateEventRequest(historical.title(),historical.description(),historical.externalLink(),List.of(unchanged,updateClass(future,"Futura",List.of(3L))));
+        var updated=service.update(created.id(),body,"uid1");
+        assertEquals(historical.description(),updated.description());assertEquals("Futura",updated.eventClasses().getLast().name());
+    }
     static DriverManagerDataSource dataSource() {
         String url=System.getenv("MANAGER_TEST_DATABASE_URL");
         if (!url.matches("jdbc:postgresql://(localhost|127\\.0\\.0\\.1):[0-9]+/astro525")) throw new IllegalArgumentException("Local disposable astro525 database required");
