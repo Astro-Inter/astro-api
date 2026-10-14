@@ -25,6 +25,17 @@ public class ConformityController {
     private final ConformityService service;
     public ConformityController(ConformityService service) { this.service = service; }
 
+    @GetMapping("/{conformityId}")
+    @Operation(summary = "Consulta um registro de conformidade pelo ID",
+            description = "Consulta a tabela e seus relacionamentos no escopo autorizado. Retorna registros não aplicáveis e históricos que já não representam o par na view. Preserva origem e conclusão vinculada.")
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "Detalhes da conformidade"),
+            @ApiResponse(responseCode = "404", description = "Registro inexistente ou fora do escopo")})
+    public ResponseEntity<ApiResult<ConformityResponse>> findById(@PathVariable Long conformityId,
+            @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
+        return ResponseEntity.ok(ApiResult.success("Conformidade retornada com sucesso",
+                service.findById(conformityId, principal), request.getRequestURI()));
+    }
+
     @GetMapping
     @Operation(summary = "Lista conformidades aplicáveis no escopo autorizado",
             description = "Consulta vw_conformidades: uma linha por colaborador/NR, priorizando aplicáveis, maior validade (nulos por último) e maior ID. Inclui histórico de colaboradores inativos e NRs revogadas. Lista completa ordenada por nome, colaborador, NR e ID. Status segue CURRENT_DATE da sessão PostgreSQL; data nula significa Sem validade.")

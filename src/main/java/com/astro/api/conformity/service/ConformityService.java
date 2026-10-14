@@ -1,6 +1,8 @@
 package com.astro.api.conformity.service;
 
 import com.astro.api.auth.security.AuthenticatedUser;
+import com.astro.api.common.exception.BusinessException;
+import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.conformity.dto.response.ConformityResponse;
 import com.astro.api.conformity.mapper.ConformityMapper;
 import com.astro.api.conformity.repository.ConformityRepository;
@@ -30,6 +32,25 @@ public class ConformityService {
         User manager = requireManager(principal);
         return repository.findAllInScope(principal.firebaseUid(), manager.getUnit().workspace.id)
                 .stream().map(mapper::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ConformityResponse findById(Long conformityId, AuthenticatedUser principal) {
+        User manager = requireManager(principal);
+        checkId(conformityId);
+        return details(conformityId, principal, manager);
+    }
+
+    private ConformityResponse details(Long conformityId, AuthenticatedUser principal, User manager) {
+        return repository.findDetailsInScope(conformityId, principal.firebaseUid(), manager.getUnit().workspace.id)
+                .map(mapper::toResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("Conformidade não encontrada"));
+    }
+
+    private void checkId(Long conformityId) {
+        if (conformityId == null || conformityId <= 0) {
+            throw new BusinessException("O identificador da conformidade deve ser positivo");
+        }
     }
 
     private User requireManager(AuthenticatedUser principal) {

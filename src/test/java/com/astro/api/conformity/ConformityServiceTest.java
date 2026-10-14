@@ -54,4 +54,17 @@ class ConformityServiceTest {
         when(repository.findAllInScope("manager", 8L)).thenReturn(List.of());
         assertTrue(service.findAll(principal).isEmpty());
     }
+
+    @Test void readsAnAuthorizedNonApplicableHistoricalRecordByItsOwnId() {
+        manager(); ConformityProjection row = mock(ConformityProjection.class);
+        when(row.getId()).thenReturn(7L); when(row.getApplicable()).thenReturn(false);
+        when(repository.findDetailsInScope(7L, "manager", 8L)).thenReturn(Optional.of(row));
+        var result = service.findById(7L, principal);
+        assertEquals(7L, result.id()); assertFalse(result.applicable());
+        verify(repository, never()).findAllInScope(anyString(), anyLong());
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,
+                () -> service.findById(99L, principal));
+        assertThrows(com.astro.api.common.exception.BusinessException.class,
+                () -> service.findById(0L, principal));
+    }
 }

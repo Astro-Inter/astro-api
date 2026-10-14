@@ -43,4 +43,17 @@ class ConformityControllerTest {
                 .andExpect(jsonPath("$.data[0].firebase_uid").doesNotExist());
         verify(service).findAll(principal);
     }
+
+    @Test void returnsDetailsAndStandardNotFoundAndMalformedIdErrors() throws Exception {
+        when(service.findById(2L, principal)).thenReturn(response());
+        mvc.perform(get("/conformities/2")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.eventCompletionId").value(42))
+                .andExpect(jsonPath("$.data.password").doesNotExist())
+                .andExpect(jsonPath("$.data.firebaseUid").doesNotExist());
+        when(service.findById(99L, principal)).thenThrow(
+                new com.astro.api.common.exception.ResourceNotFoundException("Conformidade não encontrada"));
+        mvc.perform(get("/conformities/99")).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Conformidade não encontrada"));
+        mvc.perform(get("/conformities/invalid")).andExpect(status().isBadRequest());
+    }
 }
