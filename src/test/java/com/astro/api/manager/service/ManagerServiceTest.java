@@ -5,6 +5,8 @@ import com.astro.api.auth.security.Role;
 import com.astro.api.manager.mapper.ManagerMapper;
 import com.astro.api.manager.repository.ManagerRepository;
 import com.astro.api.manager.repository.ManagerSummaryProjection;
+import com.astro.api.manager.repository.ManagerDetailsProjection;
+import com.astro.api.user.service.UserAvatarService;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.user.model.*;
 import com.astro.api.user.repository.UserRepository;
@@ -23,8 +25,9 @@ class ManagerServiceTest {
     final com.astro.api.unit.repository.UnitRepository units = mock(com.astro.api.unit.repository.UnitRepository.class);
     final com.astro.api.auth.service.FirebaseIdentityService firebase = mock(com.astro.api.auth.service.FirebaseIdentityService.class);
     final org.springframework.transaction.PlatformTransactionManager transactions = mock(org.springframework.transaction.PlatformTransactionManager.class);
+    final UserAvatarService avatars = mock(UserAvatarService.class);
     final ManagerService service = new ManagerService(repository, users, new ManagerMapper(), roles, units,
-            firebase, new ManagerStatusPolicy(), transactions);
+            firebase, new ManagerStatusPolicy(), transactions, avatars);
     final AuthenticatedUser principal = new AuthenticatedUser("workspace-manager", "owner@astro.com", Role.GESTOR_WORKSPACE);
     User requester;
 
@@ -42,15 +45,21 @@ class ManagerServiceTest {
         for (UserStatus status : UserStatus.values()) {
             var row = mock(ManagerSummaryProjection.class);
             when(row.getId()).thenReturn((long) status.ordinal() + 1);
-            when(row.getName()).thenReturn("Gestor"); when(row.getEmail()).thenReturn("manager@astro.com");
+            when(row.getName()).thenReturn("Lucas Ribeiro"); when(row.getEmail()).thenReturn("manager@astro.com");
             when(row.getUnitId()).thenReturn(10L); when(row.getStatus()).thenReturn(status.name()); rows.add(row);
         }
         when(repository.findAllInWorkspace(1L)).thenReturn(rows);
+        when(avatars.findUrls(List.of(1L, 2L, 3L))).thenReturn(Map.of(2L, "https://r2.example.com/manager"));
         var result = service.findAll(principal);
         assertEquals(List.of(UserStatus.PRE_CADASTRADO, UserStatus.ATIVO, UserStatus.DESATIVADO),
                 result.stream().map(value -> value.status()).toList());
         assertEquals(3, result.stream().map(value -> value.id()).distinct().count());
         verify(repository).findAllInWorkspace(1L);
+        assertNull(result.getFirst().profilePhotoUrl());
+        assertEquals("https://r2.example.com/manager", result.get(1).profilePhotoUrl());
+        assertEquals("LR", result.getFirst().avatarInitials());
+        verify(avatars).findUrls(List.of(1L, 2L, 3L));
+        verify(avatars, never()).findUrl(any());
     }
 
     @Test void returnsEmptyList() {
@@ -63,6 +72,58 @@ class ManagerServiceTest {
                 () -> service.findById(8L, principal));
         verify(repository).findDetailsInWorkspace(8L, 1L);
         assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.findById(0L, principal));
+        verifyNoInteractions(avatars);
+    }
+
+    @Test void detailsLoadThePhotoOnlyAfterFindingTheManagerInTheAuthorizedWorkspace() {
+        ManagerDetailsProjection row = mock(ManagerDetailsProjection.class);
+        when(row.getId()).thenReturn(4L);
+        when(row.getName()).thenReturn("Lucas Ribeiro");
+        when(row.getStatus()).thenReturn("ATIVO");
+        when(repository.findDetailsInWorkspace(4L, 1L)).thenReturn(Optional.of(row));
+        when(avatars.findUrl(4L)).thenReturn("https://r2.example.com/manager");
+        var result = service.findById(4L, principal);
+        assertEquals("https://r2.example.com/manager", result.profilePhotoUrl());
+        assertEquals("LR", result.avatarInitials());
+        var order = inOrder(repository, avatars);
+        order.verify(repository).findDetailsInWorkspace(4L, 1L);
+        order.verify(avatars).findUrl(4L);
+    }
+
+    @Test void promotionReusesTheSharedUserAvatarCacheWithoutSigningAnotherLink() {
+        var photos = mock(com.astro.api.user.repository.UserProfilePhotoRepository.class);
+        var storage = mock(com.astro.api.common.storage.R2StorageService.class);
+        var redis = mock(org.springframework.data.redis.core.StringRedisTemplate.class);
+        @SuppressWarnings("unchecked")
+        org.springframework.data.redis.core.ValueOperations<String, String> values =
+                mock(org.springframework.data.redis.core.ValueOperations.class);
+        when(redis.opsForValue()).thenReturn(values);
+        when(values.multiGet(List.of("user:avatar:4"))).thenReturn(List.of("https://r2.example.com/cached-collaborator"));
+        UserAvatarService sharedAvatars = new UserAvatarService(photos, redis, storage);
+        String selectedPhoto = sharedAvatars.findUrl(4L);
+        ManagerService withSharedCache = new ManagerService(repository, users, new ManagerMapper(), roles, units,
+                firebase, new ManagerStatusPolicy(), transactions, sharedAvatars);
+        eligibleCollaborator();
+        var result = withSharedCache.promote(new com.astro.api.manager.dto.request.PromoteManagerRequest(
+                4L, com.astro.api.manager.dto.request.ManagerAccountStatus.ATIVO), principal);
+        assertEquals(selectedPhoto, result.profilePhotoUrl());
+        assertEquals("C", result.avatarInitials());
+        verify(values, times(2)).multiGet(List.of("user:avatar:4"));
+        verifyNoInteractions(photos, storage);
+        verify(redis, never()).delete(anyString());
+    }
+
+    @Test void updateAndStatusResponsesKeepThePhotoAndRefreshInitialsFromTheCurrentName() {
+        User manager = editableManager();
+        when(avatars.findUrl(4L)).thenReturn("https://r2.example.com/manager");
+        var updated = service.update(4L, updateBody(manager.getEmail(), 2L, 10L, UserStatus.ATIVO), principal);
+        assertEquals("https://r2.example.com/manager", updated.profilePhotoUrl());
+        assertEquals("GE", updated.avatarInitials());
+        var deactivated = service.changeStatus(4L, statusBody(
+                com.astro.api.manager.dto.request.ManagerAccountStatus.DESATIVADO), principal);
+        assertEquals(updated.profilePhotoUrl(), deactivated.profilePhotoUrl());
+        assertEquals("GE", deactivated.avatarInitials());
+        verify(avatars, never()).invalidate(any());
     }
 
     User eligibleCollaborator() {
@@ -229,6 +290,6 @@ class ManagerServiceTest {
         assertThrows(AccessDeniedException.class, () -> service.findAll(principal));
         requester.setType(UserType.GESTOR_WORKSPACE); requester.setStatus(UserStatus.DESATIVADO);
         assertThrows(AccessDeniedException.class, () -> service.findAll(principal));
-        verifyNoInteractions(repository);
+        verifyNoInteractions(repository, avatars);
     }
 }

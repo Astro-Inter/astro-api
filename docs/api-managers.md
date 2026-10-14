@@ -8,7 +8,7 @@ são exclusivamente `GESTOR`, protegendo a própria conta `GESTOR_WORKSPACE`.
 ## GET /managers — SCRUM-526
 
 Retorna HTTP 200 com `ApiResult` e uma lista de `id_usuario`, `nome`, `email`,
-`unidade_id`, `unidade` e `status`. Consulta `vw_gestores` pelo workspace autorizado,
+`unidade_id`, `unidade`, `status`, `profilePhotoUrl` e `avatarInitials`. Consulta `vw_gestores` pelo workspace autorizado,
 ordenada por nome e ID. Inclui PRE_CADASTRADO, ATIVO e DESATIVADO, com vínculos
 inativos e vários gestores por unidade. Não há paginação, filtros ou CPF na lista.
 Uma lista sem registros retorna `[]`. Senha e Firebase UID nunca são expostos.
@@ -16,7 +16,8 @@ Uma lista sem registros retorna `[]`. Senha e Firebase UID nunca são expostos.
 ## GET /managers/{id} — SCRUM-527
 
 Retorna HTTP 200 com `ApiResult` e `id_usuario`, `nome`, `cpf`, `email`,
-`modalidade`, `status`, `cargo_id`, `cargo`, `unidade_id`, `unidade` e `workspace_id`.
+`modalidade`, `status`, `cargo_id`, `cargo`, `unidade_id`, `unidade`, `workspace_id`,
+`profilePhotoUrl` e `avatarInitials`.
 Modalidade pode ser nula em registros legados. ID inválido retorna 400;
 inexistente, outro perfil ou outro workspace retornam o mesmo 404.
 
@@ -61,6 +62,48 @@ Retorna 200 com detalhes. Usa as mesmas regras do PUT, mantém tipo GESTOR e nã
 conclui pré-cadastro. Solicitar o estado atual é idempotente. Ativação bloqueia
 os vínculos e exige que ambos estejam ativos no workspace autorizado.
 Desativação bloqueia a conta nas próximas requisições, inclusive com o mesmo token.
+
+## Foto e iniciais para a tela web
+
+Todos os cinco endpoints retornam `profilePhotoUrl` e `avatarInitials`, com o mesmo
+contrato dos colaboradores. A tela pode usar `profilePhotoUrl` no avatar e exibir
+`avatarInitials` quando a URL for nula. As iniciais vêm do primeiro e do último nome,
+em maiúsculas (por exemplo, `Lucas Ribeiro` → `LR`); um nome único gera uma inicial.
+
+A foto é a do próprio usuário: `UserAvatarService` gera links temporários de download
+do R2 e reutiliza o cache Redis compartilhado `user:avatar:{id}` até a expiração do
+link. A listagem consulta cache e fotos ausentes em lote, após restringir os gestores
+ao workspace autorizado. Nos demais endpoints, somente o usuário já autorizado é
+consultado. Redis indisponível mantém a consulta de fotos e geração de links.
+
+A promoção preserva o ID, a foto e o link já em cache da seleção em `/collaborators`.
+Editar nome ou status mantém o link e recalcula as iniciais com o nome atual. A troca
+de foto pelo fluxo de usuário existente invalida esse mesmo cache, servindo a nova
+imagem em colaboradores e gestores. Nenhum objeto SQL adicional é necessário.
+
+Exemplo de item da listagem (dentro de `data`):
+
+```json
+{
+  "id_usuario": 123,
+  "nome": "Lucas Ribeiro",
+  "email": "lucas@example.com",
+  "unidade_id": 10,
+  "unidade": "Matriz São Paulo",
+  "status": "ATIVO",
+  "profilePhotoUrl": "https://r2.example.com/foto?signature=...",
+  "avatarInitials": "LR"
+}
+```
+
+Sem foto cadastrada, `profilePhotoUrl` é `null`; as iniciais continuam presentes.
+
+Validação deste complemento: `verify` aprovado com 245 testes, zero falhas/erros e
+18 ignorados por dependências locais de PostgreSQL, Redis e contexto completo.
+Os testes cobrem a consulta em lote, autorização antes de consultar fotos, contrato
+JSON, ausência de foto, reaproveitamento do cache na promoção e atualização das
+iniciais na edição. Os testes existentes do serviço compartilhado verificam a
+expiração dos links, invalidação e comportamento quando Redis está indisponível.
 
 ## Verificação local
 
