@@ -17,6 +17,12 @@ public record EventResponse(
         EventStatus status,
         Instant cancellationDate,
         String cancellationReason,
+        Long managerId,
+        @io.swagger.v3.oas.annotations.media.Schema(description = "Criador de evento ativo; pode editar ou adicionar turmas futuras")
+        boolean canEdit,
+        boolean canCancel,
+        @io.swagger.v3.oas.annotations.media.Schema(description = "Metadados editáveis somente antes de qualquer turma iniciar")
+        boolean detailsEditable,
         List<EventClassResponse> eventClasses
 ) {
 }

@@ -100,6 +100,21 @@ class EventControllerIntegrationTest {
     }
 
     @Test
+    void findsEventDetailAndUsesTheApiErrorEnvelope() throws Exception {
+        when(eventService.findById(1L, "integration-manager")).thenReturn(eventResponse());
+        mockMvc.perform(get("/events/1")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.managerId").value(1))
+                .andExpect(jsonPath("$.data.canEdit").value(true));
+        when(eventService.findById(2L, "integration-manager"))
+                .thenThrow(new com.astro.api.common.exception.ResourceNotFoundException("Evento não encontrado"));
+        mockMvc.perform(get("/events/2")).andExpect(status().isNotFound()).andExpect(jsonPath("$.success").value(false));
+        when(eventService.findById(3L, "integration-manager"))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException("Gestor ativo necessário"));
+        mockMvc.perform(get("/events/3")).andExpect(status().isForbidden());
+        mockMvc.perform(get("/events/invalid")).andExpect(status().isBadRequest());
+    }
+
+    @Test
     void createsCompleteEvent() throws Exception {
         when(eventService.create(any(), anyString())).thenReturn(eventResponse());
 
@@ -176,7 +191,7 @@ class EventControllerIntegrationTest {
                 EventStatus.ATIVO,
                 null,
                 null,
-                List.of());
+                1L, true, true, true, List.of());
     }
 
     private static class AuthenticatedUserArgumentResolver implements HandlerMethodArgumentResolver {

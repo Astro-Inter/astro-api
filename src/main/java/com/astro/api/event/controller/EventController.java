@@ -63,6 +63,24 @@ public class EventController {
                 "Turmas retornadas com sucesso", calendarEvents, request.getRequestURI()));
     }
 
+    @GetMapping("/{eventId}")
+    @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
+    @Operation(summary = "Consulta o detalhe completo de um evento",
+            description = "Consulta no workspace autenticado, incluindo todas as turmas. Somente o criador de evento ativo pode editar/cancelar. detailsEditable bloqueia metadados após o início de qualquer turma; editable indica turmas futuras. canEdit permite adicionar turmas futuras mesmo quando as existentes já iniciaram.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Detalhe no envelope ApiResult"),
+            @ApiResponse(responseCode = "400", description = "Identificador inválido"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado"),
+            @ApiResponse(responseCode = "403", description = "Gestor ativo necessário"),
+            @ApiResponse(responseCode = "404", description = "Evento inexistente ou fora do workspace")
+    })
+    public ResponseEntity<ApiResult<EventResponse>> findById(
+            @PathVariable Long eventId,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser, HttpServletRequest request) {
+        return ResponseEntity.ok(ApiResult.success("Evento retornado com sucesso",
+                eventService.findById(eventId, authenticatedUser.firebaseUid()), request.getRequestURI()));
+    }
+
     @GetMapping("/eligible-candidates")
     @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
     @Operation(summary = "Lista colaboradores elegíveis para compor as turmas")

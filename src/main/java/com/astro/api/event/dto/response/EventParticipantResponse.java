@@ -1,4 +1,4 @@
 package com.astro.api.event.dto.response;
 
-public record EventParticipantResponse(Long id, String name, String email) {
+public record EventParticipantResponse(Long id, String name, String email, Long participationId) {
 }

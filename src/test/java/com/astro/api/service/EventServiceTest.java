@@ -65,11 +65,13 @@ class EventServiceTest {
                 userRepository,
                 roleRepository,
                 nrCatalogRepository,
-                new EventMapper());
+                new EventMapper(), java.time.Clock.fixed(
+                        java.time.Instant.parse("2026-10-14T12:00:00Z"), java.time.ZoneOffset.UTC));
         workspace = new Workspace();
         workspace.id = 10L;
         manager = createUser(1L, UserStatus.ATIVO, workspace);
         manager.setFirebaseUid("manager");
+        manager.setType(com.astro.api.user.model.UserType.GESTOR);
         when(userRepository.findByFirebaseUid("manager")).thenReturn(Optional.of(manager));
     }
 
@@ -216,6 +218,65 @@ class EventServiceTest {
         assertEquals(EventStatus.CANCELADO, response.status());
         assertNotNull(event.getCancellationDate());
         assertEquals("Valid reason", event.getCancellationReason());
+    }
+
+    @Test
+    void detailIncludesAllClassesInStableOrderAndPartialEditingPermissions() {
+        Event event = createEvent(EventStatus.ATIVO);
+        EventClass future = createEventClass(event, LocalDateTime.of(2026, 10, 15, 8, 0), LocalDateTime.of(2026, 10, 15, 9, 0));
+        future.setId(41L);
+        EventClass started = createEventClass(event, LocalDateTime.of(2026, 10, 14, 12, 0), LocalDateTime.of(2026, 10, 14, 13, 0));
+        when(eventRepository.findByIdAndManager_Unit_Workspace(30L, workspace)).thenReturn(Optional.of(event));
+        when(eventClassRepository.findByEventOrderByStartDate(event)).thenReturn(List.of(future, started));
+        var first = new com.astro.api.event.model.EventClassParticipant();
+        first.setId(91L); first.setEventClass(future); first.setUser(createUser(3L, UserStatus.ATIVO, workspace));
+        var second = new com.astro.api.event.model.EventClassParticipant();
+        second.setId(92L); second.setEventClass(future); second.setUser(createUser(2L, UserStatus.ATIVO, workspace));
+        when(eventClassParticipantRepository.findByEventClassIn(List.of(future, started))).thenReturn(List.of(first, second));
+        var response = service.findById(30L, "manager");
+        assertEquals(1L, response.managerId());
+        org.junit.jupiter.api.Assertions.assertTrue(response.canEdit());
+        org.junit.jupiter.api.Assertions.assertTrue(response.canCancel());
+        org.junit.jupiter.api.Assertions.assertFalse(response.detailsEditable());
+        assertEquals(List.of(40L, 41L), response.eventClasses().stream().map(com.astro.api.event.dto.response.EventClassResponse::id).toList());
+        org.junit.jupiter.api.Assertions.assertFalse(response.eventClasses().getFirst().editable());
+        org.junit.jupiter.api.Assertions.assertTrue(response.eventClasses().getLast().editable());
+        assertEquals(List.of(2L, 3L), response.eventClasses().getLast().participants().stream().map(com.astro.api.event.dto.response.EventParticipantResponse::id).toList());
+        assertEquals(92L, response.eventClasses().getLast().participants().getFirst().participationId());
+        org.junit.jupiter.api.Assertions.assertTrue(response.eventClasses().getFirst().participants().isEmpty());
+    }
+
+    @Test
+    void detailIsVisibleToOtherManagerButCannotBeModified() {
+        Event event = createEvent(EventStatus.ATIVO);
+        event.setManager(createUser(99L, UserStatus.ATIVO, workspace));
+        when(eventRepository.findByIdAndManager_Unit_Workspace(30L, workspace)).thenReturn(Optional.of(event));
+        var response = service.findById(30L, "manager");
+        org.junit.jupiter.api.Assertions.assertFalse(response.canEdit());
+        org.junit.jupiter.api.Assertions.assertFalse(response.canCancel());
+        org.junit.jupiter.api.Assertions.assertFalse(response.detailsEditable());
+    }
+
+    @Test
+    void detailHidesMissingAndForeignWorkspaceEventsAndBlocksInactiveManager() {
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class, () -> service.findById(999L, "manager"));
+        manager.setStatus(UserStatus.DESATIVADO);
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> service.findById(30L, "manager"));
+    }
+
+    @Test
+    void finalEventStatesDisableEveryPermission() {
+        for (EventStatus status : List.of(EventStatus.CANCELADO, EventStatus.CONCLUIDO)) {
+            Event event = createEvent(status);
+            var future = createEventClass(event, LocalDateTime.of(2026, 10, 15, 8, 0), LocalDateTime.of(2026, 10, 15, 9, 0));
+            when(eventRepository.findByIdAndManager_Unit_Workspace(30L, workspace)).thenReturn(Optional.of(event));
+            when(eventClassRepository.findByEventOrderByStartDate(event)).thenReturn(List.of(future));
+            var response = service.findById(30L, "manager");
+            org.junit.jupiter.api.Assertions.assertFalse(response.canEdit());
+            org.junit.jupiter.api.Assertions.assertFalse(response.canCancel());
+            org.junit.jupiter.api.Assertions.assertFalse(response.detailsEditable());
+            org.junit.jupiter.api.Assertions.assertFalse(response.eventClasses().getFirst().editable());
+        }
     }
 
     private CreateEventRequest createRequest(Integer nrId, List<Long> participantIds) {

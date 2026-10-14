@@ -21,13 +21,16 @@ import com.astro.api.event.repository.EventClassParticipantRepository;
 import com.astro.api.event.repository.EventClassRepository;
 import com.astro.api.event.repository.EventRepository;
 import com.astro.api.user.model.User;
+import com.astro.api.user.model.UserType;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.workspace.model.Workspace;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -48,6 +51,7 @@ public class EventService {
     private final RoleRepository roleRepository;
     private final NrCatalogRepository nrCatalogRepository;
     private final EventMapper eventMapper;
+    private final Clock clock;
 
     public EventService(
             EventRepository eventRepository,
@@ -56,7 +60,7 @@ public class EventService {
             UserRepository userRepository,
             RoleRepository roleRepository,
             NrCatalogRepository nrCatalogRepository,
-            EventMapper eventMapper) {
+            EventMapper eventMapper, @Qualifier("eventClock") Clock clock) {
         this.eventRepository = eventRepository;
         this.eventClassRepository = eventClassRepository;
         this.eventClassParticipantRepository = eventClassParticipantRepository;
@@ -64,6 +68,7 @@ public class EventService {
         this.roleRepository = roleRepository;
         this.nrCatalogRepository = nrCatalogRepository;
         this.eventMapper = eventMapper;
+        this.clock = clock;
     }
 
     @Transactional
@@ -85,7 +90,14 @@ public class EventService {
                 eventClasses, request.eventClasses(), participants);
         eventClassParticipantRepository.saveAll(classParticipants);
 
-        return toResponse(event, eventClasses, classParticipants);
+        return toResponse(event, eventClasses, classParticipants, manager);
+    }
+
+    @Transactional(readOnly = true)
+    public EventResponse findById(Long eventId, String firebaseUid) {
+        User manager = findAuthenticatedManager(firebaseUid);
+        Event event = findEventInWorkspace(eventId, getWorkspace(manager));
+        return toResponse(event, eventClassRepository.findByEventOrderByStartDate(event), manager);
     }
 
     public List<EventCalendarResponse> findAll(
@@ -180,7 +192,7 @@ public class EventService {
                 .sorted((firstClass, secondClass) -> firstClass.getStartDate()
                         .compareTo(secondClass.getStartDate()))
                 .toList();
-        return toResponse(event, responseClasses, responseParticipants);
+        return toResponse(event, responseClasses, responseParticipants, manager);
     }
 
     @Transactional
@@ -190,10 +202,10 @@ public class EventService {
         ensureManagerAndEditable(event, manager);
 
         event.setStatus(EventStatus.CANCELADO);
-        event.setCancellationDate(Instant.now());
+        event.setCancellationDate(clock.instant());
         event.setCancellationReason(request.reason().trim());
         eventRepository.save(event);
-        return toResponse(event, eventClassRepository.findByEventOrderByStartDate(event));
+        return toResponse(event, eventClassRepository.findByEventOrderByStartDate(event), manager);
     }
 
     private void validateNrExists(Integer nrId) {
@@ -446,7 +458,9 @@ public class EventService {
 
     private User findAuthenticatedManager(String firebaseUid) {
         return userRepository.findByFirebaseUid(firebaseUid)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário autenticado não encontrado"));
+                .filter(user -> user.getStatus() == UserStatus.ATIVO
+                        && (user.getType() == UserType.GESTOR || user.getType() == UserType.GESTOR_WORKSPACE))
+                .orElseThrow(() -> new AccessDeniedException("Gestor ativo necessário"));
     }
 
     private Workspace getWorkspace(User user) {
@@ -457,13 +471,14 @@ public class EventService {
     }
 
     private Event findEventInWorkspace(Long eventId, Workspace workspace) {
+        if (eventId == null || eventId <= 0) throw new BusinessException("Identificador do evento deve ser positivo");
         return eventRepository.findByIdAndManager_Unit_Workspace(eventId, workspace)
                 .orElseThrow(() -> new ResourceNotFoundException("Evento não encontrado"));
     }
 
     private void ensureManagerAndEditable(Event event, User manager) {
         if (!event.getManager().getId().equals(manager.getId())) {
-            throw new BusinessException("Operação não autorizada para este evento");
+            throw new AccessDeniedException("Operação não autorizada para este evento");
         }
         ensureEditable(event);
     }
@@ -484,7 +499,7 @@ public class EventService {
     }
 
     private boolean isEventClassEditable(EventClass eventClass) {
-        return LocalDateTime.now().isBefore(eventClass.getStartDate());
+        return LocalDateTime.now(clock).isBefore(eventClass.getStartDate());
     }
 
     private void validateDates(LocalDateTime startDate, LocalDateTime endDate) {
@@ -532,17 +547,27 @@ public class EventService {
         return eventMapper.toCalendarResponse(event, eventClass);
     }
 
-    private EventResponse toResponse(Event event, List<EventClass> eventClasses) {
+    private EventResponse toResponse(Event event, List<EventClass> eventClasses, User manager) {
         List<EventClassParticipant> classParticipants = eventClassParticipantRepository
                 .findByEventClassIn(eventClasses);
-        return toResponse(event, eventClasses, classParticipants);
+        return toResponse(event, eventClasses, classParticipants, manager);
     }
 
     private EventResponse toResponse(
             Event event,
             List<EventClass> eventClasses,
-            List<EventClassParticipant> classParticipants) {
-        return eventMapper.toResponse(event, eventClasses, classParticipants);
+            List<EventClassParticipant> classParticipants, User manager) {
+        boolean ownerAndActive = event.getStatus() == EventStatus.ATIVO
+                && event.getManager().getId().equals(manager.getId());
+        LocalDateTime now = LocalDateTime.now(clock);
+        boolean detailsEditable = ownerAndActive
+                && eventClasses.stream().allMatch(eventClass -> now.isBefore(eventClass.getStartDate()));
+        Set<Long> editableClassIds = ownerAndActive ? eventClasses.stream()
+                .filter(eventClass -> now.isBefore(eventClass.getStartDate()))
+                .map(EventClass::getId).collect(Collectors.toSet()) : Set.of();
+        // An active owner may always add future classes, even when all current classes started.
+        return eventMapper.toResponse(event, eventClasses, classParticipants,
+                ownerAndActive, ownerAndActive, detailsEditable, editableClassIds);
     }
 
     private record UpdatedEventClass(

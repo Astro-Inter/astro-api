@@ -12,6 +12,8 @@ import com.astro.api.user.model.User;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Comparator;
+import java.util.Set;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -21,15 +23,22 @@ public class EventMapper {
     public EventResponse toResponse(
             Event event,
             List<EventClass> eventClasses,
-            List<EventClassParticipant> classParticipants) {
-        Map<Long, List<EventParticipantResponse>> participantsByClassId = classParticipants.stream()
+            List<EventClassParticipant> classParticipants,
+            boolean canEdit, boolean canCancel, boolean detailsEditable, Set<Long> editableClassIds) {
+        Comparator<EventClassParticipant> participantOrder = Comparator
+                .comparing((EventClassParticipant participant) -> participant.getUser().getName())
+                .thenComparing(participant -> participant.getUser().getId());
+        Map<Long, List<EventParticipantResponse>> participantsByClassId = classParticipants.stream().sorted(participantOrder)
                 .collect(Collectors.groupingBy(
                         classParticipant -> classParticipant.getEventClass().getId(),
                         Collectors.mapping(this::toParticipantResponse, Collectors.toList())));
         List<EventClassResponse> classResponses = eventClasses.stream()
+                .sorted(Comparator.comparing(EventClass::getStartDate)
+                        .thenComparing(EventClass::getId))
                 .map(eventClass -> toClassResponse(
                         eventClass,
-                        participantsByClassId.getOrDefault(eventClass.getId(), List.of())))
+                        participantsByClassId.getOrDefault(eventClass.getId(), List.of()),
+                        editableClassIds.contains(eventClass.getId())))
                 .toList();
 
         return new EventResponse(
@@ -43,6 +52,8 @@ public class EventMapper {
                 event.getStatus(),
                 event.getCancellationDate(),
                 event.getCancellationReason(),
+                event.getManager().getId(),
+                canEdit, canCancel, detailsEditable,
                 classResponses);
     }
 
@@ -66,17 +77,18 @@ public class EventMapper {
 
     private EventParticipantResponse toParticipantResponse(EventClassParticipant classParticipant) {
         User user = classParticipant.getUser();
-        return new EventParticipantResponse(user.getId(), user.getName(), user.getEmail());
+        return new EventParticipantResponse(user.getId(), user.getName(), user.getEmail(), classParticipant.getId());
     }
 
     private EventClassResponse toClassResponse(
             EventClass eventClass,
-            List<EventParticipantResponse> participants) {
+            List<EventParticipantResponse> participants, boolean editable) {
         return new EventClassResponse(
                 eventClass.getId(),
                 eventClass.getName(),
                 eventClass.getStartDate(),
                 eventClass.getEndDate(),
+                editable,
                 participants);
     }
 }

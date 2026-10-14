@@ -9,5 +9,6 @@ import java.util.List;
 
 @Repository
 public interface EventClassParticipantRepository extends JpaRepository<EventClassParticipant, Long> {
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user", "user.role", "user.role.workspace", "user.unit", "user.unit.workspace", "user.unit.address"})
     List<EventClassParticipant> findByEventClassIn(List<EventClass> eventClasses);
 }
