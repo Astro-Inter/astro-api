@@ -178,16 +178,18 @@ class EventServiceTest {
                 event,
                 LocalDateTime.now().minusHours(2),
                 LocalDateTime.now().minusHours(1));
-        when(eventRepository.findByManager_Unit_Workspace(workspace)).thenReturn(List.of(event));
-        when(eventClassRepository.findByEventInOrderByStartDate(List.of(event)))
-                .thenReturn(List.of(eventClass));
-
-        var response = service.findAll(null, null, "manager");
-
+        var start = LocalDateTime.of(2026, 10, 1, 0, 0);
+        var end = LocalDateTime.of(2026, 11, 1, 0, 0);
+        var row = mock(com.astro.api.event.repository.EventCalendarProjection.class);
+        when(row.getEventTitle()).thenReturn("Event");
+        when(row.getStatus()).thenReturn(EventStatus.ATIVO);
+        when(eventClassRepository.findCalendar(workspace, start, end)).thenReturn(List.of(row));
+        var response = service.findAll(start, end, "manager");
         assertEquals(1, response.size());
         assertEquals("Event", response.getFirst().eventTitle());
+        assertEquals(EventStatus.ATIVO, response.getFirst().status());
         assertEquals(EventStatus.ATIVO, event.getStatus());
-        verify(eventRepository, never()).save(event);
+        verifyNoInteractions(eventRepository);
     }
 
     @Test
@@ -277,6 +279,16 @@ class EventServiceTest {
             org.junit.jupiter.api.Assertions.assertFalse(response.detailsEditable());
             org.junit.jupiter.api.Assertions.assertFalse(response.eventClasses().getFirst().editable());
         }
+    }
+
+    @Test
+    void requiresBothCalendarLimitsAndReturnsEmptyCalendar() {
+        var start = LocalDateTime.of(2026, 10, 1, 0, 0);
+        var end = start.plusDays(1);
+        assertThrows(BusinessException.class, () -> service.findAll(null, end, "manager"));
+        assertThrows(BusinessException.class, () -> service.findAll(start, null, "manager"));
+        assertThrows(BusinessException.class, () -> service.findAll(start, start, "manager"));
+        org.junit.jupiter.api.Assertions.assertTrue(service.findAll(start, end, "manager").isEmpty());
     }
 
     private CreateEventRequest createRequest(Integer nrId, List<Long> participantIds) {

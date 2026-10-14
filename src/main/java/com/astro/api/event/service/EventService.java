@@ -100,24 +100,15 @@ public class EventService {
         return toResponse(event, eventClassRepository.findByEventOrderByStartDate(event), manager);
     }
 
+    @Transactional(readOnly = true)
     public List<EventCalendarResponse> findAll(
             LocalDateTime startDate,
             LocalDateTime endDate,
             String firebaseUid) {
         validatePeriod(startDate, endDate);
         Workspace workspace = getWorkspace(findAuthenticatedManager(firebaseUid));
-        List<Event> events = eventRepository.findByManager_Unit_Workspace(workspace);
-        if (events.isEmpty()) {
-            return List.of();
-        }
-        Map<Long, Event> eventsById = events.stream()
-                .collect(Collectors.toMap(Event::getId, Function.identity()));
-        return eventClassRepository.findByEventInOrderByStartDate(events).stream()
-                .filter(eventClass -> isInPeriod(eventClass, startDate, endDate))
-                .map(eventClass -> toCalendarResponse(
-                        eventsById.get(eventClass.getEvent().getId()),
-                        eventClass))
-                .toList();
+        return eventClassRepository.findCalendar(workspace, startDate, endDate).stream()
+                .map(eventMapper::toCalendarResponse).toList();
     }
 
     public List<EventCandidateResponse> findEligibleCandidates(Integer nrId, String firebaseUid) {
@@ -529,22 +520,10 @@ public class EventService {
         return classParticipant;
     }
 
-    private boolean isInPeriod(
-            EventClass eventClass,
-            LocalDateTime startDate,
-            LocalDateTime endDate) {
-        return (startDate == null || !eventClass.getEndDate().isBefore(startDate))
-                && (endDate == null || !eventClass.getStartDate().isAfter(endDate));
-    }
-
     private void validatePeriod(LocalDateTime startDate, LocalDateTime endDate) {
-        if (startDate != null && endDate != null && !endDate.isAfter(startDate)) {
+        if (startDate == null || endDate == null || !endDate.isAfter(startDate)) {
             throw new BusinessException("Data final deve ser posterior à data inicial");
         }
-    }
-
-    private EventCalendarResponse toCalendarResponse(Event event, EventClass eventClass) {
-        return eventMapper.toCalendarResponse(event, eventClass);
     }
 
     private EventResponse toResponse(Event event, List<EventClass> eventClasses, User manager) {

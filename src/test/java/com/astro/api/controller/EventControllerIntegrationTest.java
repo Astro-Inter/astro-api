@@ -66,7 +66,7 @@ class EventControllerIntegrationTest {
                 2L,
                 "Grupo 1",
                 LocalDateTime.of(2026, 10, 5, 8, 0),
-                LocalDateTime.of(2026, 10, 5, 12, 0));
+                LocalDateTime.of(2026, 10, 5, 12, 0), EventStatus.CANCELADO);
         when(eventService.findAll(any(), any(), anyString())).thenReturn(List.of(calendarItem));
 
         mockMvc.perform(get("/events")
@@ -76,9 +76,21 @@ class EventControllerIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].eventTitle").value("Treinamento NR 10"))
                 .andExpect(jsonPath("$.data[0].className").value("Grupo 1"))
+                .andExpect(jsonPath("$.data[0].status").value("CANCELADO"))
                 .andExpect(jsonPath("$.data[0].participants").doesNotExist());
 
         verify(eventService).findAll(any(), any(), anyString());
+    }
+
+    @Test
+    void rejectsMissingMalformedAndInvalidCalendarPeriods() throws Exception {
+        mockMvc.perform(get("/events")).andExpect(status().isBadRequest());
+        mockMvc.perform(get("/events").param("startDate", "invalid").param("endDate", "2026-11-01T00:00:00"))
+                .andExpect(status().isBadRequest());
+        when(eventService.findAll(any(), any(), anyString()))
+                .thenThrow(new com.astro.api.common.exception.BusinessException("Intervalo inválido"));
+        mockMvc.perform(get("/events").param("startDate", "2026-11-01T00:00:00").param("endDate", "2026-10-01T00:00:00"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

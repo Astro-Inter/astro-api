@@ -42,9 +42,11 @@ public class EventController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
-    @Operation(summary = "Lista as turmas para o calendário administrativo")
+    @Operation(summary = "Lista as turmas para o calendário administrativo",
+            description = "Workspace autenticado; sobreposição inclusiva: término da turma >= startDate e início <= endDate. Datas ISO locais (yyyy-MM-ddTHH:mm:ss), sem conversão de fuso. Ordenação por início e ID; inclui cancelados com status explícito.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Turmas retornadas com sucesso"),
+            @ApiResponse(responseCode = "200", description = "Turmas retornadas no envelope ApiResult, lista vazia se não houver resultados"),
+            @ApiResponse(responseCode = "400", description = "Datas obrigatórias, formato ou intervalo inválido"),
             @ApiResponse(responseCode = "401", description = "Não autenticado"),
             @ApiResponse(responseCode = "403", description = "Não autorizado")
     })

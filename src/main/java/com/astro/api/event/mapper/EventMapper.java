@@ -64,15 +64,9 @@ public class EventMapper {
     }
 
     public EventCalendarResponse toCalendarResponse(
-            Event event,
-            EventClass eventClass) {
-        return new EventCalendarResponse(
-                event.getId(),
-                event.getTitle(),
-                eventClass.getId(),
-                eventClass.getName(),
-                eventClass.getStartDate(),
-                eventClass.getEndDate());
+            com.astro.api.event.repository.EventCalendarProjection row) {
+        return new EventCalendarResponse(row.getEventId(), row.getEventTitle(), row.getEventClassId(),
+                row.getClassName(), row.getStartDate(), row.getEndDate(), row.getStatus());
     }
 
     private EventParticipantResponse toParticipantResponse(EventClassParticipant classParticipant) {

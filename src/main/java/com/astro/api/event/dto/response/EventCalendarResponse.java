@@ -1,6 +1,7 @@
 package com.astro.api.event.dto.response;
 
 import java.time.LocalDateTime;
+import com.astro.api.event.model.EventStatus;
 
 public record EventCalendarResponse(
         Long eventId,
@@ -8,6 +9,7 @@ public record EventCalendarResponse(
         Long eventClassId,
         String className,
         LocalDateTime startDate,
-        LocalDateTime endDate
+        LocalDateTime endDate,
+        EventStatus status
 ) {
 }
