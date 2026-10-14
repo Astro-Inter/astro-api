@@ -6,6 +6,7 @@ import com.astro.api.home.repository.HomeRepository;
 import com.astro.api.home.service.HomeService;
 import com.astro.api.common.service.ViewedService;
 import com.astro.api.notification.service.NotificationService;
+import com.astro.api.form.service.FormService;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
 import tools.jackson.databind.json.JsonMapper;
@@ -18,7 +19,7 @@ import static org.mockito.Mockito.*;
 class HomeServiceTest {
     private final HomeRepository repository = mock(HomeRepository.class);
     private final HomeService service = new HomeService(repository, JsonMapper.builder().build(),
-            mock(NotificationService.class), mock(ViewedService.class));
+            mock(NotificationService.class), mock(ViewedService.class), mock(FormService.class));
 
     @Test
     void rejectsMissingIdentityBeforeQueryingTheDatabase() {
