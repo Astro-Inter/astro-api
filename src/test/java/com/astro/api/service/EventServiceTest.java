@@ -345,6 +345,41 @@ class EventServiceTest {
         }
     }
 
+    @Test
+    void updateRejectsPartialOverlapWithoutChangingManagedClasses() {
+        Event event=createEvent(EventStatus.ATIVO);
+        var start=LocalDateTime.of(2026,10,15,8,0);
+        EventClass a=createEventClass(event,start,start.plusHours(1));
+        EventClass b=createEventClass(event,start,start.plusHours(1));b.setId(41L);b.setName("B");
+        when(eventRepository.findLockedInWorkspace(30L,workspace)).thenReturn(Optional.of(event));
+        when(eventClassRepository.findByEventOrderByStartDate(event)).thenReturn(List.of(a,b));
+        var request=new com.astro.api.event.dto.request.UpdateEventRequest("Changed","Descrição",null,List.of(
+                new com.astro.api.event.dto.request.UpdateEventClassRequest(40L,"New A",start,start.plusHours(1),List.of(2L,3L)),
+                new com.astro.api.event.dto.request.UpdateEventClassRequest(41L,"New B",start,start.plusHours(1),List.of(3L,4L))));
+        assertThrows(BusinessException.class,()->service.update(30L,request,"manager"));
+        assertEquals("Class",a.getName());assertEquals("B",b.getName());assertEquals("Event",event.getTitle());
+        verify(eventClassRepository,never()).saveAll(any());verify(eventClassParticipantRepository,never()).deleteAll(any());
+    }
+
+    @Test
+    void updatePreservesUnchangedParticipantRecordsInsteadOfDeletingAndRecreating() {
+        Event event=createEvent(EventStatus.ATIVO);var start=LocalDateTime.of(2026,10,15,8,0);
+        EventClass a=createEventClass(event,start,start.plusHours(1));
+        User user=createUser(2L,UserStatus.ATIVO,workspace);
+        var participation=new com.astro.api.event.model.EventClassParticipant();participation.setId(90L);participation.setEventClass(a);participation.setUser(user);
+        when(eventRepository.findLockedInWorkspace(30L,workspace)).thenReturn(Optional.of(event));
+        when(eventClassRepository.findByEventOrderByStartDate(event)).thenReturn(List.of(a));
+        when(eventClassParticipantRepository.findByEventClassIn(List.of(a))).thenReturn(List.of(participation));
+        when(userRepository.findEventParticipantsInWorkspace(any(),eq(workspace))).thenReturn(List.of(user));
+        var body=new com.astro.api.event.dto.request.UpdateEventRequest("Event","Descrição",null,List.of(
+                new com.astro.api.event.dto.request.UpdateEventClassRequest(40L,"Class",start,start.plusHours(2),List.of(2L))));
+        var response=service.update(30L,body,"manager");
+        assertEquals(90L,response.eventClasses().getFirst().participants().getFirst().participationId());
+        verify(eventClassParticipantRepository).deleteAll(List.of());
+        verify(eventClassParticipantRepository).saveAll(List.of());
+        verify(eventClassParticipantRepository,never()).hasConclusions(any());
+    }
+
     private CreateEventRequest createRequest(Integer nrId, List<Long> participantIds) {
         LocalDateTime startDate = LocalDateTime.now().plusDays(1);
         CreateEventClassRequest eventClass = new CreateEventClassRequest(

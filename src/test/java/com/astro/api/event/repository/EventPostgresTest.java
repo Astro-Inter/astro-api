@@ -127,6 +127,92 @@ class EventPostgresTest {
         assertThrows(com.astro.api.common.exception.BusinessException.class,()->service.create(createRequest(List.of(a,b)),"uid1"));
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM evento",Integer.class));
     }
+    com.astro.api.event.dto.request.UpdateEventClassRequest updateClass(long id,String name,List<Long> participants) {
+        return new com.astro.api.event.dto.request.UpdateEventClassRequest(id,name,LocalDateTime.of(2026,10,15,8,0),LocalDateTime.of(2026,10,15,9,0),participants);
+    }
+    com.astro.api.event.dto.request.UpdateEventRequest updateRequest(String title,List<com.astro.api.event.dto.request.UpdateEventClassRequest> classes) {
+        return new com.astro.api.event.dto.request.UpdateEventRequest(title,"Descrição","https://example.com",classes);
+    }
+    @Test void updateRetainsParticipationIdentityConclusionsEvidenceAndImmutableConfiguration() {
+        var created=service.create(createRequest(List.of(createClass("A",2))),"uid1");
+        long classId=created.eventClasses().getFirst().id();long participation=created.eventClasses().getFirst().participants().getFirst().participationId();
+        long conclusion=jdbc.queryForObject("INSERT INTO conclusao_evento(turma_funcionario_id,status) VALUES (?,'CONCLUIDO') RETURNING id_conclusao_evento",Long.class,participation);
+        jdbc.update("INSERT INTO evidencia(conclusao_evento_id,caminho_objeto) VALUES (?,'example.pdf')",conclusion);
+        var updated=service.update(created.id(),updateRequest("Editado",List.of(updateClass(classId,"Renomeado",List.of(2L)))),"uid1");
+        assertEquals(participation,updated.eventClasses().getFirst().participants().getFirst().participationId());
+        assertEquals(created.nrId(),updated.nrId());assertEquals(created.completionMode(),updated.completionMode());
+        assertEquals(created.mandatoryEvidence(),updated.mandatoryEvidence());assertEquals(created.managerId(),updated.managerId());
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM conclusao_evento",Integer.class));assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM evidencia",Integer.class));
+        assertThrows(com.astro.api.common.exception.BusinessException.class,()->service.update(created.id(),updateRequest("Outro",List.of(updateClass(classId,"Renomeado",List.of(3L)))),"uid1"));
+        assertEquals("Editado",service.findById(created.id(),"uid1").title());
+    }
+    @Test void startedClassesAndMetadataRemainLockedWhileFutureClassesCanChange() {
+        var created=service.create(createRequest(List.of(createClass("A",2),createClass("B",3))),"uid1");
+        long started=created.eventClasses().getFirst().id(),future=created.eventClasses().getLast().id();
+        jdbc.update("UPDATE turma SET data_inicial='2026-10-14 12:00',data_termino='2026-10-14 13:00' WHERE id_turma=?",started);
+        jdbc.update("UPDATE usuario SET status='DESATIVADO' WHERE id_usuario=2");
+        var historical=new com.astro.api.event.dto.request.UpdateEventClassRequest(started,"A",LocalDateTime.of(2026,10,14,12,0),LocalDateTime.of(2026,10,14,13,0),List.of(2L));
+        var desired=List.of(historical,updateClass(future,"Futura",List.of(3L)));
+        var updated=service.update(created.id(),updateRequest("Evento",desired),"uid1");
+        assertEquals("Futura",updated.eventClasses().getLast().name());assertFalse(updated.detailsEditable());
+        assertEquals(created.eventClasses().getFirst().participants().getFirst().participationId(),updated.eventClasses().getFirst().participants().getFirst().participationId());
+        assertThrows(com.astro.api.common.exception.BusinessException.class,()->service.update(created.id(),updateRequest("Outro",desired),"uid1"));
+        assertThrows(com.astro.api.common.exception.BusinessException.class,()->service.update(created.id(),updateRequest("Evento",List.of(updateClass(future,"Futura",List.of(3L)))),"uid1"));
+        assertThrows(com.astro.api.common.exception.BusinessException.class,()->service.update(created.id(),updateRequest("Evento",List.of(updateClass(started,"A",List.of(2L)),updateClass(future,"Futura",List.of(3L)))),"uid1"));
+    }
+    @Test void updateRejectsPartialOverlapDuplicateIdsAndClassesFromOtherEventsAtomically() {
+        var created=service.create(createRequest(List.of(createClass("A",2),createClass("B",3))),"uid1");
+        long first=created.eventClasses().getFirst().id(),second=created.eventClasses().getLast().id();
+        var before=service.findById(created.id(),"uid1");
+        var overlap=List.of(updateClass(first,"Changed A",List.of(2L,3L)),updateClass(second,"Changed B",List.of(3L,4L)));
+        assertThrows(com.astro.api.common.exception.BusinessException.class,()->service.update(created.id(),updateRequest("Outro",overlap),"uid1"));
+        assertThrows(com.astro.api.common.exception.BusinessException.class,()->service.update(created.id(),updateRequest("Outro",List.of(updateClass(first,"A",List.of(2L)),updateClass(first,"B",List.of(3L)))),"uid1"));
+        long other=event(1,"ATIVO"),otherClass=eventClass(other,"Other","2026-10-15 08:00","2026-10-15 09:00");
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,()->service.update(created.id(),updateRequest("Outro",List.of(updateClass(otherClass,"Other",List.of(2L)))),"uid1"));
+        assertEquals(before,service.findById(created.id(),"uid1"));
+    }
+    @Test void swappingNamesAndReplacingOmittedFutureClassHonorImmediateUniqueConstraints() {
+        var created=service.create(createRequest(List.of(createClass("A",2),createClass("B",3))),"uid1");
+        long first=created.eventClasses().getFirst().id(),second=created.eventClasses().getLast().id();
+        var swapped=service.update(created.id(),updateRequest("Evento",List.of(updateClass(first,"B",List.of(2L)),updateClass(second,"A",List.of(3L)))),"uid1");
+        assertEquals(List.of("B","A"),swapped.eventClasses().stream().map(com.astro.api.event.dto.response.EventClassResponse::name).toList());
+        var added=new com.astro.api.event.dto.request.UpdateEventClassRequest(null,"A",LocalDateTime.of(2026,10,16,8,0),LocalDateTime.of(2026,10,16,9,0),List.of(3L));
+        var replaced=service.update(created.id(),updateRequest("Evento",List.of(updateClass(first,"B",List.of(2L)),added)),"uid1");
+        assertNotEquals(second,replaced.eventClasses().getLast().id());
+        assertEquals(created.eventClasses().getFirst().participants().getFirst().participationId(),replaced.eventClasses().getFirst().participants().getFirst().participationId());
+        assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM turma",Integer.class));assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM turma_funcionario",Integer.class));
+    }
+    @Test void failedUpdateRollsBackMetadataScheduleDeletionAndInsertion() {
+        var created=service.create(createRequest(List.of(createClass("A",2))),"uid1");
+        var before=service.findById(created.id(),"uid1");
+        jdbc.execute("ALTER TABLE turma_funcionario ADD CONSTRAINT test_failure CHECK(usuario_id<>3)");
+        try {
+            assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->service.update(created.id(),updateRequest("Outro",List.of(updateClass(created.eventClasses().getFirst().id(),"Novo",List.of(3L)))),"uid1"));
+            assertEquals(before,service.findById(created.id(),"uid1"));
+        } finally {jdbc.execute("ALTER TABLE turma_funcionario DROP CONSTRAINT test_failure");}
+    }
+    @Test void onlyActiveCreatorMayUpdateWithinWorkspace() {
+        for (String status:List.of("ATIVO","CANCELADO","CONCLUIDO")) {
+            long id=event(1,status);
+            var body=new com.astro.api.event.dto.request.UpdateEventRequest("Evento","Descrição",null,List.of(new com.astro.api.event.dto.request.UpdateEventClassRequest(null,"A",LocalDateTime.of(2026,10,15,8,0),LocalDateTime.of(2026,10,15,9,0),List.of(2L))));
+            assertThrows(org.springframework.security.access.AccessDeniedException.class,()->service.update(id,body,"uid3"));
+            assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,()->service.update(id,body,"uid5"));
+            if(!status.equals("ATIVO")) assertThrows(com.astro.api.common.exception.BusinessException.class,()->service.update(id,body,"uid1"));
+        }
+    }
+    @Test void concurrentUpdatesSerializeTheAggregateAndKeepParticipationIds() throws Exception {
+        var created=service.create(createRequest(List.of(createClass("A",2))),"uid1");
+        var start=new java.util.concurrent.CountDownLatch(1);
+        try(var executor=java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            java.util.concurrent.Callable<com.astro.api.event.dto.response.EventResponse> first=()->{start.await();return service.update(created.id(),updateRequest("Primeiro",List.of(updateClass(created.eventClasses().getFirst().id(),"A",List.of(2L)))),"uid1");};
+            java.util.concurrent.Callable<com.astro.api.event.dto.response.EventResponse> second=()->{start.await();return service.update(created.id(),updateRequest("Segundo",List.of(updateClass(created.eventClasses().getFirst().id(),"A",List.of(2L)))),"uid1");};
+            var a=executor.submit(first);var b=executor.submit(second);start.countDown();
+            assertEquals("Primeiro",a.get(20,java.util.concurrent.TimeUnit.SECONDS).title());assertEquals("Segundo",b.get(20,java.util.concurrent.TimeUnit.SECONDS).title());
+        }
+        var after=service.findById(created.id(),"uid1");assertTrue(List.of("Primeiro","Segundo").contains(after.title()));
+        assertEquals(created.eventClasses().getFirst().participants().getFirst().participationId(),after.eventClasses().getFirst().participants().getFirst().participationId());
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM turma_funcionario",Integer.class));
+    }
     static DriverManagerDataSource dataSource() {
         String url=System.getenv("MANAGER_TEST_DATABASE_URL");
         if (!url.matches("jdbc:postgresql://(localhost|127\\.0\\.0\\.1):[0-9]+/astro525")) throw new IllegalArgumentException("Local disposable astro525 database required");

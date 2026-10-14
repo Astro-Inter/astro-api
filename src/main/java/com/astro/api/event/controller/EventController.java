@@ -128,9 +128,12 @@ public class EventController {
 
     @PatchMapping("/{eventId}")
     @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
-    @Operation(summary = "Atualiza um evento e suas turmas futuras")
+    @Operation(summary = "Atualiza um evento e suas turmas futuras",
+            description = "Somente o criador de evento ATIVO no workspace autenticado. NR, conclusão, evidência e criador são imutáveis. Metadados bloqueados após qualquer turma iniciar; turmas iniciadas devem permanecer inalteradas. eventClasses representa o conjunto desejado: IDs existentes pertencem ao evento, sem repetição; sem ID adiciona turma; omissão remove futuras. Participações mantidas preservam IDs, conclusões e evidências; participações com conclusão não podem ser removidas. Escrita atômica e serializada por evento.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Evento atualizado com sucesso"),
+            @ApiResponse(responseCode = "200", description = "Detalhe atualizado no envelope ApiResult"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado"),
+            @ApiResponse(responseCode = "409", description = "Conflito de integridade dos dados"),
             @ApiResponse(responseCode = "400", description = "Evento ou turma não pode ser alterado"),
             @ApiResponse(responseCode = "404", description = "Evento não encontrado no Workspace"),
             @ApiResponse(responseCode = "403", description = "Não autorizado")

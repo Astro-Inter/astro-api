@@ -201,6 +201,19 @@ class EventControllerIntegrationTest {
     }
 
     @Test
+    void updateValidatesNullClassesParticipantIdsClassIdsAndMetadata() throws Exception {
+        String prefix="{\"title\":\"Evento\",\"description\":\"Descrição\",\"eventClasses\":";
+        for(String classes:List.of("null","[]","[null]",
+                "[{\"id\":0,\"name\":\"A\",\"startDate\":\"2026-10-15T08:00:00\",\"endDate\":\"2026-10-15T09:00:00\",\"participantIds\":[2]}]",
+                "[{\"name\":\"A\",\"startDate\":\"2026-10-15T08:00:00\",\"endDate\":\"2026-10-15T09:00:00\",\"participantIds\":[null]}]",
+                "[{\"name\":\"A\",\"startDate\":\"2026-10-15T08:00:00\",\"endDate\":\"2026-10-15T09:00:00\",\"participantIds\":[-1]}]")) {
+            mockMvc.perform(patch("/events/1").contentType(MediaType.APPLICATION_JSON).content(prefix+classes+"}"))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Erro de validação"));
+        }
+        org.mockito.Mockito.verifyNoInteractions(eventService);
+    }
+
+    @Test
     void cancelsEvent() throws Exception {
         when(eventService.cancel(anyLong(), any(), anyString())).thenReturn(eventResponse());
 
