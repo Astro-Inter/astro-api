@@ -30,10 +30,13 @@ class EventPostgresTest {
     static JdbcTemplate jdbc;
     EventService service;
 
-    @BeforeAll static void open() {
+    @BeforeAll static void open() throws java.io.IOException {
         var source = dataSource(); jdbc = new JdbcTemplate(source);
         jdbc.execute("CREATE SCHEMA " + SCHEMA);
         new ResourceDatabasePopulator(new ClassPathResource("manager-fixture.sql"), new ClassPathResource("event-fixture.sql")).execute(source);
+        // Let the PostgreSQL driver parse dollar-quoted function bodies.
+        jdbc.execute(new ClassPathResource("db/functions/fn_seleciona_candidatos_evento.sql")
+                .getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
         context = new AnnotationConfigApplicationContext(Config.class);
     }
     @AfterAll static void close() {
@@ -96,6 +99,23 @@ class EventPostgresTest {
         assertEquals(2,service.findEligibleCandidates(null,"uid1").size());
         jdbc.update("UPDATE usuario SET modalidade=null WHERE id_usuario=2");
         assertNull(service.findEligibleCandidates(null,"uid1").getFirst().workModel());
+    }
+    @Test void candidateFunctionRechecksCallerScopeAndDoesNotDuplicateNrAssociations() {
+        jdbc.update("INSERT INTO nr_catalogo VALUES (35,'NR 35',12,false)");
+        jdbc.update("INSERT INTO cargo_nr VALUES (1,35)");
+        var rows=service.findEligibleCandidates(null,"uid1");
+        assertEquals(List.of(2L,3L),rows.stream().map(com.astro.api.event.dto.response.EventCandidateResponse::id).toList());
+        assertEquals(rows,service.findEligibleCandidates(35,"uid1"));
+        jdbc.update("UPDATE usuario SET nome='User 2' WHERE id_usuario=3");
+        assertEquals(List.of(2L,3L),service.findEligibleCandidates(null,"uid1").stream().map(com.astro.api.event.dto.response.EventCandidateResponse::id).toList());
+        for(String uid:java.util.Arrays.asList(null,""," ","missing","uid2","uid4")) {
+            assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM fn_seleciona_candidatos_evento(?,NULL)",Integer.class,uid));
+        }
+        jdbc.update("UPDATE usuario SET status='DESATIVADO' WHERE id_usuario=1");
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM fn_seleciona_candidatos_evento('uid1',NULL)",Integer.class));
+        jdbc.update("UPDATE usuario SET status='ATIVO',tipo='GESTOR_WORKSPACE' WHERE id_usuario=1");
+        assertEquals(2,service.findEligibleCandidates(null,"uid1").size());
+        assertTrue(service.findEligibleCandidates(null,"uid5").isEmpty());
     }
     com.astro.api.event.dto.request.CreateEventRequest createRequest(List<com.astro.api.event.dto.request.CreateEventClassRequest> classes) {
         return new com.astro.api.event.dto.request.CreateEventRequest("Evento","Descrição",10,"https://example.com",com.astro.api.event.model.CompletionMode.GESTOR,true,classes);

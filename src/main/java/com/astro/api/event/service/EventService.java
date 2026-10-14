@@ -123,10 +123,10 @@ public class EventService {
     @Transactional(readOnly = true)
     public List<EventCandidateResponse> findEligibleCandidates(Integer nrId, String firebaseUid) {
         User manager = findAuthenticatedManager(firebaseUid);
-        Workspace workspace = getWorkspace(manager);
+        getWorkspace(manager);
         if (nrId != null && nrId <= 0) throw new BusinessException("Identificador da NR deve ser positivo");
         validateNrExists(nrId);
-        return candidateRepository.findEligibleCandidates(workspace.id, manager.getId(), nrId).stream()
+        return candidateRepository.findEligibleCandidates(firebaseUid, nrId).stream()
                 .map(eventMapper::toCandidateResponse).toList();
     }
 

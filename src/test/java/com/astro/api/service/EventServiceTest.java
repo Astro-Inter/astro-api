@@ -306,11 +306,11 @@ class EventServiceTest {
         when(row.getUnitId()).thenReturn(7L); when(row.getUnitName()).thenReturn("Sede");
         when(row.getWorkModel()).thenReturn("HIBRIDO");
         when(nrCatalogRepository.existsById(10)).thenReturn(true);
-        when(candidateRepository.findEligibleCandidates(10L,1L,10)).thenReturn(List.of(row));
+        when(candidateRepository.findEligibleCandidates("manager",10)).thenReturn(List.of(row));
         var response = service.findEligibleCandidates(10,"manager").getFirst();
         assertEquals(7L,response.unitId()); assertEquals("Sede",response.unitName());
         assertEquals(com.astro.api.user.model.WorkModel.HIBRIDO,response.workModel());
-        verify(candidateRepository).findEligibleCandidates(10L,1L,10);
+        verify(candidateRepository).findEligibleCandidates("manager",10);
         assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,()->service.findEligibleCandidates(99,"manager"));
         assertThrows(BusinessException.class,()->service.findEligibleCandidates(0,"manager"));
         org.junit.jupiter.api.Assertions.assertTrue(service.findEligibleCandidates(null,"manager").isEmpty());

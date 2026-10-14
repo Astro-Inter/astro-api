@@ -50,10 +50,30 @@ dados ausentes não são inventados. Apenas usuários ativos do workspace aparec
 o solicitante é excluído e outros gestores permanecem elegíveis.
 
 `nrId` é o identificador persistido do catálogo, não uma string como `NR 35`.
-NR inexistente retorna 404. A associação com Role é filtrada por `EXISTS` em
-`cargo_nr`, que não tem entidade JPA no projeto. Essa query nativa específica
-retorna projection sem carregar entidades ou duplicar candidatos. A conversão
-continua no mapper. Ordenação por nome e ID.
+NR inexistente retorna 404. O repository chama
+`fn_seleciona_candidatos_evento(firebaseUid, nrId)` e mapeia os nomes físicos para
+a projection. A função SQL `STABLE`, com `SECURITY INVOKER`, deriva o workspace do
+gestor ativo, exclui o solicitante, filtra a associação Role/NR por `EXISTS` e
+ordena por nome/ID. Não é uma view materializada: retorna o estado atual e não
+mantém cache. Services continuam validando autenticação, parâmetros e existência
+da NR, e o mapper converte a projection no DTO.
+
+### Instalação do objeto SQL
+
+Antes de implantar esta revisão da API, instale
+`src/main/resources/db/functions/fn_seleciona_candidatos_evento.sql` no schema das
+tabelas Astro. O script é idempotente para a mesma assinatura, não altera tabelas,
+triggers ou índices e não é executado automaticamente pela aplicação. Ele está
+versionado nesta PR para que o contrato de banco seja revisado junto da chamada.
+A instalação usa uma conexão autorizada para DDL; o usuário da API mantém seus
+privilégios de leitura nas tabelas e EXECUTE na função. SECURITY INVOKER conserva
+as políticas e permissões de acesso existentes.
+
+A função foi escolhida porque esta leitura recebe identidade autenticada e NR
+opcional. Uma procedure é desnecessária para um SELECT; uma view não recebe esses
+parâmetros e exigiria filtros e a regra de elegibilidade na consulta do repository. A mudança
+centraliza a consulta, sem afirmar um ganho de desempenho apenas por encurtar o
+repository. Os testes instalam o mesmo script em schemas locais isolados.
 
 ## Criação e edição
 
@@ -119,7 +139,8 @@ $env:MANAGER_TEST_DATABASE_PASSWORD='astro525-isolated'
 Os testes PostgreSQL usam schemas exclusivos em uma base local chamada `astro525`;
 o CI já disponibiliza essa infraestrutura. As fixtures reproduzem constraints
 consultadas no catálogo publicado em modo somente leitura em 14/10/2026.
-Testes de escrita ocorrem exclusivamente no banco isolado. Nenhum DDL, índice,
-trigger ou automatização de negócio foi alterado no ambiente publicado.
+Testes de escrita ocorrem exclusivamente no banco isolado. O objeto SQL foi criado
+somente nos schemas de teste; nenhum DDL, índice,
+trigger ou automatização de negócio foi aplicado no ambiente publicado.
 Fluxos mobile de conclusão/evidências, aprovação, notificações, conformidade e
 encerramento automático permanecem fora desta entrega.
