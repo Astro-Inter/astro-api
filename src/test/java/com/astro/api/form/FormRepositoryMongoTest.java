@@ -94,7 +94,7 @@ class FormRepositoryMongoTest {
         new com.astro.api.form.mapper.FormMapper().applyContent(FormTestFixtures.content(FormStatus.PENDING), form);
         form.setId(repository.nextId()); form.setStatus(FormStatus.PENDING); form.setWorkspaceId(1L); form.setSenderManagerId(10L);
         repository.insert(form);
-        var raw = mongo.getCollection("formularios").find().first();
+        var raw = mongo.getCollection("forms").find().first();
         assertNotNull(raw); assertEquals(1L, raw.get("id_workspace"));
         assertEquals("PENDENTE", raw.getString("status"));
         assertEquals(FormStatus.PENDING, repository.findById(form.getId()).orElseThrow().getStatus());
@@ -125,7 +125,7 @@ class FormRepositoryMongoTest {
         }
         Form saved = repository.findById(1L, scope).orElseThrow(); assertEquals(1L, saved.getVersion());
         // Simulate a mobile submission after the web loaded the current version.
-        mongo.getCollection("formularios").updateOne(new org.bson.Document("_id", 1L),
+        mongo.getCollection("forms").updateOne(new org.bson.Document("_id", 1L),
                 new org.bson.Document("$set", new org.bson.Document("status", "CONCLUIDO")));
         assertTrue(repository.update(saved, scope, 1L).isEmpty());
         assertEquals(FormStatus.COMPLETED, repository.findById(1L, scope).orElseThrow().getStatus());
@@ -143,15 +143,15 @@ class FormRepositoryMongoTest {
         Form value = form(1, 1, 10, 20, FormStatus.PENDING); value.setVersion(0L); mongo.insert(value);
         assertFalse(repository.delete(value, new FormScope(20L, 1L, false)));
         assertFalse(repository.delete(value, new FormScope(10L, 2L, true)));
-        mongo.getCollection("formularios").updateOne(new org.bson.Document("_id", 1L),
+        mongo.getCollection("forms").updateOne(new org.bson.Document("_id", 1L),
                 new org.bson.Document("$set", new org.bson.Document("versao", 1L)));
         assertFalse(repository.delete(value, new FormScope(10L, 1L, false)));
         value.setVersion(1L);
-        mongo.getCollection("formularios").updateOne(new org.bson.Document("_id", 1L),
+        mongo.getCollection("forms").updateOne(new org.bson.Document("_id", 1L),
                 new org.bson.Document("$set", new org.bson.Document("status", "CONCLUIDO")));
         assertFalse(repository.delete(value, new FormScope(99L, 1L, true)));
         assertNotNull(mongo.findById(1L, Form.class));
-        mongo.getCollection("formularios").updateOne(new org.bson.Document("_id", 1L),
+        mongo.getCollection("forms").updateOne(new org.bson.Document("_id", 1L),
                 new org.bson.Document("$set", new org.bson.Document("status", "PENDENTE")));
         assertTrue(repository.delete(value, new FormScope(99L, 1L, true)));
         assertNull(mongo.findById(1L, Form.class));
@@ -217,7 +217,7 @@ class FormRepositoryMongoTest {
             mvc.perform(put(url).contentType("application/json").content(json.writeValueAsString(FormTestFixtures.content(FormStatus.PENDING))))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.data.id_gestor_remetente").value(10));
             // Simulate the future mobile completion without adding response endpoints to this scope.
-            mongo.getCollection("formularios").updateOne(new org.bson.Document("_id", id), new org.bson.Document("$set",
+            mongo.getCollection("forms").updateOne(new org.bson.Document("_id", id), new org.bson.Document("$set",
                     new org.bson.Document("status", "CONCLUIDO").append("perguntas.0.resposta", List.of("Resposta única"))));
             mvc.perform(delete(url)).andExpect(status().isConflict());
             mvc.perform(put(url).contentType("application/json").content("{}"))

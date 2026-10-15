@@ -59,7 +59,7 @@ public class FormRepositoryCustomImpl implements FormRepositoryCustom {
         highestQuery.fields().include("_id");
         Form highest = mongo.findOne(highestQuery, Form.class);
         long floor = highest == null ? 0 : highest.getId();
-        Query sequence = Query.query(Criteria.where("_id").is("formularios"));
+        Query sequence = Query.query(Criteria.where("_id").is("forms"));
         Update initialize = new Update().max("valor", floor);
         try {
             mongo.upsert(sequence, initialize, "sequencias");
