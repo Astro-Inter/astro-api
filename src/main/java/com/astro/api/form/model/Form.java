@@ -18,7 +18,7 @@ import java.util.List;
 @NoArgsConstructor
 public class Form {
     @Id
-    private Long id;
+    private String id;
 
     @Field("id_workspace")
     private Long workspaceId;

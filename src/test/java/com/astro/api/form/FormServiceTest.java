@@ -27,6 +27,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static com.astro.api.form.FormTestFixtures.manager;
+import static com.astro.api.form.FormTestFixtures.formId;
 
 class FormServiceTest {
     final UserRepository users = mock(UserRepository.class);
@@ -65,7 +66,7 @@ class FormServiceTest {
     }
 
     @Test void returnsSummaryAndPagingWithoutAnswers() {
-        Form form = new Form(); form.setId(1L); form.setTitle("Pesquisa"); form.setStatus(FormStatus.PENDING);
+        Form form = new Form(); form.setId(formId(1)); form.setTitle("Pesquisa"); form.setStatus(FormStatus.PENDING);
         form.setQuestions(List.of(new Form.FormQuestion(), new Form.FormQuestion()));
         var scope = new FormScope(10L, 1L, false);
         when(repository.findAll(scope, "Pesquisa", FormStatus.PENDING, 1, 4))
@@ -76,24 +77,31 @@ class FormServiceTest {
         assertEquals(FormStatus.PENDING, result.items().getFirst().status());
     }
 
-    @Test void detailsRequireAnAccessibleFormAndPositiveIdentifier() {
+    @Test void detailsRequireAnAccessibleFormAndValidUuid() {
         var scope = new FormScope(10L, 1L, false);
         Form form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.DRAFT);
         form.setDueDate(java.time.Instant.parse("2026-10-30T03:00:00Z"));
-        when(repository.findById(1L, scope)).thenReturn(Optional.of(form));
-        var response = service.findById(1L, principal);
+        when(repository.findById(formId(1), scope)).thenReturn(Optional.of(form));
+        var response = service.findById(formId(1), principal);
         assertEquals(java.time.LocalDate.of(2026, 10, 30), response.dueDate());
         assertEquals(1L, response.questions().getFirst().id());
         assertTrue(response.questions().getFirst().answer().isEmpty());
-        assertThrows(BusinessException.class, () -> service.findById(0L, principal));
-        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class, () -> service.findById(99L, principal));
+        assertThrows(BusinessException.class, () -> service.findById("invalid", principal));
+        for (String invalid : List.of("1", "000000000000000000000001", "1-1-1-1-1", "z".repeat(36))) {
+            assertThrows(BusinessException.class, () -> service.findById(invalid, principal));
+        }
+        assertThrows(BusinessException.class, () -> service.findById(null, principal));
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class, () -> service.findById(formId(99), principal));
     }
 
     @Test void createsPublishedFormWithGeneratedIdentityAndEmptyEmbeddedAnswers() {
-        when(repository.nextId()).thenReturn(42L);
-        when(repository.insert(any(Form.class))).thenAnswer(call -> call.getArgument(0));
+        when(repository.insert(any(Form.class))).thenAnswer(call -> {
+            Form inserted = call.getArgument(0);
+            assertEquals(4, java.util.UUID.fromString(inserted.getId()).version());
+            return inserted;
+        });
         var result = service.create(FormTestFixtures.content(FormStatus.PENDING), principal);
-        assertEquals(42L, result.id()); assertEquals(1L, result.workspaceId()); assertEquals(10L, result.senderManagerId());
+        assertEquals(4, java.util.UUID.fromString(result.id()).version()); assertEquals(1L, result.workspaceId()); assertEquals(10L, result.senderManagerId());
         assertEquals(20L, result.managerId()); assertEquals("Inspeção", result.title());
         assertEquals(FormStatus.PENDING, result.status()); assertNotNull(result.createdAt()); assertNull(result.respondedAt());
         assertEquals(0, result.createdAt().getNano() % 1_000_000);
@@ -106,7 +114,11 @@ class FormServiceTest {
     }
 
     @Test void savesEmptyDraftButDoesNotPublishItOrAcceptCompletedStatus() {
-        when(repository.insert(any(Form.class))).thenAnswer(call -> call.getArgument(0));
+        when(repository.insert(any(Form.class))).thenAnswer(call -> {
+            Form inserted = call.getArgument(0);
+            assertEquals(4, java.util.UUID.fromString(inserted.getId()).version());
+            return inserted;
+        });
         var draft = new FormWriteRequest(null, null, null, null, null, null, FormStatus.DRAFT, null);
         var result = service.create(draft, principal);
         assertEquals(FormStatus.DRAFT, result.status()); assertNull(result.managerId()); assertTrue(result.questions().isEmpty());
@@ -148,9 +160,9 @@ class FormServiceTest {
     Form existing(FormStatus status, long senderId) {
         Form form = new Form();
         new FormMapper().applyContent(FormTestFixtures.content(status), form);
-        form.setId(1L); form.setWorkspaceId(1L); form.setSenderManagerId(senderId); form.setStatus(status);
+        form.setId(formId(1)); form.setWorkspaceId(1L); form.setSenderManagerId(senderId); form.setStatus(status);
         form.setVersion(0L); form.setCreatedAt(java.time.Instant.parse("2026-10-15T12:00:00Z"));
-        when(repository.findById(eq(1L), any())).thenReturn(Optional.of(form));
+        when(repository.findById(eq(formId(1)), any())).thenReturn(Optional.of(form));
         return form;
     }
 
@@ -162,7 +174,7 @@ class FormServiceTest {
         var body = new FormWriteRequest("Novo título", null, 20L, null, null, null, null,
                 List.of(kept, choice, FormTestFixtures.question(com.astro.api.form.model.FormQuestionType.DATE)));
         when(repository.update(any(), any(), eq(0L))).thenAnswer(call -> Optional.of(call.getArgument(0)));
-        var result = service.update(1L, body, principal);
+        var result = service.update(formId(1), body, principal);
         assertEquals(List.of(4L, 2L, 5L), result.questions().stream().map(q -> q.id()).toList());
         assertEquals(List.of(2L, 1L), result.questions().get(1).options().stream().map(o -> o.id()).toList());
         assertEquals(10L, result.senderManagerId()); assertEquals(form.getCreatedAt(), result.createdAt());
@@ -172,38 +184,38 @@ class FormServiceTest {
     @Test void recipientCannotEditButWorkspaceManagerCanManageAnotherSendersForm() {
         Form form = existing(FormStatus.PENDING, 99);
         form.setManagerId(10L);
-        assertThrows(AccessDeniedException.class, () -> service.update(1L, FormTestFixtures.content(FormStatus.PENDING), principal));
+        assertThrows(AccessDeniedException.class, () -> service.update(formId(1), FormTestFixtures.content(FormStatus.PENDING), principal));
         verify(repository, never()).update(any(), any(), any());
         sender.setType(UserType.GESTOR_WORKSPACE);
         var owner = new AuthenticatedUser("sender", "sender@astro.com", Role.GESTOR_WORKSPACE);
         when(repository.update(any(), any(), eq(0L))).thenAnswer(call -> Optional.of(call.getArgument(0)));
-        assertEquals(99L, service.update(1L, FormTestFixtures.content(FormStatus.PENDING), owner).senderManagerId());
+        assertEquals(99L, service.update(formId(1), FormTestFixtures.content(FormStatus.PENDING), owner).senderManagerId());
     }
 
     @Test void editingCannotConcludePublishOrOverwriteConcurrentResponses() {
         Form form = existing(FormStatus.COMPLETED, 10);
         assertThrows(com.astro.api.common.exception.ConflictException.class,
-                () -> service.update(1L, FormTestFixtures.content(FormStatus.PENDING), principal));
+                () -> service.update(formId(1), FormTestFixtures.content(FormStatus.PENDING), principal));
         form.setStatus(FormStatus.DRAFT);
-        assertThrows(BusinessException.class, () -> service.update(1L, FormTestFixtures.content(FormStatus.PENDING), principal));
+        assertThrows(BusinessException.class, () -> service.update(formId(1), FormTestFixtures.content(FormStatus.PENDING), principal));
         form.setStatus(FormStatus.PENDING); form.getQuestions().getFirst().setAnswer(List.of("Respondida"));
         assertThrows(com.astro.api.common.exception.ConflictException.class,
-                () -> service.update(1L, FormTestFixtures.content(FormStatus.PENDING), principal));
+                () -> service.update(formId(1), FormTestFixtures.content(FormStatus.PENDING), principal));
         form.getQuestions().getFirst().setAnswer(List.of());
         when(repository.update(any(), any(), eq(0L))).thenReturn(Optional.empty());
         assertThrows(com.astro.api.common.exception.ConflictException.class,
-                () -> service.update(1L, FormTestFixtures.content(FormStatus.PENDING), principal));
+                () -> service.update(formId(1), FormTestFixtures.content(FormStatus.PENDING), principal));
     }
 
     @Test void rejectsUnknownQuestionAndOptionIdsRatherThanTrustingClientProvidedIds() {
         Form form = existing(FormStatus.PENDING, 10);
         var unknownQuestion = new FormQuestionRequest(99L, com.astro.api.form.model.FormQuestionType.TEXT, "Texto", true, null, null, null, null);
         var body = new FormWriteRequest("Título", null, 20L, null, null, null, null, List.of(unknownQuestion));
-        assertThrows(BusinessException.class, () -> service.update(1L, body, principal));
+        assertThrows(BusinessException.class, () -> service.update(formId(1), body, principal));
         var unknownOption = new FormQuestionRequest(2L, com.astro.api.form.model.FormQuestionType.OPTION, "Texto", true, false,
                 List.of(new FormOptionRequest(99L, "Sim", false), new FormOptionRequest(null, "Não", false)), null, null);
         var alternativeBody = new FormWriteRequest("Título", null, 20L, null, null, null, null, List.of(unknownOption));
-        assertThrows(BusinessException.class, () -> service.update(1L, alternativeBody, principal));
+        assertThrows(BusinessException.class, () -> service.update(formId(1), alternativeBody, principal));
         verify(repository, never()).update(any(), any(), any());
     }
 
@@ -211,26 +223,26 @@ class FormServiceTest {
         for (var status : List.of(FormStatus.DRAFT, FormStatus.PENDING)) {
             Form form = existing(status, 10);
             when(repository.delete(eq(form), any())).thenReturn(true);
-            assertDoesNotThrow(() -> service.delete(1L, principal));
+            assertDoesNotThrow(() -> service.delete(formId(1), principal));
         }
         clearInvocations(repository);
         Form completed = existing(FormStatus.COMPLETED, 10);
-        assertThrows(com.astro.api.common.exception.ConflictException.class, () -> service.delete(1L, principal));
+        assertThrows(com.astro.api.common.exception.ConflictException.class, () -> service.delete(formId(1), principal));
         completed.setStatus(FormStatus.PENDING); completed.getQuestions().getFirst().setAnswer(List.of("Resposta"));
-        assertThrows(com.astro.api.common.exception.ConflictException.class, () -> service.delete(1L, principal));
+        assertThrows(com.astro.api.common.exception.ConflictException.class, () -> service.delete(formId(1), principal));
         verify(repository, never()).delete(any(), any());
     }
 
     @Test void deleteRequiresOwnershipAndDetectsConcurrentChanges() {
         existing(FormStatus.PENDING, 99);
-        assertThrows(AccessDeniedException.class, () -> service.delete(1L, principal));
+        assertThrows(AccessDeniedException.class, () -> service.delete(formId(1), principal));
         verify(repository, never()).delete(any(), any());
         sender.setType(UserType.GESTOR_WORKSPACE);
         var owner = new AuthenticatedUser("sender", "sender@astro.com", Role.GESTOR_WORKSPACE);
         when(repository.delete(any(), any())).thenReturn(false);
-        assertThrows(com.astro.api.common.exception.ConflictException.class, () -> service.delete(1L, owner));
+        assertThrows(com.astro.api.common.exception.ConflictException.class, () -> service.delete(formId(1), owner));
         when(repository.delete(any(), any())).thenReturn(true);
-        assertDoesNotThrow(() -> service.delete(1L, owner));
+        assertDoesNotThrow(() -> service.delete(formId(1), owner));
     }
 
     @Test void publicationRevalidatesTheSavedDraftAndPreservesItsEmbeddedConfiguration() {
@@ -239,43 +251,43 @@ class FormServiceTest {
             form.setStatus(FormStatus.PENDING);
             return Optional.of(form);
         });
-        var result = service.publish(1L, principal);
+        var result = service.publish(formId(1), principal);
         assertEquals(FormStatus.PENDING, result.status());
         assertEquals(List.of(1L, 2L, 3L, 4L), result.questions().stream().map(q -> q.id()).toList());
         assertTrue(result.questions().stream().allMatch(q -> q.answer().isEmpty()));
         assertEquals(10L, result.senderManagerId()); assertNull(result.respondedAt());
-        assertThrows(com.astro.api.common.exception.ConflictException.class, () -> service.publish(1L, principal));
+        assertThrows(com.astro.api.common.exception.ConflictException.class, () -> service.publish(formId(1), principal));
     }
 
     @Test void publicationRejectsIncompleteDraftAndRecipientThatHasBeenDeactivated() {
         Form form = existing(FormStatus.DRAFT, 10); form.setTitle("");
-        assertThrows(BusinessException.class, () -> service.publish(1L, principal));
+        assertThrows(BusinessException.class, () -> service.publish(formId(1), principal));
         form.setTitle("Título"); form.getQuestions().getFirst().setQuestion("");
-        assertThrows(BusinessException.class, () -> service.publish(1L, principal));
+        assertThrows(BusinessException.class, () -> service.publish(formId(1), principal));
         form.getQuestions().getFirst().setQuestion("Pergunta");
         User recipient = manager(20, 1, UserType.GESTOR); recipient.setStatus(UserStatus.DESATIVADO);
         when(users.findById(20L)).thenReturn(Optional.of(recipient));
-        assertThrows(BusinessException.class, () -> service.publish(1L, principal));
+        assertThrows(BusinessException.class, () -> service.publish(formId(1), principal));
         verify(repository, never()).publish(any(), any());
     }
 
     @Test void onlyTheSenderOrWorkspaceManagerCanPublishAndConcurrentChangesAreNotOverwritten() {
         Form form = existing(FormStatus.DRAFT, 99);
-        assertThrows(AccessDeniedException.class, () -> service.publish(1L, principal));
+        assertThrows(AccessDeniedException.class, () -> service.publish(formId(1), principal));
         sender.setType(UserType.GESTOR_WORKSPACE);
         var owner = new AuthenticatedUser("sender", "sender@astro.com", Role.GESTOR_WORKSPACE);
         when(repository.publish(eq(form), any())).thenReturn(Optional.empty());
-        assertThrows(com.astro.api.common.exception.ConflictException.class, () -> service.publish(1L, owner));
+        assertThrows(com.astro.api.common.exception.ConflictException.class, () -> service.publish(formId(1), owner));
         when(repository.publish(eq(form), any())).thenAnswer(call -> {
             form.setStatus(FormStatus.PENDING); return Optional.of(form);
         });
-        assertEquals(99L, service.publish(1L, owner).senderManagerId());
+        assertEquals(99L, service.publish(formId(1), owner).senderManagerId());
     }
 
     @Test void publicationTranslatesAnUnsupportedStoredQuestionTypeToABusinessError() {
         Form draft = existing(FormStatus.DRAFT, 10);
         draft.getQuestions().getFirst().setType("unsupported");
-        var exception = assertThrows(BusinessException.class, () -> service.publish(1L, principal));
+        var exception = assertThrows(BusinessException.class, () -> service.publish(formId(1), principal));
         assertEquals("Tipo de pergunta inválido no rascunho", exception.getMessage());
         verify(repository, never()).publish(any(), any());
     }

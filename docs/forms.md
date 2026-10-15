@@ -26,6 +26,7 @@ outros remetentes ficam ocultos ao destinatário.
 `GET /forms/{id}` retorna todos os dados e perguntas, com `id_gestor`,
 `id_gestor_remetente`, `id_workspace`, `titulo`, `descricao`, `nr`, `id_unidade`,
 `data_limite`, `status`, `criado_em`, `atualizado_em`, `respondido_em` e `perguntas`.
+O ID do formulário é uma string UUID de 36 caracteres, como `550e8400-e29b-41d4-a716-446655440000`.
 Identificador inválido retorna 400; inexistente ou fora do escopo retorna 404.
 O prazo é apresentado como `YYYY-MM-DD`, usando `America/Sao_Paulo`; no MongoDB
 é armazenado como data BSON. As opções têm `id_opcao`, `texto` e `outra`.
@@ -77,8 +78,9 @@ Fotos aceitam 1 a 10 arquivos e limites de 5, 10, 20, 50 ou 100 MB por arquivo.
 O padrão de foto é 1 arquivo de até 10 MB. Não há upload de fotos nessas rotas.
 Esses limites também se aplicam a rascunhos, que podem ter opções e enunciados vazios.
 
-IDs de formulários são gerados por contador atômico em `sequencias`, acima do maior
-ID numérico já existente. Perguntas e opções recebem IDs numéricos locais ao seu
+O `_id` dos formulários é um UUID versão 4 gerado por `UUID.randomUUID()` no Java,
+salvo como string no MongoDB e exposto como `id` na API, inclusive na Home mobile.
+Não há contador nem collection auxiliar. Perguntas e opções recebem IDs numéricos locais ao seu
 formulário/pergunta. Omita IDs em itens novos. As respostas são inicializadas como
 arrays vazios. Campos de remetente, workspace, resposta e datas enviados pelo cliente
 são ignorados; a API usa exclusivamente seus próprios valores para esses campos.
@@ -132,6 +134,8 @@ retornam 409. O destinatário passa a enxergar o formulário após a publicaçã
 ## Persistência e compatibilidade
 
 A collection é `forms`, com um documento por formulário e perguntas embutidas.
+Os documentos novos usam `_id` do tipo string UUID. IDs numéricos ou ObjectIds antigos exigem
+migração explícita, incluindo referências externas; a API não os converte automaticamente.
 O campo `id_workspace` é obrigatório para acesso pelas rotas web. Documentos antigos
 sem esse vínculo não ficam acessíveis até uma migração explícita e conferida.
 A Home mobile passa a consultar somente documentos com `status: PENDENTE`.
@@ -176,6 +180,6 @@ uma instância MongoDB descartável em `mongodb://127.0.0.1:<porta>` ou
 `forms_test_<uuid>`; não carregam a conexão da aplicação nem usam seu `.env`.
 O CI fornece uma instância MongoDB para esses testes.
 
-A integração cobre persistência BSON, escopo de consultas, IDs concorrentes,
+A integração cobre persistência BSON, escopo de consultas, geração concorrente de UUIDs,
 gravações condicionais e um fluxo HTTP completo de criação do rascunho até publicação.
 Os endpoints de resposta e upload do mobile continuam fora deste módulo de entrega.

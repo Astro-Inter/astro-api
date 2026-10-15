@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.List;
 
 import static org.mockito.Mockito.*;
+import static com.astro.api.form.FormTestFixtures.formId;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -36,7 +37,7 @@ class FormControllerTest {
 
     @Test void listsWithExplicitPagingAndValidatedIdentity() throws Exception {
         when(service.findAll(principal, "Clima", FormStatus.PENDING, 1, 4)).thenReturn(
-                new FormPageResponse(List.of(new FormSummaryResponse(1L, "Clima", "Pesquisa", 3, FormStatus.PENDING)), 1, 4, 9, 3));
+                new FormPageResponse(List.of(new FormSummaryResponse(formId(1), "Clima", "Pesquisa", 3, FormStatus.PENDING)), 1, 4, 9, 3));
         mvc.perform(get("/forms").param("search", "Clima").param("status", "PENDENTE").param("page", "1").param("size", "4")
                         .param("workspaceId", "999").param("firebaseUid", "fake"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].titulo").value("Clima"))
@@ -55,14 +56,16 @@ class FormControllerTest {
 
     @Test void detailsUsePortugueseFieldsAndStandardErrors() throws Exception {
         var form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.DRAFT);
-        when(service.findById(1L, principal)).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
-        mvc.perform(get("/forms/1")).andExpect(status().isOk())
+        when(service.findById(formId(1), principal)).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
+        mvc.perform(get("/forms/" + formId(1))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(formId(1)))
                 .andExpect(jsonPath("$.data.id_gestor").value(20))
                 .andExpect(jsonPath("$.data.perguntas[0].id_pergunta").value(1))
                 .andExpect(jsonPath("$.data.perguntas[0].resposta").isEmpty());
+        when(service.findById("invalid", principal)).thenThrow(new com.astro.api.common.exception.BusinessException("UUID inválido"));
         mvc.perform(get("/forms/invalid")).andExpect(status().isBadRequest());
-        when(service.findById(99L, principal)).thenThrow(new com.astro.api.common.exception.ResourceNotFoundException("Formulário não encontrado"));
-        mvc.perform(get("/forms/99")).andExpect(status().isNotFound());
+        when(service.findById(formId(99), principal)).thenThrow(new com.astro.api.common.exception.ResourceNotFoundException("Formulário não encontrado"));
+        mvc.perform(get("/forms/" + formId(99))).andExpect(status().isNotFound());
     }
 
     @Test void creationUsesPortugueseContractAndIgnoresForgedServerFieldsAndAnswers() throws Exception {
@@ -73,7 +76,7 @@ class FormControllerTest {
                  "id_gestor_remetente":999,"respondido_em":"2026-10-15T12:00:00Z",
                  "perguntas":[{"tipo":"texto","pergunta":"Descrição","obrigatoria":true,"resposta":["FORJADA"]}]}
                 """))
-                .andExpect(status().isCreated()).andExpect(header().string("Location", "/forms/42"))
+                .andExpect(status().isCreated()).andExpect(header().string("Location", "/forms/" + formId(42)))
                 .andExpect(jsonPath("$.data.id_workspace").value(1))
                 .andExpect(jsonPath("$.data.id_gestor_remetente").value(10));
         var request = org.mockito.ArgumentCaptor.forClass(com.astro.api.form.dto.request.FormWriteRequest.class);
@@ -92,34 +95,36 @@ class FormControllerTest {
 
     @Test void updateUsesValidatedIdentityAndMapsConcurrentConflicts() throws Exception {
         var form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.DRAFT);
-        when(service.update(eq(1L), any(), eq(principal))).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
-        mvc.perform(put("/forms/1").contentType("application/json").content("{\"titulo\":\"Rascunho\"}"))
+        when(service.update(eq(formId(1)), any(), eq(principal))).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
+        mvc.perform(put("/forms/" + formId(1)).contentType("application/json").content("{\"titulo\":\"Rascunho\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("RASCUNHO"));
-        when(service.update(eq(1L), any(), eq(principal))).thenThrow(new com.astro.api.common.exception.ConflictException("Alterado"));
-        mvc.perform(put("/forms/1").contentType("application/json").content("{}"))
+        when(service.update(eq(formId(1)), any(), eq(principal))).thenThrow(new com.astro.api.common.exception.ConflictException("Alterado"));
+        mvc.perform(put("/forms/" + formId(1)).contentType("application/json").content("{}"))
                 .andExpect(status().isConflict());
+        when(service.update(eq("invalid"), any(), eq(principal))).thenThrow(new com.astro.api.common.exception.BusinessException("UUID inválido"));
         mvc.perform(put("/forms/invalid").contentType("application/json").content("{}"))
                 .andExpect(status().isBadRequest());
     }
 
     @Test void deletionReturnsNoContentAndKeepsNotFoundAndConflictSemantics() throws Exception {
-        mvc.perform(delete("/forms/1")).andExpect(status().isNoContent()).andExpect(content().string(""));
-        verify(service).delete(1L, principal);
-        doThrow(new com.astro.api.common.exception.ResourceNotFoundException("Formulário não encontrado")).when(service).delete(99L, principal);
-        mvc.perform(delete("/forms/99")).andExpect(status().isNotFound());
-        doThrow(new com.astro.api.common.exception.ConflictException("Concluído")).when(service).delete(2L, principal);
-        mvc.perform(delete("/forms/2")).andExpect(status().isConflict());
+        mvc.perform(delete("/forms/" + formId(1))).andExpect(status().isNoContent()).andExpect(content().string(""));
+        verify(service).delete(formId(1), principal);
+        doThrow(new com.astro.api.common.exception.ResourceNotFoundException("Formulário não encontrado")).when(service).delete(formId(99), principal);
+        mvc.perform(delete("/forms/" + formId(99))).andExpect(status().isNotFound());
+        doThrow(new com.astro.api.common.exception.ConflictException("Concluído")).when(service).delete(formId(2), principal);
+        mvc.perform(delete("/forms/" + formId(2))).andExpect(status().isConflict());
     }
 
     @Test void publicationDoesNotAcceptAReplacementFormOrAnswersAndMapsItsStateErrors() throws Exception {
         var form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.PENDING);
-        when(service.publish(1L, principal)).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
-        mvc.perform(post("/forms/1/publish").contentType("application/json").content("{\"status\":\"CONCLUIDO\",\"resposta\":[\"Forjada\"]}"))
+        when(service.publish(formId(1), principal)).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
+        mvc.perform(post("/forms/" + formId(1) + "/publish").contentType("application/json").content("{\"status\":\"CONCLUIDO\",\"resposta\":[\"Forjada\"]}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("PENDENTE"))
                 .andExpect(jsonPath("$.data.perguntas[0].resposta").isEmpty());
-        verify(service).publish(1L, principal);
-        when(service.publish(1L, principal)).thenThrow(new com.astro.api.common.exception.ConflictException("Já publicado"));
-        mvc.perform(post("/forms/1/publish")).andExpect(status().isConflict());
+        verify(service).publish(formId(1), principal);
+        when(service.publish(formId(1), principal)).thenThrow(new com.astro.api.common.exception.ConflictException("Já publicado"));
+        mvc.perform(post("/forms/" + formId(1) + "/publish")).andExpect(status().isConflict());
+        when(service.publish("invalid", principal)).thenThrow(new com.astro.api.common.exception.BusinessException("UUID inválido"));
         mvc.perform(post("/forms/invalid/publish")).andExpect(status().isBadRequest());
     }
 

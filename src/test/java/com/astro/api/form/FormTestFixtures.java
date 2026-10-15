@@ -22,8 +22,10 @@ final class FormTestFixtures {
         return user;
     }
 
+    static String formId(long value) { return new java.util.UUID(0, value).toString(); }
+
     static Form form(long id, long workspace, long sender, long recipient, FormStatus status) {
-        Form form = new Form(); form.setId(id); form.setWorkspaceId(workspace); form.setSenderManagerId(sender);
+        Form form = new Form(); form.setId(formId(id)); form.setWorkspaceId(workspace); form.setSenderManagerId(sender);
         form.setManagerId(recipient); form.setStatus(status); form.setTitle("Clima");
         form.setCreatedAt(Instant.parse("2026-10-15T12:00:00Z"));
         Form.FormQuestion question = new Form.FormQuestion(); question.setId(1L); question.setAnswer(List.of());

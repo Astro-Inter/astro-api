@@ -9,11 +9,10 @@ import java.util.Optional;
 
 public interface FormRepositoryCustom {
     Listing findAll(FormScope scope, String search, FormStatus status, int page, int size);
-    Optional<Form> findById(Long id, FormScope scope);
+    Optional<Form> findById(String id, FormScope scope);
     Optional<Form> update(Form form, FormScope scope, Long expectedVersion);
     boolean delete(Form form, FormScope scope);
     Optional<Form> publish(Form form, FormScope scope);
-    long nextId();
 
     record Listing(List<Form> forms, long total) {}
 }

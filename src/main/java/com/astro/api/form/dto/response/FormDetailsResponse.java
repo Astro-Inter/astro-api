@@ -8,7 +8,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 public record FormDetailsResponse(
-        Long id,
+        String id,
         @JsonProperty("id_workspace") Long workspaceId,
         @JsonProperty("id_gestor_remetente") Long senderManagerId,
         @JsonProperty("id_gestor") Long managerId,
