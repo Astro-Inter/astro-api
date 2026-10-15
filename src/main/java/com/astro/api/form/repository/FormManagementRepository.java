@@ -34,6 +34,10 @@ public class FormManagementRepository {
                 FindAndModifyOptions.options().returnNew(true), Form.class));
     }
 
+    public boolean delete(Form form, Scope scope) {
+        return mongo.remove(editableQuery(form, scope, form.getVersion()), Form.class).getDeletedCount() == 1;
+    }
+
     private Query editableQuery(Form form, Scope scope, Long expectedVersion) {
         Criteria permissions = Criteria.where("id_workspace").is(scope.workspaceId());
         if (!scope.workspaceManager()) permissions = new Criteria().andOperator(permissions,

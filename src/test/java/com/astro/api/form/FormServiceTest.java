@@ -212,4 +212,30 @@ class FormServiceTest {
         assertThrows(BusinessException.class, () -> service.update(1L, alternativeBody, principal));
         verify(repository, never()).update(any(), any(), any());
     }
+
+    @Test void senderCanDeletePendingAndDraftFormsButNotAnsweredOrCompletedOnes() {
+        for (var status : List.of(FormStatus.RASCUNHO, FormStatus.PENDENTE)) {
+            Form form = existing(status, 10);
+            when(repository.delete(eq(form), any())).thenReturn(true);
+            assertDoesNotThrow(() -> service.delete(1L, principal));
+        }
+        clearInvocations(repository);
+        Form completed = existing(FormStatus.CONCLUIDO, 10);
+        assertThrows(com.astro.api.common.exception.ConflictException.class, () -> service.delete(1L, principal));
+        completed.setStatus(FormStatus.PENDENTE); completed.getQuestions().getFirst().setAnswer(List.of("Resposta"));
+        assertThrows(com.astro.api.common.exception.ConflictException.class, () -> service.delete(1L, principal));
+        verify(repository, never()).delete(any(), any());
+    }
+
+    @Test void deleteRequiresOwnershipAndDetectsConcurrentChanges() {
+        existing(FormStatus.PENDENTE, 99);
+        assertThrows(AccessDeniedException.class, () -> service.delete(1L, principal));
+        verify(repository, never()).delete(any(), any());
+        sender.setType(UserType.GESTOR_WORKSPACE);
+        var owner = new AuthenticatedUser("sender", "sender@astro.com", Role.GESTOR_WORKSPACE);
+        when(repository.delete(any(), any())).thenReturn(false);
+        assertThrows(com.astro.api.common.exception.ConflictException.class, () -> service.delete(1L, owner));
+        when(repository.delete(any(), any())).thenReturn(true);
+        assertDoesNotThrow(() -> service.delete(1L, owner));
+    }
 }

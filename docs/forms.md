@@ -109,6 +109,15 @@ de respostas e versão interna do documento. Alterações concorrentes detectada
 409; consulte novamente antes de repetir. A versão interna protege o intervalo entre
 a leitura do serviço e a escrita, sem representar um controle de versão da tela do usuário.
 
+## Exclusão
+
+`DELETE /forms/{id}` retorna 204, sem corpo. Somente o remetente ou o gestor do
+workspace pode excluir, e apenas enquanto não houver conclusão nem respostas.
+O gestor do workspace também respeita esse bloqueio. Não é uma exclusão lógica.
+A operação verifica a mesma versão e o estado do documento de forma atômica:
+conclusão ou alteração concorrente impede a remoção e retorna 409.
+Formulário inexistente ou fora do escopo retorna 404.
+
 ## Persistência e compatibilidade
 
 A collection é `formularios`, com um documento por formulário e perguntas embutidas.

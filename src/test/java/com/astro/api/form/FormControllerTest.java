@@ -100,4 +100,13 @@ class FormControllerTest {
         mvc.perform(put("/forms/invalid").contentType("application/json").content("{}"))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test void deletionReturnsNoContentAndKeepsNotFoundAndConflictSemantics() throws Exception {
+        mvc.perform(delete("/forms/1")).andExpect(status().isNoContent()).andExpect(content().string(""));
+        verify(service).delete(1L, principal);
+        doThrow(new com.astro.api.common.exception.ResourceNotFoundException("Formulário não encontrado")).when(service).delete(99L, principal);
+        mvc.perform(delete("/forms/99")).andExpect(status().isNotFound());
+        doThrow(new com.astro.api.common.exception.ConflictException("Concluído")).when(service).delete(2L, principal);
+        mvc.perform(delete("/forms/2")).andExpect(status().isConflict());
+    }
 }
