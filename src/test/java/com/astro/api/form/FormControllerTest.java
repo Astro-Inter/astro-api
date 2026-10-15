@@ -88,4 +88,16 @@ class FormControllerTest {
         }
         verifyNoInteractions(service);
     }
+
+    @Test void updateUsesValidatedIdentityAndMapsConcurrentConflicts() throws Exception {
+        var form = FormRepositoryMongoTest.form(1, 1, 10, 20, FormStatus.RASCUNHO);
+        when(service.update(eq(1L), any(), eq(principal))).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
+        mvc.perform(put("/forms/1").contentType("application/json").content("{\"titulo\":\"Rascunho\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("RASCUNHO"));
+        when(service.update(eq(1L), any(), eq(principal))).thenThrow(new com.astro.api.common.exception.ConflictException("Alterado"));
+        mvc.perform(put("/forms/1").contentType("application/json").content("{}"))
+                .andExpect(status().isConflict());
+        mvc.perform(put("/forms/invalid").contentType("application/json").content("{}"))
+                .andExpect(status().isBadRequest());
+    }
 }

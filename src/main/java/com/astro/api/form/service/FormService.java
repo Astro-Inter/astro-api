@@ -7,6 +7,7 @@ import com.astro.api.common.exception.BusinessException;
 import com.astro.api.form.dto.response.FormPageResponse;
 import com.astro.api.form.dto.response.FormDetailsResponse;
 import com.astro.api.common.exception.ResourceNotFoundException;
+import com.astro.api.common.exception.ConflictException;
 import com.astro.api.form.dto.request.FormWriteRequest;
 import com.astro.api.form.strategy.FormValidationMode;
 import com.astro.api.form.mapper.FormMapper;
@@ -54,6 +55,31 @@ public class FormService {
         form.setUpdatedAt(form.getCreatedAt());
         form.setVersion(0L);
         return mapper.toDetails(managementRepository.insert(form));
+    }
+
+    public FormDetailsResponse update(Long id, FormWriteRequest body, AuthenticatedUser principal) {
+        var scope = access.requireManager(principal);
+        Form form = requireForm(id, scope);
+        access.requireManagement(form, scope);
+        requireMutable(form);
+        if (body == null || (body.status() != null && body.status() != form.getStatus())) {
+            throw new BusinessException("A edição preserva o status; use a publicação para enviar um rascunho");
+        }
+        validation.validate(body, form.getStatus() == FormStatus.RASCUNHO ? FormValidationMode.DRAFT : FormValidationMode.PUBLISH);
+        references.validate(body, scope);
+        Long expectedVersion = form.getVersion();
+        mapper.applyContent(body, form);
+        form.setUpdatedAt(java.time.Instant.now());
+        return mapper.toDetails(managementRepository.update(form, scope, expectedVersion)
+                .orElseThrow(() -> new ConflictException("O formulário foi alterado; consulte novamente antes de salvar")));
+    }
+
+    private void requireMutable(Form form) {
+        if ((form.getStatus() != FormStatus.RASCUNHO && form.getStatus() != FormStatus.PENDENTE)
+                || form.getRespondedAt() != null || (form.getQuestions() != null && form.getQuestions().stream()
+                .anyMatch(question -> question.getAnswer() != null && !question.getAnswer().isEmpty()))) {
+            throw new ConflictException("Formulários concluídos ou com respostas não podem ser alterados ou excluídos");
+        }
     }
 
     public FormPageResponse findAll(AuthenticatedUser principal, String search, FormStatus status, int page, int size) {

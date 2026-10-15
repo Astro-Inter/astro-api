@@ -21,7 +21,7 @@ O gestor do workspace consulta todos os formulários do seu workspace. Outros ge
 consultam os que enviaram e os publicados dos quais são destinatários. Rascunhos de
 outros remetentes ficam ocultos ao destinatário.
 
-## Persistência e compatibilidade
+## Consulta de detalhes
 
 `GET /forms/{id}` retorna todos os dados e perguntas, com `id_gestor`,
 `id_gestor_remetente`, `id_workspace`, `titulo`, `descricao`, `nr`, `id_unidade`,
@@ -87,6 +87,29 @@ Os validadores são Strategies por tipo, selecionadas por enum, com modos `DRAFT
 e `PUBLISH`. Regras gerais de identidade, vínculos, estado e persistência ficam nos
 serviços do módulo. Não há transação distribuída entre as consultas PostgreSQL e
 a gravação MongoDB; os vínculos são conferidos a cada operação de escrita.
+
+## Edição
+
+`PUT /forms/{id}` substitui os campos editáveis e toda a lista de perguntas, retornando
+200 com os detalhes. Campos opcionais omitidos são limpos. O status é preservado;
+se enviado, deve ser igual ao atual. Um rascunho só passa a pendente por publicação.
+
+Gestores comuns só alteram formulários dos quais são remetentes. O gestor do workspace
+pode alterar os de outros remetentes no próprio workspace. O destinatário, por ser
+destinatário, não ganha permissão administrativa. A falta dessa permissão retorna 403.
+Formulários concluídos ou que já tenham respostas são protegidos contra edição (409).
+
+Preserve `id_pergunta` e `id_opcao` dos itens existentes. Omita os IDs nos novos itens
+e nas cópias; remova itens omitindo-os do array e reordene mudando sua posição.
+IDs desconhecidos ou repetidos são recusados. Remetente, workspace, criação e respostas
+não podem ser sobrescritos por essa operação.
+
+A gravação verifica atomicamente escopo, remetente quando necessário, status, ausência
+de respostas e versão interna do documento. Alterações concorrentes detectadas retornam
+409; consulte novamente antes de repetir. A versão interna protege o intervalo entre
+a leitura do serviço e a escrita, sem representar um controle de versão da tela do usuário.
+
+## Persistência e compatibilidade
 
 A collection é `formularios`, com um documento por formulário e perguntas embutidas.
 O campo `id_workspace` é obrigatório para acesso pelas rotas web. Documentos antigos

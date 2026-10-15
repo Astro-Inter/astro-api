@@ -5,6 +5,7 @@ import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.UserRepository;
+import com.astro.api.form.model.Form;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,4 +34,11 @@ public class FormAccessService {
     }
 
     public record Scope(Long managerId, Long workspaceId, boolean workspaceManager) {}
+
+    public void requireManagement(Form form, Scope scope) {
+        if (!scope.workspaceId().equals(form.getWorkspaceId())
+                || (!scope.workspaceManager() && !scope.managerId().equals(form.getSenderManagerId()))) {
+            throw new AccessDeniedException("Somente o remetente ou o gestor do workspace pode gerenciar o formulário");
+        }
+    }
 }
