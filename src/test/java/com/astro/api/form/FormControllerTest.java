@@ -53,7 +53,7 @@ class FormControllerTest {
     }
 
     @Test void detailsUsePortugueseFieldsAndStandardErrors() throws Exception {
-        var form = FormRepositoryMongoTest.form(1, 1, 10, 20, FormStatus.RASCUNHO);
+        var form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.RASCUNHO);
         when(service.findById(1L, principal)).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
         mvc.perform(get("/forms/1")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id_gestor").value(20))
@@ -65,7 +65,7 @@ class FormControllerTest {
     }
 
     @Test void creationUsesPortugueseContractAndIgnoresForgedServerFieldsAndAnswers() throws Exception {
-        var form = FormRepositoryMongoTest.form(42, 1, 10, 20, FormStatus.PENDENTE);
+        var form = FormTestFixtures.form(42, 1, 10, 20, FormStatus.PENDENTE);
         when(service.create(any(), eq(principal))).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
         mvc.perform(post("/forms").contentType("application/json").content("""
                 {"titulo":"Inspeção","id_gestor":20,"status":"PENDENTE","id_workspace":999,
@@ -90,7 +90,7 @@ class FormControllerTest {
     }
 
     @Test void updateUsesValidatedIdentityAndMapsConcurrentConflicts() throws Exception {
-        var form = FormRepositoryMongoTest.form(1, 1, 10, 20, FormStatus.RASCUNHO);
+        var form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.RASCUNHO);
         when(service.update(eq(1L), any(), eq(principal))).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
         mvc.perform(put("/forms/1").contentType("application/json").content("{\"titulo\":\"Rascunho\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("RASCUNHO"));
@@ -108,5 +108,17 @@ class FormControllerTest {
         mvc.perform(delete("/forms/99")).andExpect(status().isNotFound());
         doThrow(new com.astro.api.common.exception.ConflictException("Concluído")).when(service).delete(2L, principal);
         mvc.perform(delete("/forms/2")).andExpect(status().isConflict());
+    }
+
+    @Test void publicationDoesNotAcceptAReplacementFormOrAnswersAndMapsItsStateErrors() throws Exception {
+        var form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.PENDENTE);
+        when(service.publish(1L, principal)).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
+        mvc.perform(post("/forms/1/publish").contentType("application/json").content("{\"status\":\"CONCLUIDO\",\"resposta\":[\"Forjada\"]}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("PENDENTE"))
+                .andExpect(jsonPath("$.data.perguntas[0].resposta").isEmpty());
+        verify(service).publish(1L, principal);
+        when(service.publish(1L, principal)).thenThrow(new com.astro.api.common.exception.ConflictException("Já publicado"));
+        mvc.perform(post("/forms/1/publish")).andExpect(status().isConflict());
+        mvc.perform(post("/forms/invalid/publish")).andExpect(status().isBadRequest());
     }
 }

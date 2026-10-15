@@ -24,6 +24,14 @@ public class FormController {
 
     public FormController(FormService service) { this.service = service; }
 
+    @PostMapping("/{id}/publish")
+    @Operation(summary = "Publica um rascunho válido, tornando-o pendente para o gestor destinatário")
+    public ResponseEntity<ApiResult<FormDetailsResponse>> publish(@PathVariable("id") Long id,
+            @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
+        return ResponseEntity.ok(ApiResult.success("Formulário publicado com sucesso",
+                service.publish(id, principal), request.getRequestURI()));
+    }
+
     @DeleteMapping("/{id}")
     @Operation(summary = "Exclui um formulário sem respostas, respeitando remetente e workspace")
     public ResponseEntity<Void> delete(@PathVariable("id") Long id,

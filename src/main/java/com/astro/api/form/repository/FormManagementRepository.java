@@ -38,6 +38,14 @@ public class FormManagementRepository {
         return mongo.remove(editableQuery(form, scope, form.getVersion()), Form.class).getDeletedCount() == 1;
     }
 
+    public Optional<Form> publish(Form form, Scope scope) {
+        if (form.getStatus() != FormStatus.RASCUNHO) return Optional.empty();
+        Update update = new Update().set("status", FormStatus.PENDENTE).set("atualizado_em", form.getUpdatedAt())
+                .set("versao", form.getVersion() == null ? 1L : form.getVersion() + 1);
+        return Optional.ofNullable(mongo.findAndModify(editableQuery(form, scope, form.getVersion()), update,
+                FindAndModifyOptions.options().returnNew(true), Form.class));
+    }
+
     private Query editableQuery(Form form, Scope scope, Long expectedVersion) {
         Criteria permissions = Criteria.where("id_workspace").is(scope.workspaceId());
         if (!scope.workspaceManager()) permissions = new Criteria().andOperator(permissions,
