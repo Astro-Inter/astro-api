@@ -149,6 +149,24 @@ db.formularios.createIndex({id_workspace: 1, id_gestor: 1, status: 1, criado_em:
 db.formularios.createIndex({id_gestor: 1, status: 1, data_limite: 1, _id: 1})
 ```
 
+## Organização do módulo
+
+`FormRepository` é o único repository de formulários: combina `MongoRepository` com
+o fragmento `FormRepositoryCustom`, implementado por `FormRepositoryCustomImpl` para
+consultas paginadas e gravações condicionais no MongoDB. O fragmento retorna documentos
+e resultados do banco, sem montar DTOs ou traduzir regras de negócio. Os vínculos
+relacionais reutilizam `UserRepository`, `UnitRepository` e `NrCatalogRepository`.
+
+Os controllers cuidam do HTTP. Os services coordenam autorização, validações,
+identificadores e estados. `FormMapper` concentra conversões e a resposta paginada.
+Os DTOs de request referenciam mensagens em português de `ValidationMessages.properties`.
+
+Os identificadores Java usam inglês, incluindo `nrCode`, `DRAFT`, `PENDING`,
+`COMPLETED`, `TEXT`, `OPTION`, `PHOTO` e `DATE`. `@JsonProperty`, `@Field`, o
+conversor de status do MongoDB e a conversão do parâmetro HTTP preservam os nomes
+do contrato existente: `nr`, `RASCUNHO`, `PENDENTE`, `CONCLUIDO`, `texto`,
+`alternativa`, `foto` e `data`. Essa adequação não exige migração adicional de dados.
+
 ## Validação local
 
 `./mvnw test` executa testes de serviço, Strategies, contratos HTTP e segurança Firebase.

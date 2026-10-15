@@ -8,7 +8,7 @@ import java.util.Set;
 
 @Component
 public class PhotoQuestionStrategy implements FormQuestionStrategy {
-    public FormQuestionType supportedType() { return FormQuestionType.FOTO; }
+    public FormQuestionType supportedType() { return FormQuestionType.PHOTO; }
     public void validate(FormQuestionRequest question, FormValidationMode mode) {
         QuestionRules.noAlternatives(question);
         QuestionRules.require(question.maxFiles() == null || (question.maxFiles() >= 1 && question.maxFiles() <= 10),

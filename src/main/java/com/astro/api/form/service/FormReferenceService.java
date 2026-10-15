@@ -4,7 +4,7 @@ import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.conformity.repository.NrCatalogRepository;
 import com.astro.api.form.dto.request.FormWriteRequest;
-import com.astro.api.form.service.FormAccessService.Scope;
+import com.astro.api.form.model.FormScope;
 import com.astro.api.unit.repository.UnitRepository;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
@@ -23,7 +23,7 @@ public class FormReferenceService {
     }
 
     @Transactional(readOnly = true)
-    public void validate(FormWriteRequest body, Scope scope) {
+    public void validate(FormWriteRequest body, FormScope scope) {
         if (body.managerId() != null) {
             var manager = users.findById(body.managerId()).filter(user -> user.getUnit() != null
                     && user.getUnit().workspace != null && scope.workspaceId().equals(user.getUnit().workspace.id)
@@ -39,9 +39,9 @@ public class FormReferenceService {
                     .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada no workspace"));
             if (!unit.isActive) throw new BusinessException("A unidade vinculada deve estar ativa");
         }
-        if (body.nr() != null) {
-            var nr = nrs.findById(body.nr()).orElseThrow(() -> new ResourceNotFoundException("NR não encontrada"));
-            if (nr.isRevoked()) throw new BusinessException("A NR vinculada não pode estar revogada");
+        if (body.nrCode() != null) {
+            var nrCatalogEntry = nrs.findById(body.nrCode()).orElseThrow(() -> new ResourceNotFoundException("NR não encontrada"));
+            if (nrCatalogEntry.isRevoked()) throw new BusinessException("A NR vinculada não pode estar revogada");
         }
     }
 }

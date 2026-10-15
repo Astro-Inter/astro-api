@@ -11,12 +11,13 @@ import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record FormWriteRequest(
-        @JsonProperty("titulo") @Size(max = 100) String title,
-        @JsonProperty("descricao") @Size(max = 240) String description,
-        @JsonProperty("id_gestor") @Positive Long managerId,
-        @Positive Integer nr,
-        @JsonProperty("id_unidade") @Positive Long unitId,
+        @JsonProperty("titulo") @Size(max = 100, message = "{form.title.size}") String title,
+        @JsonProperty("descricao") @Size(max = 240, message = "{form.description.size}") String description,
+        @JsonProperty("id_gestor") @Positive(message = "{form.managerId.positive}") Long managerId,
+        @JsonProperty("nr") @Positive(message = "{form.nrCode.positive}") Integer nrCode,
+        @JsonProperty("id_unidade") @Positive(message = "{form.unitId.positive}") Long unitId,
         @JsonProperty("data_limite") LocalDate dueDate,
         FormStatus status,
-        @JsonProperty("perguntas") @Size(max = 100) List<@NotNull @Valid FormQuestionRequest> questions
+        @JsonProperty("perguntas") @Size(max = 100, message = "{form.questions.size}")
+        List<@NotNull(message = "{form.question.item.notNull}") @Valid FormQuestionRequest> questions
 ) {}

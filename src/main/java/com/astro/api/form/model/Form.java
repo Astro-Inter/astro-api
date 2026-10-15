@@ -6,6 +6,8 @@ import lombok.Setter;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
+import org.springframework.data.convert.ValueConverter;
+import com.astro.api.form.mapper.FormStatusConverter;
 
 import java.time.Instant;
 import java.util.List;
@@ -36,6 +38,7 @@ public class Form {
     @Field("data_limite")
     private Instant dueDate;
 
+    @ValueConverter(FormStatusConverter.class)
     private FormStatus status;
 
     @Field("criado_em")
@@ -48,7 +51,7 @@ public class Form {
     private Instant respondedAt;
 
     @Field("nr")
-    private Integer nr;
+    private Integer nrCode;
 
     @Field("id_unidade")
     private Long unitId;

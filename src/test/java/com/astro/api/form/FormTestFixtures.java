@@ -38,15 +38,15 @@ final class FormTestFixtures {
 
     static FormQuestionRequest question(FormQuestionType type) {
         return new FormQuestionRequest(null, type, " Pergunta ", true,
-                type == FormQuestionType.ALTERNATIVA ? true : null,
-                type == FormQuestionType.ALTERNATIVA ? List.of(new FormOptionRequest(null, "Sim", false),
+                type == FormQuestionType.OPTION ? true : null,
+                type == FormQuestionType.OPTION ? List.of(new FormOptionRequest(null, "Sim", false),
                         new FormOptionRequest(null, "", true)) : null, null, null);
     }
 
     static FormWriteRequest content(FormStatus status) {
         return new FormWriteRequest(" Inspeção ", " Descrição ", 20L, null, null,
                 LocalDate.of(2026, 10, 30), status,
-                List.of(question(FormQuestionType.TEXTO), question(FormQuestionType.ALTERNATIVA),
-                        question(FormQuestionType.FOTO), question(FormQuestionType.DATA)));
+                List.of(question(FormQuestionType.TEXT), question(FormQuestionType.OPTION),
+                        question(FormQuestionType.PHOTO), question(FormQuestionType.DATE)));
     }
 }

@@ -2,12 +2,11 @@ package com.astro.api.form.repository;
 
 import com.astro.api.form.model.Form;
 import com.astro.api.form.model.FormStatus;
-import com.astro.api.form.service.FormAccessService.Scope;
+import com.astro.api.form.model.FormScope;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.stereotype.Repository;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.dao.DuplicateKeyException;
@@ -17,42 +16,39 @@ import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
-@Repository
-public class FormManagementRepository {
+public class FormRepositoryCustomImpl implements FormRepositoryCustom {
     private final MongoTemplate mongo;
 
-    public FormManagementRepository(MongoTemplate mongo) { this.mongo = mongo; }
+    public FormRepositoryCustomImpl(MongoTemplate mongo) { this.mongo = mongo; }
 
-    public Form insert(Form form) { return mongo.insert(form); }
-
-    public Optional<Form> update(Form form, Scope scope, Long expectedVersion) {
+    public Optional<Form> update(Form form, FormScope scope, Long expectedVersion) {
         Update update = new Update().set("titulo", form.getTitle()).set("descricao", form.getDescription())
-                .set("id_gestor", form.getManagerId()).set("nr", form.getNr()).set("id_unidade", form.getUnitId())
+                .set("id_gestor", form.getManagerId()).set("nr", form.getNrCode()).set("id_unidade", form.getUnitId())
                 .set("data_limite", form.getDueDate()).set("perguntas", form.getQuestions())
                 .set("atualizado_em", form.getUpdatedAt()).set("versao", expectedVersion == null ? 1L : expectedVersion + 1);
         return Optional.ofNullable(mongo.findAndModify(editableQuery(form, scope, expectedVersion), update,
                 FindAndModifyOptions.options().returnNew(true), Form.class));
     }
 
-    public boolean delete(Form form, Scope scope) {
+    public boolean delete(Form form, FormScope scope) {
         return mongo.remove(editableQuery(form, scope, form.getVersion()), Form.class).getDeletedCount() == 1;
     }
 
-    public Optional<Form> publish(Form form, Scope scope) {
-        if (form.getStatus() != FormStatus.RASCUNHO) return Optional.empty();
-        Update update = new Update().set("status", FormStatus.PENDENTE).set("atualizado_em", form.getUpdatedAt())
+    public Optional<Form> publish(Form form, FormScope scope) {
+        Query query = editableQuery(form, scope, form.getVersion()).addCriteria(Criteria.where("status").is(FormStatus.DRAFT));
+        Update update = new Update().set("status", FormStatus.PENDING).set("atualizado_em", form.getUpdatedAt())
                 .set("versao", form.getVersion() == null ? 1L : form.getVersion() + 1);
-        return Optional.ofNullable(mongo.findAndModify(editableQuery(form, scope, form.getVersion()), update,
+        return Optional.ofNullable(mongo.findAndModify(query, update,
                 FindAndModifyOptions.options().returnNew(true), Form.class));
     }
 
-    private Query editableQuery(Form form, Scope scope, Long expectedVersion) {
+    private Query editableQuery(Form form, FormScope scope, Long expectedVersion) {
         Criteria permissions = Criteria.where("id_workspace").is(scope.workspaceId());
         if (!scope.workspaceManager()) permissions = new Criteria().andOperator(permissions,
                 Criteria.where("id_gestor_remetente").is(scope.managerId()));
         return Query.query(new Criteria().andOperator(permissions, Criteria.where("_id").is(form.getId()),
                 Criteria.where("versao").is(expectedVersion), Criteria.where("status").is(form.getStatus()),
-                Criteria.where("status").in(FormStatus.RASCUNHO, FormStatus.PENDENTE),
+                Criteria.where("status").in(FormStatus.DRAFT, FormStatus.PENDING),
                 Criteria.where("respondido_em").is(null),
                 Criteria.where("perguntas").not().elemMatch(Criteria.where("resposta.0").exists(true))));
     }
@@ -76,12 +72,12 @@ public class FormManagementRepository {
         return ((Number) counter.get("valor")).longValue();
     }
 
-    public Optional<Form> findById(Long id, Scope scope) {
+    public Optional<Form> findById(Long id, FormScope scope) {
         return Optional.ofNullable(mongo.findOne(Query.query(new Criteria().andOperator(
                 Criteria.where("_id").is(id), readable(scope))), Form.class));
     }
 
-    public Listing findAll(Scope scope, String search, FormStatus status, int page, int size) {
+    public Listing findAll(FormScope scope, String search, FormStatus status, int page, int size) {
         Criteria criteria = readable(scope);
         if (status != null) criteria = new Criteria().andOperator(criteria, Criteria.where("status").is(status));
         if (search != null && !search.isBlank()) {
@@ -96,14 +92,13 @@ public class FormManagementRepository {
         return new Listing(mongo.find(query, Form.class), total);
     }
 
-    private Criteria readable(Scope scope) {
+    private Criteria readable(FormScope scope) {
         Criteria workspace = Criteria.where("id_workspace").is(scope.workspaceId());
         if (scope.workspaceManager()) return workspace;
         return new Criteria().andOperator(workspace, new Criteria().orOperator(
                 Criteria.where("id_gestor_remetente").is(scope.managerId()),
                 new Criteria().andOperator(Criteria.where("id_gestor").is(scope.managerId()),
-                        Criteria.where("status").in(FormStatus.PENDENTE, FormStatus.CONCLUIDO))));
+                        Criteria.where("status").in(FormStatus.PENDING, FormStatus.COMPLETED))));
     }
 
-    public record Listing(List<Form> forms, long total) {}
 }

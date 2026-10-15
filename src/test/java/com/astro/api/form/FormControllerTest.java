@@ -35,25 +35,26 @@ class FormControllerTest {
     @AfterEach void cleanUp() { SecurityContextHolder.clearContext(); }
 
     @Test void listsWithExplicitPagingAndValidatedIdentity() throws Exception {
-        when(service.findAll(principal, "Clima", FormStatus.PENDENTE, 1, 4)).thenReturn(
-                new FormPageResponse(List.of(new FormSummaryResponse(1L, "Clima", "Pesquisa", 3, FormStatus.PENDENTE)), 1, 4, 9, 3));
+        when(service.findAll(principal, "Clima", FormStatus.PENDING, 1, 4)).thenReturn(
+                new FormPageResponse(List.of(new FormSummaryResponse(1L, "Clima", "Pesquisa", 3, FormStatus.PENDING)), 1, 4, 9, 3));
         mvc.perform(get("/forms").param("search", "Clima").param("status", "PENDENTE").param("page", "1").param("size", "4")
                         .param("workspaceId", "999").param("firebaseUid", "fake"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].titulo").value("Clima"))
                 .andExpect(jsonPath("$.data.items[0].quantidade_perguntas").value(3))
                 .andExpect(jsonPath("$.data.items[0].perguntas").doesNotExist())
                 .andExpect(jsonPath("$.data.totalPages").value(3));
-        verify(service).findAll(principal, "Clima", FormStatus.PENDENTE, 1, 4);
+        verify(service).findAll(principal, "Clima", FormStatus.PENDING, 1, 4);
     }
 
     @Test void rejectsMalformedPagingAndUnknownStatus() throws Exception {
         mvc.perform(get("/forms").param("page", "bad")).andExpect(status().isBadRequest());
         mvc.perform(get("/forms").param("status", "OTHER")).andExpect(status().isBadRequest());
+        mvc.perform(get("/forms").param("status", "DRAFT")).andExpect(status().isBadRequest());
         verifyNoInteractions(service);
     }
 
     @Test void detailsUsePortugueseFieldsAndStandardErrors() throws Exception {
-        var form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.RASCUNHO);
+        var form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.DRAFT);
         when(service.findById(1L, principal)).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
         mvc.perform(get("/forms/1")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id_gestor").value(20))
@@ -65,7 +66,7 @@ class FormControllerTest {
     }
 
     @Test void creationUsesPortugueseContractAndIgnoresForgedServerFieldsAndAnswers() throws Exception {
-        var form = FormTestFixtures.form(42, 1, 10, 20, FormStatus.PENDENTE);
+        var form = FormTestFixtures.form(42, 1, 10, 20, FormStatus.PENDING);
         when(service.create(any(), eq(principal))).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
         mvc.perform(post("/forms").contentType("application/json").content("""
                 {"titulo":"Inspeção","id_gestor":20,"status":"PENDENTE","id_workspace":999,
@@ -77,7 +78,7 @@ class FormControllerTest {
                 .andExpect(jsonPath("$.data.id_gestor_remetente").value(10));
         var request = org.mockito.ArgumentCaptor.forClass(com.astro.api.form.dto.request.FormWriteRequest.class);
         verify(service).create(request.capture(), eq(principal));
-        assertEquals(com.astro.api.form.model.FormQuestionType.TEXTO, request.getValue().questions().getFirst().type());
+        assertEquals(com.astro.api.form.model.FormQuestionType.TEXT, request.getValue().questions().getFirst().type());
     }
 
     @Test void creationRejectsUnknownTypesImpossibleDatesAndOutOfRangeConfigurations() throws Exception {
@@ -90,7 +91,7 @@ class FormControllerTest {
     }
 
     @Test void updateUsesValidatedIdentityAndMapsConcurrentConflicts() throws Exception {
-        var form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.RASCUNHO);
+        var form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.DRAFT);
         when(service.update(eq(1L), any(), eq(principal))).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
         mvc.perform(put("/forms/1").contentType("application/json").content("{\"titulo\":\"Rascunho\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("RASCUNHO"));
@@ -111,7 +112,7 @@ class FormControllerTest {
     }
 
     @Test void publicationDoesNotAcceptAReplacementFormOrAnswersAndMapsItsStateErrors() throws Exception {
-        var form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.PENDENTE);
+        var form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.PENDING);
         when(service.publish(1L, principal)).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
         mvc.perform(post("/forms/1/publish").contentType("application/json").content("{\"status\":\"CONCLUIDO\",\"resposta\":[\"Forjada\"]}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("PENDENTE"))
@@ -120,5 +121,16 @@ class FormControllerTest {
         when(service.publish(1L, principal)).thenThrow(new com.astro.api.common.exception.ConflictException("Já publicado"));
         mvc.perform(post("/forms/1/publish")).andExpect(status().isConflict());
         mvc.perform(post("/forms/invalid/publish")).andExpect(status().isBadRequest());
+    }
+
+    @Test void requestValidationResolvesPortugueseMessagesFromTheResourceBundle() throws Exception {
+        mvc.perform(post("/forms").contentType("application/json").content("{\"titulo\":\"" + "a".repeat(101) + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0]").value(org.hamcrest.Matchers.containsString(
+                        "O título do formulário deve ter no máximo 100 caracteres")));
+        mvc.perform(post("/forms").contentType("application/json").content("{\"perguntas\":[{}]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0]").value(org.hamcrest.Matchers.containsString("O tipo da pergunta é obrigatório")));
+        verifyNoInteractions(service);
     }
 }

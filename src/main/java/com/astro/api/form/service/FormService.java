@@ -12,7 +12,7 @@ import com.astro.api.form.dto.request.FormWriteRequest;
 import com.astro.api.form.strategy.FormValidationMode;
 import com.astro.api.form.mapper.FormMapper;
 import com.astro.api.form.model.FormStatus;
-import com.astro.api.form.repository.FormManagementRepository;
+import com.astro.api.form.model.FormScope;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -22,17 +22,14 @@ import java.time.temporal.ChronoUnit;
 @Service
 public class FormService {
     private final FormRepository formRepository;
-    private final FormManagementRepository managementRepository;
     private final FormAccessService access;
     private final FormMapper mapper;
     private final FormValidationService validation;
     private final FormReferenceService references;
 
-    public FormService(FormRepository formRepository, FormManagementRepository managementRepository,
-                       FormAccessService access, FormMapper mapper,
+    public FormService(FormRepository formRepository, FormAccessService access, FormMapper mapper,
                        FormValidationService validation, FormReferenceService references) {
         this.formRepository = formRepository;
-        this.managementRepository = managementRepository;
         this.access = access;
         this.mapper = mapper;
         this.validation = validation;
@@ -41,22 +38,23 @@ public class FormService {
 
     public FormDetailsResponse create(FormWriteRequest body, AuthenticatedUser principal) {
         var scope = access.requireManager(principal);
-        if (body == null || (body.status() != null && body.status() != FormStatus.RASCUNHO && body.status() != FormStatus.PENDENTE)) {
+        if (body == null || (body.status() != null && body.status() != FormStatus.DRAFT && body.status() != FormStatus.PENDING)) {
             throw new BusinessException("Crie o formulário como RASCUNHO ou PENDENTE");
         }
-        FormStatus status = body.status() == null ? FormStatus.PENDENTE : body.status();
-        validation.validate(body, status == FormStatus.RASCUNHO ? FormValidationMode.DRAFT : FormValidationMode.PUBLISH);
+        FormStatus status = body.status() == null ? FormStatus.PENDING : body.status();
+        validation.validate(body, status == FormStatus.DRAFT ? FormValidationMode.DRAFT : FormValidationMode.PUBLISH);
+        validation.validateIdentifiers(body, List.of());
         references.validate(body, scope);
         Form form = new Form();
         mapper.applyContent(body, form);
-        form.setId(managementRepository.nextId());
+        form.setId(formRepository.nextId());
         form.setWorkspaceId(scope.workspaceId());
         form.setSenderManagerId(scope.managerId());
         form.setStatus(status);
         form.setCreatedAt(now());
         form.setUpdatedAt(form.getCreatedAt());
         form.setVersion(0L);
-        return mapper.toDetails(managementRepository.insert(form));
+        return mapper.toDetails(formRepository.insert(form));
     }
 
     public FormDetailsResponse update(Long id, FormWriteRequest body, AuthenticatedUser principal) {
@@ -67,12 +65,13 @@ public class FormService {
         if (body == null || (body.status() != null && body.status() != form.getStatus())) {
             throw new BusinessException("A edição preserva o status; use a publicação para enviar um rascunho");
         }
-        validation.validate(body, form.getStatus() == FormStatus.RASCUNHO ? FormValidationMode.DRAFT : FormValidationMode.PUBLISH);
+        validation.validate(body, form.getStatus() == FormStatus.DRAFT ? FormValidationMode.DRAFT : FormValidationMode.PUBLISH);
+        validation.validateIdentifiers(body, form.getQuestions() == null ? List.of() : form.getQuestions());
         references.validate(body, scope);
         Long expectedVersion = form.getVersion();
         mapper.applyContent(body, form);
         form.setUpdatedAt(now());
-        return mapper.toDetails(managementRepository.update(form, scope, expectedVersion)
+        return mapper.toDetails(formRepository.update(form, scope, expectedVersion)
                 .orElseThrow(() -> new ConflictException("O formulário foi alterado; consulte novamente antes de salvar")));
     }
 
@@ -81,7 +80,7 @@ public class FormService {
         Form form = requireForm(id, scope);
         access.requireManagement(form, scope);
         requireMutable(form);
-        if (!managementRepository.delete(form, scope)) {
+        if (!formRepository.delete(form, scope)) {
             throw new ConflictException("O formulário foi alterado; consulte novamente antes de excluir");
         }
     }
@@ -91,19 +90,24 @@ public class FormService {
         Form form = requireForm(id, scope);
         access.requireManagement(form, scope);
         requireMutable(form);
-        if (form.getStatus() != FormStatus.RASCUNHO) {
+        if (form.getStatus() != FormStatus.DRAFT) {
             throw new ConflictException("Somente rascunhos podem ser publicados");
         }
-        FormWriteRequest content = mapper.toWriteRequest(form);
+        FormWriteRequest content;
+        try {
+            content = mapper.toWriteRequest(form);
+        } catch (IllegalArgumentException exception) {
+            throw new BusinessException("Tipo de pergunta inválido no rascunho");
+        }
         validation.validate(content, FormValidationMode.PUBLISH);
         references.validate(content, scope);
         form.setUpdatedAt(now());
-        return mapper.toDetails(managementRepository.publish(form, scope)
+        return mapper.toDetails(formRepository.publish(form, scope)
                 .orElseThrow(() -> new ConflictException("O formulário foi alterado; consulte novamente antes de publicar")));
     }
 
     private void requireMutable(Form form) {
-        if ((form.getStatus() != FormStatus.RASCUNHO && form.getStatus() != FormStatus.PENDENTE)
+        if ((form.getStatus() != FormStatus.DRAFT && form.getStatus() != FormStatus.PENDING)
                 || form.getRespondedAt() != null || (form.getQuestions() != null && form.getQuestions().stream()
                 .anyMatch(question -> question.getAnswer() != null && !question.getAnswer().isEmpty()))) {
             throw new ConflictException("Formulários concluídos ou com respostas não podem ser alterados ou excluídos");
@@ -115,9 +119,8 @@ public class FormService {
         if (page < 0 || size < 1 || size > 100 || (search != null && search.length() > 240)) {
             throw new BusinessException("Use page >= 0, size entre 1 e 100 e busca de até 240 caracteres");
         }
-        var listing = managementRepository.findAll(scope, search, status, page, size);
-        return new FormPageResponse(listing.forms().stream().map(mapper::toSummary).toList(), page, size,
-                listing.total(), (listing.total() + size - 1) / size);
+        var listing = formRepository.findAll(scope, search, status, page, size);
+        return mapper.toPage(listing.forms(), page, size, listing.total());
     }
 
     public List<Form> findTop3PendingForManager(Long managerId) {
@@ -128,9 +131,9 @@ public class FormService {
         return mapper.toDetails(requireForm(id, access.requireManager(principal)));
     }
 
-    private Form requireForm(Long id, FormAccessService.Scope scope) {
+    private Form requireForm(Long id, FormScope scope) {
         if (id == null || id <= 0) throw new BusinessException("O identificador do formulário deve ser positivo");
-        return managementRepository.findById(id, scope)
+        return formRepository.findById(id, scope)
                 .orElseThrow(() -> new ResourceNotFoundException("Formulário não encontrado"));
     }
 
