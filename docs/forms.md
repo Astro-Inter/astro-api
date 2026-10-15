@@ -23,6 +23,14 @@ outros remetentes ficam ocultos ao destinatário.
 
 ## Persistência e compatibilidade
 
+`GET /forms/{id}` retorna todos os dados e perguntas, com `id_gestor`,
+`id_gestor_remetente`, `id_workspace`, `titulo`, `descricao`, `nr`, `id_unidade`,
+`data_limite`, `status`, `criado_em`, `atualizado_em`, `respondido_em` e `perguntas`.
+Identificador inválido retorna 400; inexistente ou fora do escopo retorna 404.
+O prazo é apresentado como `YYYY-MM-DD`, usando `America/Sao_Paulo`; no MongoDB
+é armazenado como data BSON. As opções têm `id_opcao`, `texto` e `outra`.
+As perguntas de foto têm `maximo_arquivos` e `tamanho_maximo_mb`.
+
 A collection é `formularios`, com um documento por formulário e perguntas embutidas.
 O campo `id_workspace` é obrigatório para acesso pelas rotas web. Documentos antigos
 sem esse vínculo não ficam acessíveis até uma migração explícita e conferida.

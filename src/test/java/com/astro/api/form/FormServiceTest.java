@@ -75,4 +75,17 @@ class FormServiceTest {
         assertEquals(2, result.items().getFirst().questionCount());
         assertEquals(FormStatus.PENDENTE, result.items().getFirst().status());
     }
+
+    @Test void detailsRequireAnAccessibleFormAndPositiveIdentifier() {
+        var scope = new FormAccessService.Scope(10L, 1L, false);
+        Form form = FormRepositoryMongoTest.form(1, 1, 10, 20, FormStatus.RASCUNHO);
+        form.setDueDate(java.time.Instant.parse("2026-10-30T03:00:00Z"));
+        when(repository.findById(1L, scope)).thenReturn(Optional.of(form));
+        var response = service.findById(1L, principal);
+        assertEquals(java.time.LocalDate.of(2026, 10, 30), response.dueDate());
+        assertEquals(1L, response.questions().getFirst().id());
+        assertTrue(response.questions().getFirst().answer().isEmpty());
+        assertThrows(BusinessException.class, () -> service.findById(0L, principal));
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class, () -> service.findById(99L, principal));
+    }
 }

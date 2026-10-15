@@ -68,4 +68,16 @@ class FormRepositoryMongoTest {
         var home = new MongoRepositoryFactory(mongo).getRepository(FormRepository.class);
         assertEquals(List.of(3L), home.findTop3PendingByManagerId(20L).stream().map(Form::getId).toList());
     }
+
+    @Test void detailHidesOtherWorkspacesAndUnpublishedDraftsButPreservesOrderAndConfiguration() {
+        Form value = form(1, 1, 10, 20, FormStatus.RASCUNHO);
+        value.getQuestions().getFirst().setType("foto");
+        value.getQuestions().getFirst().setMaxFiles(3);
+        mongo.insert(value);
+        assertTrue(repository.findById(1L, new Scope(20L, 1L, false)).isEmpty());
+        assertTrue(repository.findById(1L, new Scope(10L, 2L, true)).isEmpty());
+        assertEquals(3, repository.findById(1L, new Scope(10L, 1L, false)).orElseThrow()
+                .getQuestions().getFirst().getMaxFiles());
+        assertTrue(repository.findById(1L, new Scope(99L, 1L, true)).isPresent());
+    }
 }

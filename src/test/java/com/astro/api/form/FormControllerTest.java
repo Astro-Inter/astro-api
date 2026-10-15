@@ -50,4 +50,16 @@ class FormControllerTest {
         mvc.perform(get("/forms").param("status", "OTHER")).andExpect(status().isBadRequest());
         verifyNoInteractions(service);
     }
+
+    @Test void detailsUsePortugueseFieldsAndStandardErrors() throws Exception {
+        var form = FormRepositoryMongoTest.form(1, 1, 10, 20, FormStatus.RASCUNHO);
+        when(service.findById(1L, principal)).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
+        mvc.perform(get("/forms/1")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id_gestor").value(20))
+                .andExpect(jsonPath("$.data.perguntas[0].id_pergunta").value(1))
+                .andExpect(jsonPath("$.data.perguntas[0].resposta").isEmpty());
+        mvc.perform(get("/forms/invalid")).andExpect(status().isBadRequest());
+        when(service.findById(99L, principal)).thenThrow(new com.astro.api.common.exception.ResourceNotFoundException("Formulário não encontrado"));
+        mvc.perform(get("/forms/99")).andExpect(status().isNotFound());
+    }
 }

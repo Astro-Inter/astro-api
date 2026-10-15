@@ -76,9 +76,32 @@ public class Form {
         private List<Object> answer;
 
         @Field("opcoes")
-        private List<String> options;
+        private List<FormOption> options;
 
         @Field("obrigatoria")
         private Boolean required;
+
+        @Field("multipla_escolha")
+        private Boolean multiple;
+
+        @Field("maximo_arquivos")
+        private Integer maxFiles;
+
+        @Field("tamanho_maximo_mb")
+        private Integer maxFileSizeMb;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class FormOption {
+        @Field("id_opcao")
+        private Long id;
+
+        @Field("texto")
+        private String text;
+
+        @Field("outra")
+        private Boolean other;
     }
 }

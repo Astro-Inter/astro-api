@@ -10,6 +10,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 @Repository
@@ -17,6 +18,11 @@ public class FormManagementRepository {
     private final MongoTemplate mongo;
 
     public FormManagementRepository(MongoTemplate mongo) { this.mongo = mongo; }
+
+    public Optional<Form> findById(Long id, Scope scope) {
+        return Optional.ofNullable(mongo.findOne(Query.query(new Criteria().andOperator(
+                Criteria.where("_id").is(id), readable(scope))), Form.class));
+    }
 
     public Listing findAll(Scope scope, String search, FormStatus status, int page, int size) {
         Criteria criteria = readable(scope);

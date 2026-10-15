@@ -5,6 +5,8 @@ import com.astro.api.form.repository.FormRepository;
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.form.dto.response.FormPageResponse;
+import com.astro.api.form.dto.response.FormDetailsResponse;
+import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.form.mapper.FormMapper;
 import com.astro.api.form.model.FormStatus;
 import com.astro.api.form.repository.FormManagementRepository;
@@ -39,5 +41,15 @@ public class FormService {
 
     public List<Form> findTop3PendingForManager(Long managerId) {
         return formRepository.findTop3PendingByManagerId(managerId);
+    }
+
+    public FormDetailsResponse findById(Long id, AuthenticatedUser principal) {
+        return mapper.toDetails(requireForm(id, access.requireManager(principal)));
+    }
+
+    private Form requireForm(Long id, FormAccessService.Scope scope) {
+        if (id == null || id <= 0) throw new BusinessException("O identificador do formulário deve ser positivo");
+        return managementRepository.findById(id, scope)
+                .orElseThrow(() -> new ResourceNotFoundException("Formulário não encontrado"));
     }
 }
