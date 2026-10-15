@@ -271,6 +271,50 @@ class ConformityPostgresTest {
         assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM conformidade", Integer.class));
     }
 
+    @Test void derivedNrLookupKeepsTheSharedLockUntilTheTransactionCompletes() throws Exception {
+        var nrCatalogRepository = context.getBean(com.astro.api.conformity.repository.NrCatalogRepository.class);
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(
+                context.getBean(org.springframework.transaction.PlatformTransactionManager.class));
+        try (var executor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+            transaction.executeWithoutResult(status -> {
+                assertFalse(nrCatalogRepository.findLockedByCodeNr(10).orElseThrow().isRevoked());
+                var concurrentUpdate = executor.submit(() -> {
+                    try (var connection = database.getConnection(); var statement = connection.createStatement()) {
+                        statement.execute("SET lock_timeout = '300ms'");
+                        // Shared locks allow reads but must block a change to the NR being validated.
+                        try (var result = statement.executeQuery("SELECT revogada FROM nr_catalogo WHERE codigo_nr=10")) {
+                            assertTrue(result.next()); assertFalse(result.getBoolean(1));
+                        }
+                        try { statement.executeUpdate("UPDATE nr_catalogo SET revogada=true WHERE codigo_nr=10"); return "updated"; }
+                        catch (java.sql.SQLException error) { return error.getSQLState(); }
+                    }
+                });
+                try { assertEquals("55P03", concurrentUpdate.get(5, java.util.concurrent.TimeUnit.SECONDS)); }
+                catch (Exception error) { throw new AssertionError(error); }
+            });
+        }
+        assertEquals(1, jdbc.update("UPDATE nr_catalogo SET revogada=true WHERE codigo_nr=10"));
+        transaction.executeWithoutResult(status -> assertTrue(nrCatalogRepository.findLockedByCodeNr(10).orElseThrow().isRevoked()));
+    }
+
+    @Test void importRepresentativeSelectionKeepsNullsLastAndUsesTheHighestIdOnTies() {
+        jdbc.update("""
+                INSERT INTO conformidade(id_conformidade,usuario_id,nr_id,aplicavel,data_validade,origem)
+                VALUES (10,2,10,true,NULL,'MANUAL'),(11,2,10,true,'2030-01-01','ANTIGA'),
+                       (12,2,10,true,'2030-01-01','IMPORTADA'),(13,2,10,false,'2099-01-01','MANUAL'),
+                       (14,2,11,true,NULL,'MANUAL'),(15,2,11,true,NULL,'IMPORTADA')
+                """);
+        assertFalse(service.importRow("00000000002", 10, java.time.LocalDate.of(2031,1,1), principal));
+        assertEquals(java.time.LocalDate.of(2031,1,1), service.findById(12L, principal).expiresAt());
+        assertEquals("IMPORTADA", service.findById(12L, principal).origin());
+        assertEquals(java.time.LocalDate.of(2030,1,1), service.findById(11L, principal).expiresAt());
+        assertNull(service.findById(10L, principal).expiresAt());
+        assertFalse(service.importRow("00000000002", 11, java.time.LocalDate.of(2031,1,1), principal));
+        assertEquals(java.time.LocalDate.of(2031,1,1), service.findById(15L, principal).expiresAt());
+        assertNull(service.findById(14L, principal).expiresAt());
+        assertEquals(6, jdbc.queryForObject("SELECT count(*) FROM conformidade", Integer.class));
+    }
+
     @Test void exercisesAllSixEndpointsOverRealLocalHttpWithIsolatedPostgres() throws Exception {
         var tomcat = new org.apache.catalina.startup.Tomcat();
         var directory = java.nio.file.Files.createTempDirectory("conformity-http-");

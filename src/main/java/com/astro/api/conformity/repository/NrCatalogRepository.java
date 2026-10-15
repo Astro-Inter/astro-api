@@ -6,12 +6,13 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 
 @Repository
 public interface NrCatalogRepository extends JpaRepository<NrCatalog, Integer> {
-    @Query(value = "SELECT * FROM nr_catalogo WHERE codigo_nr = :nrId FOR SHARE", nativeQuery = true)
-    Optional<NrCatalog> findForShare(@Param("nrId") Integer nrId);
+    // A shared entity lock prevents concurrent revocation while a conformity write is validated.
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    Optional<NrCatalog> findLockedByCodeNr(int nrId);
     List<NrCatalog> findAllByOrderByCodeNrAsc();
 }

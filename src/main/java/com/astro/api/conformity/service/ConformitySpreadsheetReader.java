@@ -2,7 +2,14 @@ package com.astro.api.conformity.service;
 
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.conformity.model.ConformityImportRow;
-import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.DataFormatter;
+import org.apache.poi.ss.usermodel.DateUtil;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -11,9 +18,20 @@ import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.ResolverStyle;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Parses XLS/XLSX into validated rows without querying or writing business data.
+ * Component registration makes this stateless reader injectable into ConformityImportService.
+ * Authorization and per-row transactions belong to the services, not this reader.
+ */
 @Component
 public class ConformitySpreadsheetReader {
     private static final long MAX_SIZE = 10L * 1024 * 1024;
@@ -105,7 +123,7 @@ public class ConformitySpreadsheetReader {
             return (int) value;
         }
         if (cell.getCellType() != CellType.STRING) throw new BusinessException("NR inválida");
-        var matcher = NR.matcher(cell.getStringCellValue().trim());
+        Matcher matcher = NR.matcher(cell.getStringCellValue().trim());
         if (!matcher.matches()) throw new BusinessException("Informe o código da NR, como 10 ou NR 10");
         try {
             int value = Integer.parseInt(matcher.group(1));

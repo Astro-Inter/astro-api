@@ -1,6 +1,7 @@
 package com.astro.api.conformity.repository;
 
 import com.astro.api.conformity.model.Conformity;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.Modifying;
@@ -9,14 +10,16 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ConformityRepository extends JpaRepository<Conformity, Long> {
-    @Query(value = """
-            SELECT c.* FROM conformidade c WHERE c.usuario_id = :collaboratorId AND c.nr_id = :nrId
-              AND c.aplicavel = TRUE
-            ORDER BY c.data_validade DESC NULLS LAST, c.id_conformidade DESC LIMIT 1
-            """, nativeQuery = true)
+    // Explicit NULLS LAST and ID ordering must match vw_conformidades; Limit restricts the result.
+    @Query("""
+            SELECT c FROM Conformity c WHERE c.collaboratorId = :collaboratorId AND c.nrId = :nrId
+              AND c.applicable = TRUE
+            ORDER BY c.expiresAt DESC NULLS LAST, c.id DESC
+            """)
     Optional<Conformity> findApplicableRepresentative(@Param("collaboratorId") Long collaboratorId,
-                                                     @Param("nrId") Integer nrId);
+                                                     @Param("nrId") Integer nrId, Limit limit);
 
+    // Mutations need the entity for this exact ID, including records no longer selected by the view.
     @Query(value = """
             SELECT c.* FROM conformidade c
             JOIN usuario u ON u.id_usuario = c.usuario_id AND u.tipo = 'COLABORADOR'
@@ -27,6 +30,7 @@ public interface ConformityRepository extends JpaRepository<Conformity, Long> {
     Optional<Conformity> findRecordInScope(@Param("conformityId") Long conformityId,
             @Param("firebaseUid") String firebaseUid, @Param("workspaceId") Long workspaceId);
 
+    // Event completion has no entity mapping; SQL follows its participation/class/event relation.
     @Query(value = """
             SELECT EXISTS (SELECT 1 FROM conclusao_evento ce
             JOIN turma_funcionario tf ON tf.id_turma_funcionario = ce.turma_funcionario_id
@@ -44,15 +48,16 @@ public interface ConformityRepository extends JpaRepository<Conformity, Long> {
     @Query(value = "LOCK TABLE conformidade IN SHARE ROW EXCLUSIVE MODE", nativeQuery = true)
     void lockWrites();
 
-    @Query(value = """
-            SELECT EXISTS (SELECT 1 FROM conformidade WHERE usuario_id = :collaboratorId
-                AND nr_id = :nrId AND aplicavel = TRUE
-                AND (:excludedId IS NULL OR id_conformidade <> :excludedId))
-            """, nativeQuery = true)
+    @Query("""
+            SELECT COUNT(c) > 0 FROM Conformity c WHERE c.collaboratorId = :collaboratorId
+                AND c.nrId = :nrId AND c.applicable = TRUE
+                AND (:excludedId IS NULL OR c.id <> :excludedId)
+            """)
     boolean hasApplicableConflict(@Param("collaboratorId") Long collaboratorId, @Param("nrId") Integer nrId,
                                   @Param("excludedId") Long excludedId);
 
-    String DETAILS = """
+    // A direct-table projection keeps historical IDs readable and computes status in the DB timezone.
+    @Query(value = """
             SELECT c.id_conformidade AS id, c.usuario_id AS "collaboratorId",
                    u.nome AS "collaboratorName", u.email AS "collaboratorEmail",
                    c.nr_id AS "nrId", nr.titulo AS "nrTitle", c.data_validade AS "expiresAt",
@@ -66,12 +71,11 @@ public interface ConformityRepository extends JpaRepository<Conformity, Long> {
             JOIN nr_catalogo nr ON nr.codigo_nr = c.nr_id
             WHERE c.id_conformidade = :conformityId AND un.workspace_id = :workspaceId
               AND u.unidade_id IN (SELECT id_unidade FROM fn_seleciona_unidades(:firebaseUid))
-            """;
-
-    @Query(value = DETAILS, nativeQuery = true)
+            """, nativeQuery = true)
     Optional<ConformityProjection> findDetailsInScope(@Param("conformityId") Long conformityId,
             @Param("firebaseUid") String firebaseUid, @Param("workspaceId") Long workspaceId);
 
+    // The view owns consolidation; fn_seleciona_unidades applies the existing authorization policy.
     @Query(value = """
             SELECT v.id_conformidade AS id, v.usuario_id AS "collaboratorId",
                    v.nome AS "collaboratorName", v.email AS "collaboratorEmail",
