@@ -31,9 +31,68 @@ O prazo é apresentado como `YYYY-MM-DD`, usando `America/Sao_Paulo`; no MongoDB
 é armazenado como data BSON. As opções têm `id_opcao`, `texto` e `outra`.
 As perguntas de foto têm `maximo_arquivos` e `tamanho_maximo_mb`.
 
+## Criação e rascunhos
+
+`POST /forms` retorna 201, `Location: /forms/{id}` e os detalhes do documento criado.
+
+Exemplo de corpo (não é o documento completo do MongoDB):
+
+```json
+{
+  "titulo": "Inspeção de segurança",
+  "descricao": "Condições da unidade",
+  "id_gestor": 20,
+  "nr": 6,
+  "id_unidade": 3,
+  "data_limite": "2026-10-30",
+  "status": "PENDENTE",
+  "perguntas": [
+    {"tipo": "texto", "pergunta": "Descreva o local", "obrigatoria": true},
+    {
+      "tipo": "alternativa", "pergunta": "Quais riscos foram encontrados?",
+      "obrigatoria": true, "multipla_escolha": true,
+      "opcoes": [{"texto": "Queda", "outra": false}, {"texto": "", "outra": true}]
+    },
+    {
+      "tipo": "foto", "pergunta": "Fotos do local", "obrigatoria": false,
+      "maximo_arquivos": 3, "tamanho_maximo_mb": 10
+    },
+    {"tipo": "data", "pergunta": "Data da inspeção", "obrigatoria": true}
+  ]
+}
+```
+
+`status` omitido cria `PENDENTE`. Para um rascunho vazio, envie
+`{"status":"RASCUNHO"}`. Não é permitido criar como `CONCLUIDO`.
+Gestor e título podem faltar no rascunho; se gestor, unidade ou NR forem informados,
+os vínculos precisam existir e estar elegíveis. A unidade opcional é um vínculo
+contextual e não define quem responde: somente `id_gestor` é o destinatário.
+
+Na publicação são obrigatórios título não vazio, gestor ativo e 1 a 100 perguntas
+com enunciados preenchidos. Descrição, NR, unidade e prazo são opcionais.
+Limites: título 100, descrição 240, enunciado 140 e texto de opção 80 caracteres.
+Cada alternativa aceita 2 a 100 opções, com no máximo uma marcada `outra`.
+O texto de `outra` é normalizado para `Outros`; seu campo de resposta pertence ao mobile.
+Fotos aceitam 1 a 10 arquivos e limites de 5, 10, 20, 50 ou 100 MB por arquivo.
+O padrão de foto é 1 arquivo de até 10 MB. Não há upload de fotos nessas rotas.
+Esses limites também se aplicam a rascunhos, que podem ter opções e enunciados vazios.
+
+IDs de formulários são gerados por contador atômico em `sequencias`, acima do maior
+ID numérico já existente. Perguntas e opções recebem IDs numéricos locais ao seu
+formulário/pergunta. Omita IDs em itens novos. As respostas são inicializadas como
+arrays vazios. Campos de remetente, workspace, resposta e datas enviados pelo cliente
+são ignorados; a API usa exclusivamente seus próprios valores para esses campos.
+
+Os validadores são Strategies por tipo, selecionadas por enum, com modos `DRAFT`
+e `PUBLISH`. Regras gerais de identidade, vínculos, estado e persistência ficam nos
+serviços do módulo. Não há transação distribuída entre as consultas PostgreSQL e
+a gravação MongoDB; os vínculos são conferidos a cada operação de escrita.
+
 A collection é `formularios`, com um documento por formulário e perguntas embutidas.
 O campo `id_workspace` é obrigatório para acesso pelas rotas web. Documentos antigos
 sem esse vínculo não ficam acessíveis até uma migração explícita e conferida.
 A Home mobile passa a consultar somente documentos com `status: PENDENTE`.
 Documentos antigos precisam ter seu status definido antes de aparecer nessa consulta.
 Não inferimos conclusão a partir de perguntas opcionais sem resposta.
+Opções antigas como arrays de strings precisam ser migradas para objetos com
+`id_opcao`, `texto` e `outra` antes de usar a consulta completa/edição web.

@@ -33,7 +33,7 @@ class FormRepositoryMongoTest {
         if (client != null) client.close();
     }
 
-    @BeforeEach void clear() { mongo.dropCollection(Form.class); }
+    @BeforeEach void clear() { mongo.dropCollection(Form.class); mongo.dropCollection("sequencias"); }
 
     static Form form(long id, long workspace, long sender, long recipient, FormStatus status) {
         Form form = new Form(); form.setId(id); form.setWorkspaceId(workspace); form.setSenderManagerId(sender);
@@ -79,5 +79,33 @@ class FormRepositoryMongoTest {
         assertEquals(3, repository.findById(1L, new Scope(10L, 1L, false)).orElseThrow()
                 .getQuestions().getFirst().getMaxFiles());
         assertTrue(repository.findById(1L, new Scope(99L, 1L, true)).isPresent());
+    }
+
+    @Test void numericSequenceStartsAboveExistingIdsAndIsUniqueUnderConcurrentInitialization() throws Exception {
+        mongo.insert(form(100, 1, 10, 20, FormStatus.PENDENTE));
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(8)) {
+            var calls = java.util.stream.IntStream.range(0, 32)
+                    .<java.util.concurrent.Callable<Long>>mapToObj(i -> repository::nextId).toList();
+            var ids = new HashSet<Long>();
+            for (var future : executor.invokeAll(calls)) ids.add(future.get());
+            assertEquals(32, ids.size()); assertEquals(101L, Collections.min(ids)); assertEquals(132L, Collections.max(ids));
+        }
+    }
+
+    @Test void persistsTypedOptionsAndEmptyEmbeddedAnswersInASingleFormDocument() {
+        Form form = new Form();
+        new com.astro.api.form.mapper.FormMapper().applyContent(FormTestFixtures.content(FormStatus.PENDENTE), form);
+        form.setId(repository.nextId()); form.setStatus(FormStatus.PENDENTE); form.setWorkspaceId(1L); form.setSenderManagerId(10L);
+        repository.insert(form);
+        var raw = mongo.getCollection("formularios").find().first();
+        assertNotNull(raw); assertEquals(1L, raw.get("id_workspace"));
+        var questions = raw.getList("perguntas", org.bson.Document.class);
+        assertEquals(4, questions.size()); assertEquals(List.of(), questions.getFirst().get("resposta"));
+        assertEquals(1L, questions.getFirst().getLong("id_pergunta"));
+        assertEquals(1L, questions.get(1).getList("opcoes", org.bson.Document.class).getFirst().getLong("id_opcao"));
+        assertEquals("alternativa", questions.get(1).getString("tipo"));
+        assertTrue(questions.get(1).getList("opcoes", org.bson.Document.class).get(1).getBoolean("outra"));
+        assertEquals(java.util.Date.from(Instant.parse("2026-10-30T03:00:00Z")), raw.get("data_limite"));
+        assertEquals(4, repository.findById(form.getId(), new Scope(10L, 1L, false)).orElseThrow().getQuestions().size());
     }
 }
