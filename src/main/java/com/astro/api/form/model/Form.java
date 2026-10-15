@@ -12,7 +12,7 @@ import com.astro.api.form.mapper.FormStatusConverter;
 import java.time.Instant;
 import java.util.List;
 
-@Document(collection = "formularios")
+@Document(collection = "forms")
 @Getter
 @Setter
 @NoArgsConstructor

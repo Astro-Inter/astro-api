@@ -131,7 +131,7 @@ retornam 409. O destinatário passa a enxergar o formulário após a publicaçã
 
 ## Persistência e compatibilidade
 
-A collection é `formularios`, com um documento por formulário e perguntas embutidas.
+A collection é `forms`, com um documento por formulário e perguntas embutidas.
 O campo `id_workspace` é obrigatório para acesso pelas rotas web. Documentos antigos
 sem esse vínculo não ficam acessíveis até uma migração explícita e conferida.
 A Home mobile passa a consultar somente documentos com `status: PENDENTE`.
@@ -143,10 +143,10 @@ Opções antigas como arrays de strings precisam ser migradas para objetos com
 Índices sugeridos para provisionamento no banco (a API não altera índices ao iniciar):
 
 ```javascript
-db.formularios.createIndex({id_workspace: 1, criado_em: -1, _id: -1})
-db.formularios.createIndex({id_workspace: 1, id_gestor_remetente: 1, criado_em: -1, _id: -1})
-db.formularios.createIndex({id_workspace: 1, id_gestor: 1, status: 1, criado_em: -1, _id: -1})
-db.formularios.createIndex({id_gestor: 1, status: 1, data_limite: 1, _id: 1})
+db.forms.createIndex({id_workspace: 1, criado_em: -1, _id: -1})
+db.forms.createIndex({id_workspace: 1, id_gestor_remetente: 1, criado_em: -1, _id: -1})
+db.forms.createIndex({id_workspace: 1, id_gestor: 1, status: 1, criado_em: -1, _id: -1})
+db.forms.createIndex({id_gestor: 1, status: 1, data_limite: 1, _id: 1})
 ```
 
 ## Organização do módulo
