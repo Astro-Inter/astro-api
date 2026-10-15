@@ -186,13 +186,16 @@ class FormRepositoryMongoTest {
         var json = tools.jackson.databind.json.JsonMapper.builder().build();
         try {
             authenticate("sender", com.astro.api.auth.security.Role.GESTOR);
-            mvc.perform(post("/forms").contentType("application/json").content("{\"status\":\"RASCUNHO\"}"))
-                    .andExpect(status().isCreated());
+            var creation = mvc.perform(post("/forms").contentType("application/json").content("{\"status\":\"RASCUNHO\"}"))
+                    .andExpect(status().isCreated()).andReturn();
+            String createdAt = json.readTree(creation.getResponse().getContentAsString()).get("data").get("criado_em").asString();
             Long id = mongo.findAll(Form.class).getFirst().getId();
             String url = "/forms/" + id;
+            mvc.perform(get(url)).andExpect(status().isOk()).andExpect(jsonPath("$.data.criado_em").value(createdAt));
             mvc.perform(post(url + "/publish")).andExpect(status().isBadRequest());
             mvc.perform(put(url).contentType("application/json").content(json.writeValueAsString(FormTestFixtures.content(FormStatus.RASCUNHO))))
-                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.perguntas.length()").value(4));
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.perguntas.length()").value(4))
+                    .andExpect(jsonPath("$.data.criado_em").value(createdAt));
             authenticate("recipient", com.astro.api.auth.security.Role.GESTOR);
             mvc.perform(get(url)).andExpect(status().isNotFound());
             authenticate("sender", com.astro.api.auth.security.Role.GESTOR);

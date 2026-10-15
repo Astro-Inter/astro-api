@@ -96,6 +96,7 @@ class FormServiceTest {
         assertEquals(42L, result.id()); assertEquals(1L, result.workspaceId()); assertEquals(10L, result.senderManagerId());
         assertEquals(20L, result.managerId()); assertEquals("Inspeção", result.title());
         assertEquals(FormStatus.PENDENTE, result.status()); assertNotNull(result.createdAt()); assertNull(result.respondedAt());
+        assertEquals(0, result.createdAt().getNano() % 1_000_000);
         assertEquals(List.of(1L, 2L, 3L, 4L), result.questions().stream().map(q -> q.id()).toList());
         assertTrue(result.questions().stream().allMatch(q -> q.answer().isEmpty()));
         assertTrue(result.questions().get(1).multiple());

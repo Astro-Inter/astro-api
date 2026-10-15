@@ -16,6 +16,8 @@ import com.astro.api.form.repository.FormManagementRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Service
 public class FormService {
@@ -51,7 +53,7 @@ public class FormService {
         form.setWorkspaceId(scope.workspaceId());
         form.setSenderManagerId(scope.managerId());
         form.setStatus(status);
-        form.setCreatedAt(java.time.Instant.now());
+        form.setCreatedAt(now());
         form.setUpdatedAt(form.getCreatedAt());
         form.setVersion(0L);
         return mapper.toDetails(managementRepository.insert(form));
@@ -69,7 +71,7 @@ public class FormService {
         references.validate(body, scope);
         Long expectedVersion = form.getVersion();
         mapper.applyContent(body, form);
-        form.setUpdatedAt(java.time.Instant.now());
+        form.setUpdatedAt(now());
         return mapper.toDetails(managementRepository.update(form, scope, expectedVersion)
                 .orElseThrow(() -> new ConflictException("O formulário foi alterado; consulte novamente antes de salvar")));
     }
@@ -95,7 +97,7 @@ public class FormService {
         FormWriteRequest content = mapper.toWriteRequest(form);
         validation.validate(content, FormValidationMode.PUBLISH);
         references.validate(content, scope);
-        form.setUpdatedAt(java.time.Instant.now());
+        form.setUpdatedAt(now());
         return mapper.toDetails(managementRepository.publish(form, scope)
                 .orElseThrow(() -> new ConflictException("O formulário foi alterado; consulte novamente antes de publicar")));
     }
@@ -130,5 +132,10 @@ public class FormService {
         if (id == null || id <= 0) throw new BusinessException("O identificador do formulário deve ser positivo");
         return managementRepository.findById(id, scope)
                 .orElseThrow(() -> new ResourceNotFoundException("Formulário não encontrado"));
+    }
+
+    private Instant now() {
+        // BSON dates preserve milliseconds; use that precision in the initial HTTP response too.
+        return Instant.now().truncatedTo(ChronoUnit.MILLIS);
     }
 }
