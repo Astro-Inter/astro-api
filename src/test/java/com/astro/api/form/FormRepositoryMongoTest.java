@@ -139,4 +139,22 @@ class FormRepositoryMongoTest {
         assertEquals(List.of("Resposta"), repository.findById(1L, new Scope(10L, 1L, false)).orElseThrow()
                 .getQuestions().getFirst().getAnswer());
     }
+
+    @Test void deletionChecksOwnershipWorkspaceVersionAndCompletionAtomically() {
+        Form value = form(1, 1, 10, 20, FormStatus.PENDENTE); value.setVersion(0L); mongo.insert(value);
+        assertFalse(repository.delete(value, new Scope(20L, 1L, false)));
+        assertFalse(repository.delete(value, new Scope(10L, 2L, true)));
+        mongo.getCollection("formularios").updateOne(new org.bson.Document("_id", 1L),
+                new org.bson.Document("$set", new org.bson.Document("versao", 1L)));
+        assertFalse(repository.delete(value, new Scope(10L, 1L, false)));
+        value.setVersion(1L);
+        mongo.getCollection("formularios").updateOne(new org.bson.Document("_id", 1L),
+                new org.bson.Document("$set", new org.bson.Document("status", "CONCLUIDO")));
+        assertFalse(repository.delete(value, new Scope(99L, 1L, true)));
+        assertNotNull(mongo.findById(1L, Form.class));
+        mongo.getCollection("formularios").updateOne(new org.bson.Document("_id", 1L),
+                new org.bson.Document("$set", new org.bson.Document("status", "PENDENTE")));
+        assertTrue(repository.delete(value, new Scope(99L, 1L, true)));
+        assertNull(mongo.findById(1L, Form.class));
+    }
 }

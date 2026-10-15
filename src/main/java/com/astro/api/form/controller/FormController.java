@@ -24,6 +24,14 @@ public class FormController {
 
     public FormController(FormService service) { this.service = service; }
 
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Exclui um formulário sem respostas, respeitando remetente e workspace")
+    public ResponseEntity<Void> delete(@PathVariable("id") Long id,
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        service.delete(id, principal);
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/{id}")
     @Operation(summary = "Substitui dados e perguntas de um formulário próprio ou gerenciado pelo workspace")
     public ResponseEntity<ApiResult<FormDetailsResponse>> update(@PathVariable("id") Long id,

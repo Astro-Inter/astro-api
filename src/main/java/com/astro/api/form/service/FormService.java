@@ -74,6 +74,16 @@ public class FormService {
                 .orElseThrow(() -> new ConflictException("O formulário foi alterado; consulte novamente antes de salvar")));
     }
 
+    public void delete(Long id, AuthenticatedUser principal) {
+        var scope = access.requireManager(principal);
+        Form form = requireForm(id, scope);
+        access.requireManagement(form, scope);
+        requireMutable(form);
+        if (!managementRepository.delete(form, scope)) {
+            throw new ConflictException("O formulário foi alterado; consulte novamente antes de excluir");
+        }
+    }
+
     private void requireMutable(Form form) {
         if ((form.getStatus() != FormStatus.RASCUNHO && form.getStatus() != FormStatus.PENDENTE)
                 || form.getRespondedAt() != null || (form.getQuestions() != null && form.getQuestions().stream()
