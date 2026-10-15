@@ -82,6 +82,8 @@ ID numérico já existente. Perguntas e opções recebem IDs numéricos locais a
 formulário/pergunta. Omita IDs em itens novos. As respostas são inicializadas como
 arrays vazios. Campos de remetente, workspace, resposta e datas enviados pelo cliente
 são ignorados; a API usa exclusivamente seus próprios valores para esses campos.
+Datas de criação e atualização usam precisão de milissegundos, compatível com BSON,
+para que a criação e as consultas seguintes retornem os mesmos valores persistidos.
 
 Os validadores são Strategies por tipo, selecionadas por enum, com modos `DRAFT`
 e `PUBLISH`. Regras gerais de identidade, vínculos, estado e persistência ficam nos
