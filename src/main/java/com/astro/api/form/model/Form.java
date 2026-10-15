@@ -18,6 +18,9 @@ public class Form {
     @Id
     private Long id;
 
+    @Field("id_workspace")
+    private Long workspaceId;
+
     @Field("id_gestor")
     private Long managerId;
 
@@ -32,6 +35,26 @@ public class Form {
 
     @Field("data_limite")
     private Instant dueDate;
+
+    private FormStatus status;
+
+    @Field("criado_em")
+    private Instant createdAt;
+
+    @Field("atualizado_em")
+    private Instant updatedAt;
+
+    @Field("respondido_em")
+    private Instant respondedAt;
+
+    @Field("nr")
+    private Integer nr;
+
+    @Field("id_unidade")
+    private Long unitId;
+
+    @Field("versao")
+    private Long version;
 
     @Field("perguntas")
     private List<FormQuestion> questions;

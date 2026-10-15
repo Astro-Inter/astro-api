@@ -8,7 +8,7 @@ import java.util.List;
 
 public interface FormRepository extends MongoRepository<Form, Long> {
     @Aggregation(pipeline = {
-            "{ '$match': { 'id_gestor': ?0, 'perguntas': { '$elemMatch': { 'resposta': { '$size': 0 } } } } }",
+            "{ '$match': { 'id_gestor': ?0, 'status': 'PENDENTE' } }",
             "{ '$addFields': { '_due_date_missing': { '$cond': [ { '$eq': [ { '$ifNull': [ '$data_limite', null ] }, null ] }, 1, 0 ] } } }",
             "{ '$sort': { '_due_date_missing': 1, 'data_limite': 1, '_id': 1 } }",
             "{ '$limit': 3 }",
