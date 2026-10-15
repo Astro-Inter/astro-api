@@ -16,6 +16,7 @@ import com.astro.api.form.model.FormScope;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
@@ -47,7 +48,7 @@ public class FormService {
         references.validate(body, scope);
         Form form = new Form();
         mapper.applyContent(body, form);
-        form.setId(formRepository.nextId());
+        form.setId(UUID.randomUUID().toString());
         form.setWorkspaceId(scope.workspaceId());
         form.setSenderManagerId(scope.managerId());
         form.setStatus(status);
@@ -57,7 +58,7 @@ public class FormService {
         return mapper.toDetails(formRepository.insert(form));
     }
 
-    public FormDetailsResponse update(Long id, FormWriteRequest body, AuthenticatedUser principal) {
+    public FormDetailsResponse update(String id, FormWriteRequest body, AuthenticatedUser principal) {
         var scope = access.requireManager(principal);
         Form form = requireForm(id, scope);
         access.requireManagement(form, scope);
@@ -75,7 +76,7 @@ public class FormService {
                 .orElseThrow(() -> new ConflictException("O formulário foi alterado; consulte novamente antes de salvar")));
     }
 
-    public void delete(Long id, AuthenticatedUser principal) {
+    public void delete(String id, AuthenticatedUser principal) {
         var scope = access.requireManager(principal);
         Form form = requireForm(id, scope);
         access.requireManagement(form, scope);
@@ -85,7 +86,7 @@ public class FormService {
         }
     }
 
-    public FormDetailsResponse publish(Long id, AuthenticatedUser principal) {
+    public FormDetailsResponse publish(String id, AuthenticatedUser principal) {
         var scope = access.requireManager(principal);
         Form form = requireForm(id, scope);
         access.requireManagement(form, scope);
@@ -127,12 +128,19 @@ public class FormService {
         return formRepository.findTop3PendingByManagerId(managerId);
     }
 
-    public FormDetailsResponse findById(Long id, AuthenticatedUser principal) {
+    public FormDetailsResponse findById(String id, AuthenticatedUser principal) {
         return mapper.toDetails(requireForm(id, access.requireManager(principal)));
     }
 
-    private Form requireForm(Long id, FormScope scope) {
-        if (id == null || id <= 0) throw new BusinessException("O identificador do formulário deve ser positivo");
+    private Form requireForm(String id, FormScope scope) {
+        if (id == null || id.length() != 36) {
+            throw new BusinessException("O identificador do formulário deve ser um UUID válido");
+        }
+        try {
+            id = UUID.fromString(id).toString();
+        } catch (IllegalArgumentException exception) {
+            throw new BusinessException("O identificador do formulário deve ser um UUID válido");
+        }
         return formRepository.findById(id, scope)
                 .orElseThrow(() -> new ResourceNotFoundException("Formulário não encontrado"));
     }

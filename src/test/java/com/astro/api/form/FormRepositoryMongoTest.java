@@ -15,6 +15,7 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static com.astro.api.form.FormTestFixtures.form;
+import static com.astro.api.form.FormTestFixtures.formId;
 import static com.astro.api.form.FormTestFixtures.manager;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -39,7 +40,7 @@ class FormRepositoryMongoTest {
         if (client != null) client.close();
     }
 
-    @BeforeEach void clear() { mongo.dropCollection(Form.class); mongo.dropCollection("sequencias"); }
+    @BeforeEach void clear() { mongo.dropCollection(Form.class); }
 
     @Test void scopesDraftsAndRecipientsAndUsesStablePaginationAndLiteralSearch() {
         mongo.insert(form(1, 1, 10, 20, FormStatus.DRAFT));
@@ -49,10 +50,10 @@ class FormRepositoryMongoTest {
         mongo.insert(form(5, 2, 10, 20, FormStatus.PENDING));
         var manager = new FormScope(10L, 1L, false);
         var result = repository.findAll(manager, "clima", null, 0, 1);
-        assertEquals(2, result.total()); assertEquals(3L, result.forms().getFirst().getId());
+        assertEquals(2, result.total()); assertEquals(formId(3), result.forms().getFirst().getId());
         assertEquals(1, result.forms().getFirst().getQuestions().size());
         assertNull(result.forms().getFirst().getQuestions().getFirst().getAnswer());
-        assertEquals(1L, repository.findAll(manager, null, null, 1, 1).forms().getFirst().getId());
+        assertEquals(formId(1), repository.findAll(manager, null, null, 1, 1).forms().getFirst().getId());
         assertEquals(0, repository.findAll(manager, ".*", null, 0, 20).total());
         assertEquals(4, repository.findAll(new FormScope(99L, 1L, true), null, null, 0, 20).total());
         assertEquals(1, repository.findAll(manager, null, FormStatus.PENDING, 0, 20).total());
@@ -63,7 +64,7 @@ class FormRepositoryMongoTest {
         mongo.insert(form(2, 1, 10, 20, FormStatus.COMPLETED));
         Form pending = form(3, 1, 10, 20, FormStatus.PENDING); pending.setQuestions(List.of()); mongo.insert(pending);
         var home = repository;
-        assertEquals(List.of(3L), home.findTop3PendingByManagerId(20L).stream().map(Form::getId).toList());
+        assertEquals(List.of(formId(3)), home.findTop3PendingByManagerId(20L).stream().map(Form::getId).toList());
     }
 
     @Test void detailHidesOtherWorkspacesAndUnpublishedDraftsButPreservesOrderAndConfiguration() {
@@ -71,31 +72,46 @@ class FormRepositoryMongoTest {
         value.getQuestions().getFirst().setType("foto");
         value.getQuestions().getFirst().setMaxFiles(3);
         mongo.insert(value);
-        assertTrue(repository.findById(1L, new FormScope(20L, 1L, false)).isEmpty());
-        assertTrue(repository.findById(1L, new FormScope(10L, 2L, true)).isEmpty());
-        assertEquals(3, repository.findById(1L, new FormScope(10L, 1L, false)).orElseThrow()
+        assertTrue(repository.findById(formId(1), new FormScope(20L, 1L, false)).isEmpty());
+        assertTrue(repository.findById(formId(1), new FormScope(10L, 2L, true)).isEmpty());
+        assertEquals(3, repository.findById(formId(1), new FormScope(10L, 1L, false)).orElseThrow()
                 .getQuestions().getFirst().getMaxFiles());
-        assertTrue(repository.findById(1L, new FormScope(99L, 1L, true)).isPresent());
+        assertTrue(repository.findById(formId(1), new FormScope(99L, 1L, true)).isPresent());
     }
 
-    @Test void numericSequenceStartsAboveExistingIdsAndIsUniqueUnderConcurrentInitialization() throws Exception {
-        mongo.insert(form(100, 1, 10, 20, FormStatus.PENDING));
+    @Test void generatesUuidStringsForConcurrentCreationsWithoutAnAuxiliaryCollection() throws Exception {
+        var access = mock(com.astro.api.form.service.FormAccessService.class);
+        when(access.requireManager(any())).thenReturn(new FormScope(10L, 1L, false));
+        var service = new com.astro.api.form.service.FormService(repository, access,
+                new com.astro.api.form.mapper.FormMapper(), FormTestFixtures.validator(),
+                mock(com.astro.api.form.service.FormReferenceService.class));
         try (var executor = java.util.concurrent.Executors.newFixedThreadPool(8)) {
             var calls = java.util.stream.IntStream.range(0, 32)
-                    .<java.util.concurrent.Callable<Long>>mapToObj(i -> repository::nextId).toList();
-            var ids = new HashSet<Long>();
-            for (var future : executor.invokeAll(calls)) ids.add(future.get());
-            assertEquals(32, ids.size()); assertEquals(101L, Collections.min(ids)); assertEquals(132L, Collections.max(ids));
+                    .<java.util.concurrent.Callable<String>>mapToObj(index -> () ->
+                            service.create(FormTestFixtures.content(FormStatus.PENDING), null).id()).toList();
+            var ids = new HashSet<String>();
+            for (var future : executor.invokeAll(calls)) {
+                String id = future.get();
+                assertEquals(4, UUID.fromString(id).version());
+                assertTrue(ids.add(id));
+                assertTrue(repository.findById(id).isPresent());
+            }
+            assertEquals(32, ids.size());
+            assertEquals(List.of("forms"), mongo.getDb().listCollectionNames().into(new ArrayList<>()));
         }
     }
 
     @Test void persistsTypedOptionsAndEmptyEmbeddedAnswersInASingleFormDocument() {
         Form form = new Form();
+        form.setId(UUID.randomUUID().toString());
         new com.astro.api.form.mapper.FormMapper().applyContent(FormTestFixtures.content(FormStatus.PENDING), form);
-        form.setId(repository.nextId()); form.setStatus(FormStatus.PENDING); form.setWorkspaceId(1L); form.setSenderManagerId(10L);
+        form.setStatus(FormStatus.PENDING); form.setWorkspaceId(1L); form.setSenderManagerId(10L);
         repository.insert(form);
         var raw = mongo.getCollection("forms").find().first();
-        assertNotNull(raw); assertEquals(1L, raw.get("id_workspace"));
+        assertNotNull(raw);
+        assertInstanceOf(String.class, raw.get("_id"));
+        assertEquals(form.getId(), raw.getString("_id"));
+        assertEquals(1L, raw.get("id_workspace"));
         assertEquals("PENDENTE", raw.getString("status"));
         assertEquals(FormStatus.PENDING, repository.findById(form.getId()).orElseThrow().getStatus());
         var questions = raw.getList("perguntas", org.bson.Document.class);
@@ -111,8 +127,8 @@ class FormRepositoryMongoTest {
     @Test void updateAtomicallyChecksVersionPermissionsAndResponseState() throws Exception {
         Form value = form(1, 1, 10, 20, FormStatus.PENDING); value.setVersion(0L); mongo.insert(value);
         var scope = new FormScope(10L, 1L, false);
-        Form first = repository.findById(1L, scope).orElseThrow(); first.setTitle("Primeira edição");
-        Form second = repository.findById(1L, scope).orElseThrow(); second.setTitle("Segunda edição");
+        Form first = repository.findById(formId(1), scope).orElseThrow(); first.setTitle("Primeira edição");
+        Form second = repository.findById(formId(1), scope).orElseThrow(); second.setTitle("Segunda edição");
         assertTrue(repository.update(first, new FormScope(20L, 1L, false), 0L).isEmpty());
         assertTrue(repository.update(first, new FormScope(10L, 2L, true), 0L).isEmpty());
         try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
@@ -123,19 +139,19 @@ class FormRepositoryMongoTest {
             for (var result : results) if ((Boolean) result.get()) successful++;
             assertEquals(1, successful);
         }
-        Form saved = repository.findById(1L, scope).orElseThrow(); assertEquals(1L, saved.getVersion());
+        Form saved = repository.findById(formId(1), scope).orElseThrow(); assertEquals(1L, saved.getVersion());
         // Simulate a mobile submission after the web loaded the current version.
-        mongo.getCollection("forms").updateOne(new org.bson.Document("_id", 1L),
+        mongo.getCollection("forms").updateOne(new org.bson.Document("_id", formId(1)),
                 new org.bson.Document("$set", new org.bson.Document("status", "CONCLUIDO")));
         assertTrue(repository.update(saved, scope, 1L).isEmpty());
-        assertEquals(FormStatus.COMPLETED, repository.findById(1L, scope).orElseThrow().getStatus());
+        assertEquals(FormStatus.COMPLETED, repository.findById(formId(1), scope).orElseThrow().getStatus());
     }
 
     @Test void updateDoesNotEraseAnswersEvenWhenTheStatusHasNotBeenConcluded() {
         Form value = form(1, 1, 10, 20, FormStatus.PENDING); value.setVersion(0L);
         value.getQuestions().getFirst().setAnswer(List.of("Resposta")); mongo.insert(value);
         assertTrue(repository.update(value, new FormScope(10L, 1L, false), 0L).isEmpty());
-        assertEquals(List.of("Resposta"), repository.findById(1L, new FormScope(10L, 1L, false)).orElseThrow()
+        assertEquals(List.of("Resposta"), repository.findById(formId(1), new FormScope(10L, 1L, false)).orElseThrow()
                 .getQuestions().getFirst().getAnswer());
     }
 
@@ -143,18 +159,18 @@ class FormRepositoryMongoTest {
         Form value = form(1, 1, 10, 20, FormStatus.PENDING); value.setVersion(0L); mongo.insert(value);
         assertFalse(repository.delete(value, new FormScope(20L, 1L, false)));
         assertFalse(repository.delete(value, new FormScope(10L, 2L, true)));
-        mongo.getCollection("forms").updateOne(new org.bson.Document("_id", 1L),
+        mongo.getCollection("forms").updateOne(new org.bson.Document("_id", formId(1)),
                 new org.bson.Document("$set", new org.bson.Document("versao", 1L)));
         assertFalse(repository.delete(value, new FormScope(10L, 1L, false)));
         value.setVersion(1L);
-        mongo.getCollection("forms").updateOne(new org.bson.Document("_id", 1L),
+        mongo.getCollection("forms").updateOne(new org.bson.Document("_id", formId(1)),
                 new org.bson.Document("$set", new org.bson.Document("status", "CONCLUIDO")));
         assertFalse(repository.delete(value, new FormScope(99L, 1L, true)));
-        assertNotNull(mongo.findById(1L, Form.class));
-        mongo.getCollection("forms").updateOne(new org.bson.Document("_id", 1L),
+        assertNotNull(mongo.findById(formId(1), Form.class));
+        mongo.getCollection("forms").updateOne(new org.bson.Document("_id", formId(1)),
                 new org.bson.Document("$set", new org.bson.Document("status", "PENDENTE")));
         assertTrue(repository.delete(value, new FormScope(99L, 1L, true)));
-        assertNull(mongo.findById(1L, Form.class));
+        assertNull(mongo.findById(formId(1), Form.class));
     }
 
     @Test void publicationAllowsOneTransitionAndRejectsStaleEditsDeletesAndForeignManagers() {
@@ -167,7 +183,7 @@ class FormRepositoryMongoTest {
         assertTrue(repository.publish(draft, new FormScope(10L, 1L, false)).isEmpty());
         assertTrue(repository.update(draft, new FormScope(10L, 1L, false), 0L).isEmpty());
         assertFalse(repository.delete(draft, new FormScope(10L, 1L, false)));
-        assertTrue(repository.findById(1L, new FormScope(20L, 1L, false)).isPresent());
+        assertTrue(repository.findById(formId(1), new FormScope(20L, 1L, false)).isPresent());
     }
 
     @Test void httpWorkflowPersistsDraftEditingPublicationAndAdministrativeRulesInMongo() throws Exception {
@@ -191,8 +207,14 @@ class FormRepositoryMongoTest {
             var creation = mvc.perform(post("/forms").contentType("application/json").content("{\"status\":\"RASCUNHO\"}"))
                     .andExpect(status().isCreated()).andReturn();
             String createdAt = json.readTree(creation.getResponse().getContentAsString()).get("data").get("criado_em").asString();
-            Long id = mongo.findAll(Form.class).getFirst().getId();
+            String id = mongo.findAll(Form.class).getFirst().getId();
             String url = "/forms/" + id;
+            assertEquals(4, UUID.fromString(id).version());
+            mvc.perform(get("/forms/invalid")).andExpect(status().isBadRequest());
+            mvc.perform(put("/forms/invalid").contentType("application/json").content("{}"))
+                    .andExpect(status().isBadRequest());
+            mvc.perform(delete("/forms/invalid")).andExpect(status().isBadRequest());
+            mvc.perform(post("/forms/invalid/publish")).andExpect(status().isBadRequest());
             mvc.perform(get(url)).andExpect(status().isOk()).andExpect(jsonPath("$.data.criado_em").value(createdAt));
             mvc.perform(post(url + "/publish")).andExpect(status().isBadRequest());
             mvc.perform(put(url).contentType("application/json").content(json.writeValueAsString(FormTestFixtures.content(FormStatus.DRAFT))))
@@ -226,7 +248,7 @@ class FormRepositoryMongoTest {
                     .andExpect(jsonPath("$.data.perguntas[0].resposta[0]").value("Resposta única"));
             mvc.perform(post("/forms").contentType("application/json").content("{\"status\":\"RASCUNHO\"}"))
                     .andExpect(status().isCreated());
-            Long removable = mongo.findAll(Form.class).stream().map(Form::getId).filter(value -> !value.equals(id)).findFirst().orElseThrow();
+            String removable = mongo.findAll(Form.class).stream().map(Form::getId).filter(value -> !value.equals(id)).findFirst().orElseThrow();
             mvc.perform(delete("/forms/" + removable)).andExpect(status().isNoContent());
             assertEquals(1, mongo.count(new org.springframework.data.mongodb.core.query.Query(), Form.class));
         } finally {
@@ -245,7 +267,7 @@ class FormRepositoryMongoTest {
             var configuredRepository = context.getBean(FormRepository.class);
             configuredRepository.insert(form(1, 1, 10, 20, FormStatus.DRAFT));
             assertEquals(1, configuredRepository.findAll(new FormScope(10L, 1L, false), null, FormStatus.DRAFT, 0, 20).total());
-            assertEquals(FormStatus.DRAFT, configuredRepository.findById(1L).orElseThrow().getStatus());
+            assertEquals(FormStatus.DRAFT, configuredRepository.findById(formId(1)).orElseThrow().getStatus());
         }
     }
 

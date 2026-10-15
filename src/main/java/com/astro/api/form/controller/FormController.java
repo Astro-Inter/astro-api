@@ -38,7 +38,7 @@ public class FormController {
 
     @PostMapping("/{id}/publish")
     @Operation(summary = "Publica um rascunho válido, tornando-o pendente para o gestor destinatário")
-    public ResponseEntity<ApiResult<FormDetailsResponse>> publish(@PathVariable("id") Long id,
+    public ResponseEntity<ApiResult<FormDetailsResponse>> publish(@PathVariable("id") String id,
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Formulário publicado com sucesso",
                 service.publish(id, principal), request.getRequestURI()));
@@ -46,7 +46,7 @@ public class FormController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Exclui um formulário sem respostas, respeitando remetente e workspace")
-    public ResponseEntity<Void> delete(@PathVariable("id") Long id,
+    public ResponseEntity<Void> delete(@PathVariable("id") String id,
             @AuthenticationPrincipal AuthenticatedUser principal) {
         service.delete(id, principal);
         return ResponseEntity.noContent().build();
@@ -54,7 +54,7 @@ public class FormController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Substitui dados e perguntas de um formulário próprio ou gerenciado pelo workspace")
-    public ResponseEntity<ApiResult<FormDetailsResponse>> update(@PathVariable("id") Long id,
+    public ResponseEntity<ApiResult<FormDetailsResponse>> update(@PathVariable("id") String id,
             @Valid @RequestBody FormWriteRequest body, @AuthenticationPrincipal AuthenticatedUser principal,
             HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Formulário atualizado com sucesso",
@@ -73,7 +73,7 @@ public class FormController {
     @GetMapping("/{id}")
     @Operation(summary = "Consulta informações e perguntas de um formulário acessível")
     public ResponseEntity<ApiResult<FormDetailsResponse>> findById(
-            @PathVariable("id") Long id, @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable("id") String id, @AuthenticationPrincipal AuthenticatedUser principal,
             HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Formulário retornado com sucesso",
                 service.findById(id, principal), request.getRequestURI()));

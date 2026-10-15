@@ -6,7 +6,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
 
-public interface FormRepository extends MongoRepository<Form, Long>, FormRepositoryCustom {
+public interface FormRepository extends MongoRepository<Form, String>, FormRepositoryCustom {
     @Aggregation(pipeline = {
             "{ '$match': { 'id_gestor': ?0, 'status': 'PENDENTE' } }",
             "{ '$addFields': { '_due_date_missing': { '$cond': [ { '$eq': [ { '$ifNull': [ '$data_limite', null ] }, null ] }, 1, 0 ] } } }",
