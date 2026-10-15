@@ -70,6 +70,21 @@ public class FormMapper {
 
     private String clean(String value) { return value == null ? "" : value.strip(); }
 
+    public FormWriteRequest toWriteRequest(Form form) {
+        var questions = form.getQuestions() == null ? java.util.List.<FormQuestionRequest>of() : form.getQuestions().stream()
+                .map(question -> new FormQuestionRequest(question.getId(), questionType(question.getType()), question.getQuestion(),
+                        question.getRequired(), question.getMultiple(), question.getOptions() == null ? java.util.List.of()
+                        : question.getOptions().stream().map(option -> new FormOptionRequest(option.getId(), option.getText(), option.getOther())).toList(),
+                        question.getMaxFiles(), question.getMaxFileSizeMb())).toList();
+        return new FormWriteRequest(form.getTitle(), form.getDescription(), form.getManagerId(), form.getNr(), form.getUnitId(),
+                form.getDueDate() == null ? null : form.getDueDate().atZone(FORM_ZONE).toLocalDate(), form.getStatus(), questions);
+    }
+
+    private FormQuestionType questionType(String value) {
+        return java.util.Arrays.stream(FormQuestionType.values()).filter(type -> type.value().equals(value)).findFirst()
+                .orElseThrow(() -> new BusinessException("Tipo de pergunta inválido no rascunho"));
+    }
+
     public FormSummaryResponse toSummary(Form form) {
         return new FormSummaryResponse(form.getId(), form.getTitle(), form.getDescription(),
                 form.getQuestions() == null ? 0 : form.getQuestions().size(), form.getStatus());

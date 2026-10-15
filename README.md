@@ -17,6 +17,9 @@ Todas as interfaces consomem uma única API backend.
 O contrato de `GET /home-workspace`, com os indicadores da Home WEB, está em
 [docs/home-workspace.md](docs/home-workspace.md).
 
+O contrato dos endpoints de formulários da web, com rascunhos, publicação e
+validações por tipo de pergunta, está em [docs/forms.md](docs/forms.md).
+
 ## Stack técnica
 
 - **Java 21**

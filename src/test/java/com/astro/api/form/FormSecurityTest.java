@@ -49,6 +49,7 @@ class FormSecurityTest {
                 mvc.perform(put("/forms/1").header("Authorization", "Bearer valid")
                         .contentType("application/json").content("{}")).andExpect(status().isForbidden());
                 mvc.perform(delete("/forms/1").header("Authorization", "Bearer valid")).andExpect(status().isForbidden());
+                mvc.perform(post("/forms/1/publish").header("Authorization", "Bearer valid")).andExpect(status().isForbidden());
             }
             verifyNoInteractions(service);
             for (Role role : List.of(Role.GESTOR, Role.GESTOR_WORKSPACE)) {

@@ -84,6 +84,22 @@ public class FormService {
         }
     }
 
+    public FormDetailsResponse publish(Long id, AuthenticatedUser principal) {
+        var scope = access.requireManager(principal);
+        Form form = requireForm(id, scope);
+        access.requireManagement(form, scope);
+        requireMutable(form);
+        if (form.getStatus() != FormStatus.RASCUNHO) {
+            throw new ConflictException("Somente rascunhos podem ser publicados");
+        }
+        FormWriteRequest content = mapper.toWriteRequest(form);
+        validation.validate(content, FormValidationMode.PUBLISH);
+        references.validate(content, scope);
+        form.setUpdatedAt(java.time.Instant.now());
+        return mapper.toDetails(managementRepository.publish(form, scope)
+                .orElseThrow(() -> new ConflictException("O formulário foi alterado; consulte novamente antes de publicar")));
+    }
+
     private void requireMutable(Form form) {
         if ((form.getStatus() != FormStatus.RASCUNHO && form.getStatus() != FormStatus.PENDENTE)
                 || form.getRespondedAt() != null || (form.getQuestions() != null && form.getQuestions().stream()

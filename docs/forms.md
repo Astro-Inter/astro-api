@@ -118,6 +118,15 @@ A operação verifica a mesma versão e o estado do documento de forma atômica:
 conclusão ou alteração concorrente impede a remoção e retorna 409.
 Formulário inexistente ou fora do escopo retorna 404.
 
+## Publicação
+
+`POST /forms/{id}/publish` não exige corpo. Revalida os dados salvos e os vínculos
+atuais no PostgreSQL; depois altera apenas `RASCUNHO` para `PENDENTE`, a atualização
+e a versão interna. Retorna 200 com os detalhes e mantém perguntas e respostas.
+Somente o remetente ou o gestor do workspace pode publicar. Rascunho incompleto
+retorna 400; publicação repetida, formulário concluído ou corrida de atualização
+retornam 409. O destinatário passa a enxergar o formulário após a publicação.
+
 ## Persistência e compatibilidade
 
 A collection é `formularios`, com um documento por formulário e perguntas embutidas.
@@ -128,3 +137,25 @@ Documentos antigos precisam ter seu status definido antes de aparecer nessa cons
 Não inferimos conclusão a partir de perguntas opcionais sem resposta.
 Opções antigas como arrays de strings precisam ser migradas para objetos com
 `id_opcao`, `texto` e `outra` antes de usar a consulta completa/edição web.
+
+Índices sugeridos para provisionamento no banco (a API não altera índices ao iniciar):
+
+```javascript
+db.formularios.createIndex({id_workspace: 1, criado_em: -1, _id: -1})
+db.formularios.createIndex({id_workspace: 1, id_gestor_remetente: 1, criado_em: -1, _id: -1})
+db.formularios.createIndex({id_workspace: 1, id_gestor: 1, status: 1, criado_em: -1, _id: -1})
+db.formularios.createIndex({id_gestor: 1, status: 1, data_limite: 1, _id: 1})
+```
+
+## Validação local
+
+`./mvnw test` executa testes de serviço, Strategies, contratos HTTP e segurança Firebase.
+Para executar também `FormRepositoryMongoTest`, aponte `FORM_TEST_MONGODB_URI` para
+uma instância MongoDB descartável em `mongodb://127.0.0.1:<porta>` ou
+`mongodb://localhost:<porta>`. Os testes criam e removem apenas uma base própria
+`forms_test_<uuid>`; não carregam a conexão da aplicação nem usam seu `.env`.
+O CI fornece uma instância MongoDB para esses testes.
+
+A integração cobre persistência BSON, escopo de consultas, IDs concorrentes,
+gravações condicionais e um fluxo HTTP completo de criação do rascunho até publicação.
+Os endpoints de resposta e upload do mobile continuam fora deste módulo de entrega.

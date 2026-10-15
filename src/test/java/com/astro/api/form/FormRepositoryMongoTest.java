@@ -14,6 +14,11 @@ import java.time.Instant;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static com.astro.api.form.FormTestFixtures.form;
+import static com.astro.api.form.FormTestFixtures.manager;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @EnabledIfEnvironmentVariable(named = "FORM_TEST_MONGODB_URI", matches = "mongodb://(127\\.0\\.0\\.1|localhost):[0-9]+")
 class FormRepositoryMongoTest {
@@ -34,15 +39,6 @@ class FormRepositoryMongoTest {
     }
 
     @BeforeEach void clear() { mongo.dropCollection(Form.class); mongo.dropCollection("sequencias"); }
-
-    static Form form(long id, long workspace, long sender, long recipient, FormStatus status) {
-        Form form = new Form(); form.setId(id); form.setWorkspaceId(workspace); form.setSenderManagerId(sender);
-        form.setManagerId(recipient); form.setStatus(status); form.setTitle("Clima");
-        form.setCreatedAt(Instant.parse("2026-10-15T12:00:00Z"));
-        Form.FormQuestion question = new Form.FormQuestion(); question.setId(1L); question.setAnswer(List.of());
-        form.setQuestions(List.of(question));
-        return form;
-    }
 
     @Test void scopesDraftsAndRecipientsAndUsesStablePaginationAndLiteralSearch() {
         mongo.insert(form(1, 1, 10, 20, FormStatus.RASCUNHO));
@@ -156,5 +152,86 @@ class FormRepositoryMongoTest {
                 new org.bson.Document("$set", new org.bson.Document("status", "PENDENTE")));
         assertTrue(repository.delete(value, new Scope(99L, 1L, true)));
         assertNull(mongo.findById(1L, Form.class));
+    }
+
+    @Test void publicationAllowsOneTransitionAndRejectsStaleEditsDeletesAndForeignManagers() {
+        Form draft = form(1, 1, 10, 20, FormStatus.RASCUNHO); draft.setVersion(0L); mongo.insert(draft);
+        assertTrue(repository.publish(draft, new Scope(20L, 1L, false)).isEmpty());
+        assertTrue(repository.publish(draft, new Scope(10L, 2L, true)).isEmpty());
+        var saved = repository.publish(draft, new Scope(99L, 1L, true)).orElseThrow();
+        assertEquals(FormStatus.PENDENTE, saved.getStatus()); assertEquals(1L, saved.getVersion());
+        assertTrue(saved.getQuestions().getFirst().getAnswer().isEmpty());
+        assertTrue(repository.publish(draft, new Scope(10L, 1L, false)).isEmpty());
+        assertTrue(repository.update(draft, new Scope(10L, 1L, false), 0L).isEmpty());
+        assertFalse(repository.delete(draft, new Scope(10L, 1L, false)));
+        assertTrue(repository.findById(1L, new Scope(20L, 1L, false)).isPresent());
+    }
+
+    @Test void httpWorkflowPersistsDraftEditingPublicationAndAdministrativeRulesInMongo() throws Exception {
+        var users = mock(com.astro.api.user.repository.UserRepository.class);
+        var units = mock(com.astro.api.unit.repository.UnitRepository.class);
+        var nrs = mock(com.astro.api.conformity.repository.NrCatalogRepository.class);
+        when(users.findByFirebaseUid("sender")).thenReturn(Optional.of(manager(10, 1, com.astro.api.user.model.UserType.GESTOR)));
+        when(users.findByFirebaseUid("recipient")).thenReturn(Optional.of(manager(20, 1, com.astro.api.user.model.UserType.GESTOR)));
+        when(users.findByFirebaseUid("owner")).thenReturn(Optional.of(manager(99, 1, com.astro.api.user.model.UserType.GESTOR_WORKSPACE)));
+        when(users.findByFirebaseUid("outsider")).thenReturn(Optional.of(manager(30, 2, com.astro.api.user.model.UserType.GESTOR_WORKSPACE)));
+        when(users.findById(20L)).thenReturn(Optional.of(manager(20, 1, com.astro.api.user.model.UserType.GESTOR)));
+        var service = new com.astro.api.form.service.FormService(new MongoRepositoryFactory(mongo).getRepository(FormRepository.class),
+                repository, new com.astro.api.form.service.FormAccessService(users), new com.astro.api.form.mapper.FormMapper(),
+                FormTestFixtures.validator(), new com.astro.api.form.service.FormReferenceService(users, units, nrs));
+        var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders
+                .standaloneSetup(new com.astro.api.form.controller.FormController(service))
+                .setControllerAdvice(new com.astro.api.common.handler.GlobalExceptionHandler())
+                .setCustomArgumentResolvers(new org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver()).build();
+        var json = tools.jackson.databind.json.JsonMapper.builder().build();
+        try {
+            authenticate("sender", com.astro.api.auth.security.Role.GESTOR);
+            mvc.perform(post("/forms").contentType("application/json").content("{\"status\":\"RASCUNHO\"}"))
+                    .andExpect(status().isCreated());
+            Long id = mongo.findAll(Form.class).getFirst().getId();
+            String url = "/forms/" + id;
+            mvc.perform(post(url + "/publish")).andExpect(status().isBadRequest());
+            mvc.perform(put(url).contentType("application/json").content(json.writeValueAsString(FormTestFixtures.content(FormStatus.RASCUNHO))))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.perguntas.length()").value(4));
+            authenticate("recipient", com.astro.api.auth.security.Role.GESTOR);
+            mvc.perform(get(url)).andExpect(status().isNotFound());
+            authenticate("sender", com.astro.api.auth.security.Role.GESTOR);
+            mvc.perform(post(url + "/publish")).andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("PENDENTE"));
+            mvc.perform(post(url + "/publish")).andExpect(status().isConflict());
+            mvc.perform(get("/forms").param("status", "PENDENTE").param("search", "Inspeção"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(1));
+            authenticate("recipient", com.astro.api.auth.security.Role.GESTOR);
+            mvc.perform(get(url)).andExpect(status().isOk());
+            mvc.perform(put(url).contentType("application/json").content("{}"))
+                    .andExpect(status().isForbidden());
+            mvc.perform(delete(url)).andExpect(status().isForbidden());
+            authenticate("outsider", com.astro.api.auth.security.Role.GESTOR_WORKSPACE);
+            mvc.perform(get(url)).andExpect(status().isNotFound());
+            mvc.perform(delete(url)).andExpect(status().isNotFound());
+            authenticate("owner", com.astro.api.auth.security.Role.GESTOR_WORKSPACE);
+            mvc.perform(put(url).contentType("application/json").content(json.writeValueAsString(FormTestFixtures.content(FormStatus.PENDENTE))))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.id_gestor_remetente").value(10));
+            // Simulate the future mobile completion without adding response endpoints to this scope.
+            mongo.getCollection("formularios").updateOne(new org.bson.Document("_id", id), new org.bson.Document("$set",
+                    new org.bson.Document("status", "CONCLUIDO").append("perguntas.0.resposta", List.of("Resposta única"))));
+            mvc.perform(delete(url)).andExpect(status().isConflict());
+            mvc.perform(put(url).contentType("application/json").content("{}"))
+                    .andExpect(status().isConflict());
+            mvc.perform(get(url)).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.perguntas[0].resposta[0]").value("Resposta única"));
+            mvc.perform(post("/forms").contentType("application/json").content("{\"status\":\"RASCUNHO\"}"))
+                    .andExpect(status().isCreated());
+            Long removable = mongo.findAll(Form.class).stream().map(Form::getId).filter(value -> !value.equals(id)).findFirst().orElseThrow();
+            mvc.perform(delete("/forms/" + removable)).andExpect(status().isNoContent());
+            assertEquals(1, mongo.count(new org.springframework.data.mongodb.core.query.Query(), Form.class));
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
+    }
+
+    private void authenticate(String uid, com.astro.api.auth.security.Role role) {
+        var principal = new com.astro.api.auth.security.AuthenticatedUser(uid, uid + "@astro.com", role);
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(principal, null, List.of()));
     }
 }
