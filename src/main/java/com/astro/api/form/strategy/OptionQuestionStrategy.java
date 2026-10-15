@@ -9,7 +9,7 @@ import java.util.List;
 
 @Component
 public class OptionQuestionStrategy implements FormQuestionStrategy {
-    public FormQuestionType supportedType() { return FormQuestionType.ALTERNATIVA; }
+    public FormQuestionType supportedType() { return FormQuestionType.OPTION; }
     public void validate(FormQuestionRequest question, FormValidationMode mode) {
         QuestionRules.noFileLimits(question);
         var options = question.options() == null ? List.<com.astro.api.form.dto.request.FormOptionRequest>of() : question.options();

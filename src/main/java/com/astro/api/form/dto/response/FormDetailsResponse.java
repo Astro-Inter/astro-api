@@ -14,7 +14,7 @@ public record FormDetailsResponse(
         @JsonProperty("id_gestor") Long managerId,
         @JsonProperty("titulo") String title,
         @JsonProperty("descricao") String description,
-        Integer nr,
+        @JsonProperty("nr") Integer nrCode,
         @JsonProperty("id_unidade") Long unitId,
         @JsonProperty("data_limite") LocalDate dueDate,
         FormStatus status,

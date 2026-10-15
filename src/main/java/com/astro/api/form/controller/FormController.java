@@ -11,6 +11,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import com.astro.api.form.dto.request.FormWriteRequest;
 import java.net.URI;
+import java.beans.PropertyEditorSupport;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,6 +25,16 @@ public class FormController {
     private final FormService service;
 
     public FormController(FormService service) { this.service = service; }
+
+    @InitBinder
+    public void configureStatusBinding(WebDataBinder binder) {
+        binder.registerCustomEditor(FormStatus.class, new PropertyEditorSupport() {
+            @Override
+            public void setAsText(String text) {
+                setValue(FormStatus.fromValue(text));
+            }
+        });
+    }
 
     @PostMapping("/{id}/publish")
     @Operation(summary = "Publica um rascunho válido, tornando-o pendente para o gestor destinatário")

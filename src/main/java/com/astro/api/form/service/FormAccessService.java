@@ -6,6 +6,7 @@ import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.form.model.Form;
+import com.astro.api.form.model.FormScope;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,7 +18,7 @@ public class FormAccessService {
     public FormAccessService(UserRepository users) { this.users = users; }
 
     @Transactional(readOnly = true)
-    public Scope requireManager(AuthenticatedUser principal) {
+    public FormScope requireManager(AuthenticatedUser principal) {
         if (principal == null || principal.firebaseUid() == null || principal.firebaseUid().isBlank()) {
             throw new AccessDeniedException("Gestor autenticado necessário");
         }
@@ -30,12 +31,10 @@ public class FormAccessService {
                 || user.getUnit().workspace == null || user.getUnit().workspace.id == null) {
             throw new AccessDeniedException("Gestor ativo com unidade e workspace válidos necessário");
         }
-        return new Scope(user.getId(), user.getUnit().workspace.id, user.getType() == UserType.GESTOR_WORKSPACE);
+        return new FormScope(user.getId(), user.getUnit().workspace.id, user.getType() == UserType.GESTOR_WORKSPACE);
     }
 
-    public record Scope(Long managerId, Long workspaceId, boolean workspaceManager) {}
-
-    public void requireManagement(Form form, Scope scope) {
+    public void requireManagement(Form form, FormScope scope) {
         if (!scope.workspaceId().equals(form.getWorkspaceId())
                 || (!scope.workspaceManager() && !scope.managerId().equals(form.getSenderManagerId()))) {
             throw new AccessDeniedException("Somente o remetente ou o gestor do workspace pode gerenciar o formulário");

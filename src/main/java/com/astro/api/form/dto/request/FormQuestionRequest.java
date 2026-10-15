@@ -10,12 +10,15 @@ import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record FormQuestionRequest(
-        @JsonProperty("id_pergunta") @Positive Long id,
-        @JsonProperty("tipo") @NotNull FormQuestionType type,
-        @JsonProperty("pergunta") @Size(max = 140) String question,
+        @JsonProperty("id_pergunta") @Positive(message = "{form.question.id.positive}") Long id,
+        @JsonProperty("tipo") @NotNull(message = "{form.question.type.notNull}") FormQuestionType type,
+        @JsonProperty("pergunta") @Size(max = 140, message = "{form.question.text.size}") String question,
         @JsonProperty("obrigatoria") Boolean required,
         @JsonProperty("multipla_escolha") Boolean multiple,
-        @JsonProperty("opcoes") @Size(max = 100) List<@NotNull @Valid FormOptionRequest> options,
-        @JsonProperty("maximo_arquivos") @Min(1) @Max(10) Integer maxFiles,
-        @JsonProperty("tamanho_maximo_mb") @Min(1) @Max(100) Integer maxFileSizeMb
+        @JsonProperty("opcoes") @Size(max = 100, message = "{form.question.options.size}")
+        List<@NotNull(message = "{form.option.item.notNull}") @Valid FormOptionRequest> options,
+        @JsonProperty("maximo_arquivos") @Min(value = 1, message = "{form.question.maxFiles.range}")
+        @Max(value = 10, message = "{form.question.maxFiles.range}") Integer maxFiles,
+        @JsonProperty("tamanho_maximo_mb") @Min(value = 1, message = "{form.question.maxFileSizeMb.range}")
+        @Max(value = 100, message = "{form.question.maxFileSizeMb.range}") Integer maxFileSizeMb
 ) {}

@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class TextQuestionStrategy implements FormQuestionStrategy {
-    public FormQuestionType supportedType() { return FormQuestionType.TEXTO; }
+    public FormQuestionType supportedType() { return FormQuestionType.TEXT; }
     public void validate(FormQuestionRequest question, FormValidationMode mode) {
         QuestionRules.noAlternatives(question);
         QuestionRules.noFileLimits(question);
