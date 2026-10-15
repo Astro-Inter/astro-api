@@ -43,6 +43,7 @@ class FormSecurityTest {
             for (Role role : List.of(Role.COLABORADOR, Role.ADMIN)) {
                 when(authorization.getRole("manager")).thenReturn(Optional.of(role));
                 mvc.perform(get("/forms").header("Authorization", "Bearer valid")).andExpect(status().isForbidden());
+                mvc.perform(get("/forms/1").header("Authorization", "Bearer valid")).andExpect(status().isForbidden());
             }
             verifyNoInteractions(service);
             for (Role role : List.of(Role.GESTOR, Role.GESTOR_WORKSPACE)) {
