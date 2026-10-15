@@ -108,4 +108,35 @@ class FormRepositoryMongoTest {
         assertEquals(java.util.Date.from(Instant.parse("2026-10-30T03:00:00Z")), raw.get("data_limite"));
         assertEquals(4, repository.findById(form.getId(), new Scope(10L, 1L, false)).orElseThrow().getQuestions().size());
     }
+
+    @Test void updateAtomicallyChecksVersionPermissionsAndResponseState() throws Exception {
+        Form value = form(1, 1, 10, 20, FormStatus.PENDENTE); value.setVersion(0L); mongo.insert(value);
+        var scope = new Scope(10L, 1L, false);
+        Form first = repository.findById(1L, scope).orElseThrow(); first.setTitle("Primeira edição");
+        Form second = repository.findById(1L, scope).orElseThrow(); second.setTitle("Segunda edição");
+        assertTrue(repository.update(first, new Scope(20L, 1L, false), 0L).isEmpty());
+        assertTrue(repository.update(first, new Scope(10L, 2L, true), 0L).isEmpty());
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var results = executor.invokeAll(List.of(
+                    () -> repository.update(first, scope, 0L).isPresent(),
+                    () -> repository.update(second, scope, 0L).isPresent()));
+            int successful = 0;
+            for (var result : results) if ((Boolean) result.get()) successful++;
+            assertEquals(1, successful);
+        }
+        Form saved = repository.findById(1L, scope).orElseThrow(); assertEquals(1L, saved.getVersion());
+        // Simulate a mobile submission after the web loaded the current version.
+        mongo.getCollection("formularios").updateOne(new org.bson.Document("_id", 1L),
+                new org.bson.Document("$set", new org.bson.Document("status", "CONCLUIDO")));
+        assertTrue(repository.update(saved, scope, 1L).isEmpty());
+        assertEquals(FormStatus.CONCLUIDO, repository.findById(1L, scope).orElseThrow().getStatus());
+    }
+
+    @Test void updateDoesNotEraseAnswersEvenWhenTheStatusHasNotBeenConcluded() {
+        Form value = form(1, 1, 10, 20, FormStatus.PENDENTE); value.setVersion(0L);
+        value.getQuestions().getFirst().setAnswer(List.of("Resposta")); mongo.insert(value);
+        assertTrue(repository.update(value, new Scope(10L, 1L, false), 0L).isEmpty());
+        assertEquals(List.of("Resposta"), repository.findById(1L, new Scope(10L, 1L, false)).orElseThrow()
+                .getQuestions().getFirst().getAnswer());
+    }
 }

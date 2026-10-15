@@ -25,6 +25,26 @@ public class FormManagementRepository {
 
     public Form insert(Form form) { return mongo.insert(form); }
 
+    public Optional<Form> update(Form form, Scope scope, Long expectedVersion) {
+        Update update = new Update().set("titulo", form.getTitle()).set("descricao", form.getDescription())
+                .set("id_gestor", form.getManagerId()).set("nr", form.getNr()).set("id_unidade", form.getUnitId())
+                .set("data_limite", form.getDueDate()).set("perguntas", form.getQuestions())
+                .set("atualizado_em", form.getUpdatedAt()).set("versao", expectedVersion == null ? 1L : expectedVersion + 1);
+        return Optional.ofNullable(mongo.findAndModify(editableQuery(form, scope, expectedVersion), update,
+                FindAndModifyOptions.options().returnNew(true), Form.class));
+    }
+
+    private Query editableQuery(Form form, Scope scope, Long expectedVersion) {
+        Criteria permissions = Criteria.where("id_workspace").is(scope.workspaceId());
+        if (!scope.workspaceManager()) permissions = new Criteria().andOperator(permissions,
+                Criteria.where("id_gestor_remetente").is(scope.managerId()));
+        return Query.query(new Criteria().andOperator(permissions, Criteria.where("_id").is(form.getId()),
+                Criteria.where("versao").is(expectedVersion), Criteria.where("status").is(form.getStatus()),
+                Criteria.where("status").in(FormStatus.RASCUNHO, FormStatus.PENDENTE),
+                Criteria.where("respondido_em").is(null),
+                Criteria.where("perguntas").not().elemMatch(Criteria.where("resposta.0").exists(true))));
+    }
+
     public long nextId() {
         // Bootstrap above existing numeric IDs; $max never moves a concurrent counter backwards.
         Query highestQuery = new Query().with(Sort.by(Sort.Direction.DESC, "_id")).limit(1);

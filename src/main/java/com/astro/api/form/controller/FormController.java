@@ -24,6 +24,15 @@ public class FormController {
 
     public FormController(FormService service) { this.service = service; }
 
+    @PutMapping("/{id}")
+    @Operation(summary = "Substitui dados e perguntas de um formulário próprio ou gerenciado pelo workspace")
+    public ResponseEntity<ApiResult<FormDetailsResponse>> update(@PathVariable("id") Long id,
+            @Valid @RequestBody FormWriteRequest body, @AuthenticationPrincipal AuthenticatedUser principal,
+            HttpServletRequest request) {
+        return ResponseEntity.ok(ApiResult.success("Formulário atualizado com sucesso",
+                service.update(id, body, principal), request.getRequestURI()));
+    }
+
     @PostMapping
     @Operation(summary = "Cria um formulário pendente ou um rascunho com respostas vazias")
     public ResponseEntity<ApiResult<FormDetailsResponse>> create(@Valid @RequestBody FormWriteRequest body,
