@@ -103,6 +103,7 @@ class EventControllerIntegrationTest {
     @Test
     void listsEventsForAuthenticatedCollaborator() throws Exception {
         CollaboratorEventResponse event = new CollaboratorEventResponse(
+                1l,
                 "Treinamento NR 10",
                 LocalDateTime.of(2026, 10, 5, 12, 0),
                 true,

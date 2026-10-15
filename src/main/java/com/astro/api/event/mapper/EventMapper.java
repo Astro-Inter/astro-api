@@ -72,6 +72,7 @@ public class EventMapper {
         EventClass eventClass = participation.getEventClass();
         Event event = eventClass.getEvent();
         return new CollaboratorEventResponse(
+                event.getId(),
                 event.getTitle(),
                 eventClass.getEndDate(),
                 viewed,

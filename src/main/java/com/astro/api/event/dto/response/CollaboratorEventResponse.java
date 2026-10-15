@@ -5,6 +5,7 @@ import com.astro.api.event.model.EventStatus;
 import java.time.LocalDateTime;
 
 public record CollaboratorEventResponse(
+        Long id,
         String eventTitle,
         LocalDateTime classLimitDate,
         boolean viewed,
