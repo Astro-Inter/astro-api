@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.List;
 
 import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -61,5 +62,30 @@ class FormControllerTest {
         mvc.perform(get("/forms/invalid")).andExpect(status().isBadRequest());
         when(service.findById(99L, principal)).thenThrow(new com.astro.api.common.exception.ResourceNotFoundException("Formulário não encontrado"));
         mvc.perform(get("/forms/99")).andExpect(status().isNotFound());
+    }
+
+    @Test void creationUsesPortugueseContractAndIgnoresForgedServerFieldsAndAnswers() throws Exception {
+        var form = FormRepositoryMongoTest.form(42, 1, 10, 20, FormStatus.PENDENTE);
+        when(service.create(any(), eq(principal))).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
+        mvc.perform(post("/forms").contentType("application/json").content("""
+                {"titulo":"Inspeção","id_gestor":20,"status":"PENDENTE","id_workspace":999,
+                 "id_gestor_remetente":999,"respondido_em":"2026-10-15T12:00:00Z",
+                 "perguntas":[{"tipo":"texto","pergunta":"Descrição","obrigatoria":true,"resposta":["FORJADA"]}]}
+                """))
+                .andExpect(status().isCreated()).andExpect(header().string("Location", "/forms/42"))
+                .andExpect(jsonPath("$.data.id_workspace").value(1))
+                .andExpect(jsonPath("$.data.id_gestor_remetente").value(10));
+        var request = org.mockito.ArgumentCaptor.forClass(com.astro.api.form.dto.request.FormWriteRequest.class);
+        verify(service).create(request.capture(), eq(principal));
+        assertEquals(com.astro.api.form.model.FormQuestionType.TEXTO, request.getValue().questions().getFirst().type());
+    }
+
+    @Test void creationRejectsUnknownTypesImpossibleDatesAndOutOfRangeConfigurations() throws Exception {
+        for (String body : List.of("null", "{\"id_gestor\":0}", "{\"data_limite\":\"2026-02-30\"}",
+                "{\"perguntas\":[{\"tipo\":\"unknown\"}]}", "{\"perguntas\":[{}]}",
+                "{\"perguntas\":[{\"tipo\":\"foto\",\"maximo_arquivos\":11}]}")) {
+            mvc.perform(post("/forms").contentType("application/json").content(body)).andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(service);
     }
 }

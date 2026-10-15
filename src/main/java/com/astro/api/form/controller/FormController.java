@@ -8,6 +8,9 @@ import com.astro.api.form.model.FormStatus;
 import com.astro.api.form.service.FormService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import com.astro.api.form.dto.request.FormWriteRequest;
+import java.net.URI;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,6 +23,15 @@ public class FormController {
     private final FormService service;
 
     public FormController(FormService service) { this.service = service; }
+
+    @PostMapping
+    @Operation(summary = "Cria um formulário pendente ou um rascunho com respostas vazias")
+    public ResponseEntity<ApiResult<FormDetailsResponse>> create(@Valid @RequestBody FormWriteRequest body,
+            @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
+        var form = service.create(body, principal);
+        return ResponseEntity.created(URI.create("/forms/" + form.id())).body(ApiResult.success(
+                "Formulário criado com sucesso", form, request.getRequestURI()));
+    }
 
     @GetMapping("/{id}")
     @Operation(summary = "Consulta informações e perguntas de um formulário acessível")

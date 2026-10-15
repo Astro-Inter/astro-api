@@ -8,6 +8,10 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
+import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.dao.DuplicateKeyException;
+import org.bson.Document;
 
 import java.util.List;
 import java.util.Optional;
@@ -18,6 +22,27 @@ public class FormManagementRepository {
     private final MongoTemplate mongo;
 
     public FormManagementRepository(MongoTemplate mongo) { this.mongo = mongo; }
+
+    public Form insert(Form form) { return mongo.insert(form); }
+
+    public long nextId() {
+        // Bootstrap above existing numeric IDs; $max never moves a concurrent counter backwards.
+        Query highestQuery = new Query().with(Sort.by(Sort.Direction.DESC, "_id")).limit(1);
+        highestQuery.fields().include("_id");
+        Form highest = mongo.findOne(highestQuery, Form.class);
+        long floor = highest == null ? 0 : highest.getId();
+        Query sequence = Query.query(Criteria.where("_id").is("formularios"));
+        Update initialize = new Update().max("valor", floor);
+        try {
+            mongo.upsert(sequence, initialize, "sequencias");
+        } catch (DuplicateKeyException concurrentInitialization) {
+            mongo.updateFirst(sequence, initialize, "sequencias");
+        }
+        Document counter = mongo.findAndModify(sequence, new Update().inc("valor", 1L),
+                FindAndModifyOptions.options().returnNew(true), Document.class, "sequencias");
+        if (counter == null) throw new IllegalStateException("Sequência de formulários indisponível");
+        return ((Number) counter.get("valor")).longValue();
+    }
 
     public Optional<Form> findById(Long id, Scope scope) {
         return Optional.ofNullable(mongo.findOne(Query.query(new Criteria().andOperator(

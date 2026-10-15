@@ -10,6 +10,10 @@ import com.astro.api.form.repository.FormManagementRepository;
 import com.astro.api.form.repository.FormRepository;
 import com.astro.api.form.service.FormAccessService;
 import com.astro.api.form.service.FormService;
+import com.astro.api.form.service.FormReferenceService;
+import com.astro.api.form.dto.request.*;
+import com.astro.api.unit.repository.UnitRepository;
+import com.astro.api.conformity.repository.NrCatalogRepository;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.user.model.*;
 import com.astro.api.user.repository.UserRepository;
@@ -29,13 +33,17 @@ class FormServiceTest {
     final FormManagementRepository repository = mock(FormManagementRepository.class);
     final FormRepository homeRepository = mock(FormRepository.class);
     final FormAccessService access = new FormAccessService(users);
-    final FormService service = new FormService(homeRepository, repository, access, new FormMapper());
+    final UnitRepository units = mock(UnitRepository.class);
+    final NrCatalogRepository nrs = mock(NrCatalogRepository.class);
+    final FormService service = new FormService(homeRepository, repository, access, new FormMapper(),
+            FormTestFixtures.validator(), new FormReferenceService(users, units, nrs));
     final AuthenticatedUser principal = new AuthenticatedUser("sender", "sender@astro.com", Role.GESTOR);
     User sender;
 
     @BeforeEach void setUp() {
         sender = manager(10L, 1L, UserType.GESTOR);
         when(users.findByFirebaseUid("sender")).thenReturn(Optional.of(sender));
+        when(users.findById(20L)).thenReturn(Optional.of(manager(20, 1, UserType.GESTOR)));
     }
 
     static User manager(long id, long workspaceId, UserType type) {
@@ -87,5 +95,60 @@ class FormServiceTest {
         assertTrue(response.questions().getFirst().answer().isEmpty());
         assertThrows(BusinessException.class, () -> service.findById(0L, principal));
         assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class, () -> service.findById(99L, principal));
+    }
+
+    @Test void createsPublishedFormWithGeneratedIdentityAndEmptyEmbeddedAnswers() {
+        when(repository.nextId()).thenReturn(42L);
+        when(repository.insert(any())).thenAnswer(call -> call.getArgument(0));
+        var result = service.create(FormTestFixtures.content(FormStatus.PENDENTE), principal);
+        assertEquals(42L, result.id()); assertEquals(1L, result.workspaceId()); assertEquals(10L, result.senderManagerId());
+        assertEquals(20L, result.managerId()); assertEquals("Inspeção", result.title());
+        assertEquals(FormStatus.PENDENTE, result.status()); assertNotNull(result.createdAt()); assertNull(result.respondedAt());
+        assertEquals(List.of(1L, 2L, 3L, 4L), result.questions().stream().map(q -> q.id()).toList());
+        assertTrue(result.questions().stream().allMatch(q -> q.answer().isEmpty()));
+        assertTrue(result.questions().get(1).multiple());
+        assertEquals("Outros", result.questions().get(1).options().get(1).text());
+        assertEquals(1, result.questions().get(2).maxFiles());
+        assertEquals(10, result.questions().get(2).maxFileSizeMb());
+    }
+
+    @Test void savesEmptyDraftButDoesNotPublishItOrAcceptCompletedStatus() {
+        when(repository.insert(any())).thenAnswer(call -> call.getArgument(0));
+        var draft = new FormWriteRequest(null, null, null, null, null, null, FormStatus.RASCUNHO, null);
+        var result = service.create(draft, principal);
+        assertEquals(FormStatus.RASCUNHO, result.status()); assertNull(result.managerId()); assertTrue(result.questions().isEmpty());
+        clearInvocations(repository);
+        assertThrows(BusinessException.class, () -> service.create(new FormWriteRequest(null, null, null, null, null, null, FormStatus.PENDENTE, null), principal));
+        assertThrows(BusinessException.class, () -> service.create(FormTestFixtures.content(FormStatus.CONCLUIDO), principal));
+        verifyNoInteractions(repository);
+    }
+
+    @Test void rejectsForeignInactiveAndCollaboratorRecipientsBeforeWriting() {
+        when(users.findById(20L)).thenReturn(Optional.of(manager(20, 2, UserType.GESTOR)));
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class, () -> service.create(FormTestFixtures.content(FormStatus.PENDENTE), principal));
+        User recipient = manager(20, 1, UserType.COLABORADOR);
+        when(users.findById(20L)).thenReturn(Optional.of(recipient));
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class, () -> service.create(FormTestFixtures.content(FormStatus.PENDENTE), principal));
+        recipient.setType(UserType.GESTOR); recipient.setStatus(UserStatus.DESATIVADO);
+        assertThrows(BusinessException.class, () -> service.create(FormTestFixtures.content(FormStatus.PENDENTE), principal));
+        recipient.setStatus(UserStatus.ATIVO); recipient.getUnit().isActive = false;
+        assertThrows(BusinessException.class, () -> service.create(FormTestFixtures.content(FormStatus.PENDENTE), principal));
+        verifyNoInteractions(repository);
+    }
+
+    @Test void validatesOptionalUnitAndNrAgainstTheirAuthoritativeCatalogs() {
+        var body = new FormWriteRequest("Título", null, 20L, 6, 3L, null, FormStatus.PENDENTE,
+                List.of(FormTestFixtures.question(com.astro.api.form.model.FormQuestionType.TEXTO)));
+        var unit = manager(20, 2, UserType.GESTOR).getUnit();
+        when(units.findById(3L)).thenReturn(Optional.of(unit));
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class, () -> service.create(body, principal));
+        unit.workspace.id = 1L; unit.isActive = false;
+        assertThrows(BusinessException.class, () -> service.create(body, principal));
+        unit.isActive = true;
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class, () -> service.create(body, principal));
+        var nr = mock(com.astro.api.conformity.model.NrCatalog.class);
+        when(nrs.findById(6)).thenReturn(Optional.of(nr)); when(nr.isRevoked()).thenReturn(true);
+        assertThrows(BusinessException.class, () -> service.create(body, principal));
+        verifyNoInteractions(repository);
     }
 }
