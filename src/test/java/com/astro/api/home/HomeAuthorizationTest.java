@@ -55,6 +55,8 @@ class HomeAuthorizationTest {
     @EnableMethodSecurity
     static class Config {
         @Bean HomeService homeService() { return mock(HomeService.class); }
-        @Bean HomeController homeController(HomeService service) { return new HomeController(service); }
+        @Bean HomeController homeController(HomeService service) {
+            return new HomeController(service);
+        }
     }
 }

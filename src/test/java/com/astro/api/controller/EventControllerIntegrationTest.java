@@ -11,6 +11,7 @@ import com.astro.api.event.dto.request.UpdateEventClassRequest;
 import com.astro.api.event.dto.request.UpdateEventRequest;
 import com.astro.api.event.dto.response.EventCalendarResponse;
 import com.astro.api.event.dto.response.EventCandidateResponse;
+import com.astro.api.event.dto.response.CollaboratorEventResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.model.CompletionMode;
 import com.astro.api.event.model.EventStatus;
@@ -97,6 +98,27 @@ class EventControllerIntegrationTest {
                 .andExpect(jsonPath("$.data[0].name").value("Maria"));
 
         verify(eventService).findEligibleCandidates(anyInt(), anyString());
+    }
+
+    @Test
+    void listsEventsForAuthenticatedCollaborator() throws Exception {
+        CollaboratorEventResponse event = new CollaboratorEventResponse(
+                "Treinamento NR 10",
+                LocalDateTime.of(2026, 10, 5, 12, 0),
+                true,
+                "PENDENTE",
+                "Grupo 1",
+                EventStatus.ATIVO);
+        when(eventService.findForCollaborator(anyString())).thenReturn(List.of(event));
+
+        mockMvc.perform(get("/events/collaborator"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].classLimitDate").value("2026-10-05T12:00:00"))
+                .andExpect(jsonPath("$.data[0].classStatus").value("PENDENTE"))
+                .andExpect(jsonPath("$.data[0].eventStatus").value("ATIVO"));
+
+        verify(eventService).findForCollaborator(anyString());
     }
 
     @Test

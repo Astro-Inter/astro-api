@@ -3,6 +3,7 @@ package com.astro.api.service;
 import com.astro.api.role.model.Role;
 import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.common.exception.BusinessException;
+import com.astro.api.common.service.ViewedService;
 import com.astro.api.conformity.repository.NrCatalogRepository;
 import com.astro.api.event.dto.request.CancelEventRequest;
 import com.astro.api.event.dto.request.CreateEventClassRequest;
@@ -11,6 +12,7 @@ import com.astro.api.event.mapper.EventMapper;
 import com.astro.api.event.model.CompletionMode;
 import com.astro.api.event.model.Event;
 import com.astro.api.event.model.EventClass;
+import com.astro.api.event.model.EventClassParticipant;
 import com.astro.api.event.model.EventStatus;
 import com.astro.api.event.repository.EventClassParticipantRepository;
 import com.astro.api.event.repository.EventClassRepository;
@@ -27,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -46,6 +49,7 @@ class EventServiceTest {
     private UserRepository userRepository;
     private RoleRepository roleRepository;
     private NrCatalogRepository nrCatalogRepository;
+    private ViewedService viewedService;
     private EventService service;
     private User manager;
     private Workspace workspace;
@@ -58,6 +62,7 @@ class EventServiceTest {
         userRepository = mock(UserRepository.class);
         roleRepository = mock(RoleRepository.class);
         nrCatalogRepository = mock(NrCatalogRepository.class);
+        viewedService = mock(ViewedService.class);
         service = new EventService(
                 eventRepository,
                 eventClassRepository,
@@ -65,7 +70,8 @@ class EventServiceTest {
                 userRepository,
                 roleRepository,
                 nrCatalogRepository,
-                new EventMapper());
+                new EventMapper(),
+                viewedService);
         workspace = new Workspace();
         workspace.id = 10L;
         manager = createUser(1L, UserStatus.ATIVO, workspace);
@@ -216,6 +222,39 @@ class EventServiceTest {
         assertEquals(EventStatus.CANCELADO, response.status());
         assertNotNull(event.getCancellationDate());
         assertEquals("Valid reason", event.getCancellationReason());
+    }
+
+    @Test
+    void listsAllCollaboratorClassesInChronologicalOrderWithIndividualStatus() {
+        User collaborator = createUser(2L, UserStatus.ATIVO, workspace);
+        collaborator.setFirebaseUid("collaborator");
+        Event pastEvent = createEvent(EventStatus.CANCELADO);
+        pastEvent.setId(31L);
+        Event futureEvent = createEvent(EventStatus.ATIVO);
+        futureEvent.setId(32L);
+        EventClass pastClass = createEventClass(
+                pastEvent, LocalDateTime.now().minusDays(2), LocalDateTime.now().minusDays(1));
+        EventClass futureClass = createEventClass(
+                futureEvent, LocalDateTime.now().plusDays(1), LocalDateTime.now().plusDays(2));
+        EventClassParticipant pastParticipation = new EventClassParticipant();
+        pastParticipation.setEventClass(pastClass);
+        pastParticipation.setUser(collaborator);
+        EventClassParticipant futureParticipation = new EventClassParticipant();
+        futureParticipation.setEventClass(futureClass);
+        futureParticipation.setUser(collaborator);
+        when(userRepository.findByFirebaseUid("collaborator")).thenReturn(Optional.of(collaborator));
+        when(eventClassParticipantRepository.findByUser_IdOrderByEventClass_StartDateAsc(2L))
+                .thenReturn(List.of(pastParticipation, futureParticipation));
+        when(viewedService.findViewed(2L, "events", List.of(31L, 32L))).thenReturn(Set.of("31"));
+
+        var response = service.findForCollaborator("collaborator");
+
+        assertEquals(2, response.size());
+        assertEquals("CANCELADO", response.getFirst().classStatus());
+        assertEquals(EventStatus.CANCELADO, response.getFirst().eventStatus());
+        assertEquals(true, response.getFirst().viewed());
+        assertEquals("PENDENTE", response.get(1).classStatus());
+        assertEquals(false, response.get(1).viewed());
     }
 
     private CreateEventRequest createRequest(Integer nrId, List<Long> participantIds) {

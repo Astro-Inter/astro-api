@@ -2,6 +2,7 @@ package com.astro.api.home.controller;
 
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.response.ApiResult;
+import com.astro.api.home.dto.response.ManagerHomeResponse;
 import com.astro.api.home.dto.response.WorkspaceHomeResponse;
 import com.astro.api.home.dto.response.CollaboratorHomeResponse;
 import com.astro.api.home.service.HomeService;
@@ -48,5 +49,24 @@ public class HomeController {
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Dados da Home retornados com sucesso",
                 homeService.loadHome(user), request.getRequestURI()));
+    }
+
+    @GetMapping("/manager")
+    @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
+    @Operation(summary = "Retorna a Home do gestor",
+            description = "Requer autenticação de gestor. Os indicadores resumem os eventos atuais e as pendências; "
+                    + "viewed informa se o item já foi visualizado e days_left informa dias de calendário até o prazo.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Home retornada com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado"),
+            @ApiResponse(responseCode = "403", description = "Não autorizado"),
+            @ApiResponse(responseCode = "404", description = "Gestor inexistente, inativo ou inelegível"),
+            @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
+    })
+    public ResponseEntity<ApiResult<ManagerHomeResponse>> loadManagerHome(
+            @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
+        ManagerHomeResponse response = homeService.loadManagerHome(user);
+        return ResponseEntity.ok(ApiResult.success("Home do gestor retornada com sucesso", response,
+                request.getRequestURI()));
     }
 }
