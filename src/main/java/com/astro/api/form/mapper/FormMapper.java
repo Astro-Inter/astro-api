@@ -1,5 +1,6 @@
 package com.astro.api.form.mapper;
 
+import java.util.Map;
 import com.astro.api.form.dto.response.FormSummaryResponse;
 import com.astro.api.form.dto.response.FormPageResponse;
 import com.astro.api.form.dto.response.FormDetailsResponse;
@@ -20,7 +21,7 @@ public class FormMapper {
     public static final ZoneId FORM_ZONE = ZoneId.of("America/Sao_Paulo");
 
     public void applyContent(FormWriteRequest body, Form form) {
-        var previous = form.getQuestions() == null ? List.<Form.FormQuestion>of() : form.getQuestions();
+        List<Form.FormQuestion> previous = form.getQuestions() == null ? List.<Form.FormQuestion>of() : form.getQuestions();
         form.setQuestions(toQuestions(body.questions() == null ? List.of() : body.questions(), previous));
         form.setTitle(clean(body.title()));
         form.setDescription(clean(body.description()));
@@ -32,11 +33,11 @@ public class FormMapper {
 
     private List<Form.FormQuestion> toQuestions(List<FormQuestionRequest> requests,
                                                 List<Form.FormQuestion> previous) {
-        var existing = previous.stream().collect(Collectors.toMap(Form.FormQuestion::getId, value -> value));
+        Map<Long, Form.FormQuestion> existing = previous.stream().collect(Collectors.toMap(Form.FormQuestion::getId, value -> value));
         long nextId = previous.stream().mapToLong(Form.FormQuestion::getId).max().orElse(0) + 1;
-        var result = new ArrayList<Form.FormQuestion>();
-        for (var request : requests) {
-            var question = new Form.FormQuestion();
+        List<Form.FormQuestion> result = new ArrayList<>();
+        for (FormQuestionRequest request : requests) {
+            Form.FormQuestion question = new Form.FormQuestion();
             question.setId(request.id() == null ? nextId++ : request.id());
             question.setType(request.type().value());
             question.setQuestion(clean(request.question()));
@@ -44,7 +45,7 @@ public class FormMapper {
             question.setMultiple(request.type() == FormQuestionType.OPTION ? Boolean.TRUE.equals(request.multiple()) : null);
             question.setMaxFiles(request.type() == FormQuestionType.PHOTO ? (request.maxFiles() == null ? 1 : request.maxFiles()) : null);
             question.setMaxFileSizeMb(request.type() == FormQuestionType.PHOTO ? (request.maxFileSizeMb() == null ? 10 : request.maxFileSizeMb()) : null);
-            var old = request.id() == null ? null : existing.get(request.id());
+            Form.FormQuestion old = request.id() == null ? null : existing.get(request.id());
             question.setOptions(toOptions(request.options() == null ? List.of() : request.options(), old));
             question.setAnswer(old == null || old.getAnswer() == null ? List.of() : List.copyOf(old.getAnswer()));
             result.add(question);
@@ -53,11 +54,11 @@ public class FormMapper {
     }
 
     private List<Form.FormOption> toOptions(List<FormOptionRequest> requests, Form.FormQuestion previous) {
-        var oldOptions = previous == null || previous.getOptions() == null ? List.<Form.FormOption>of() : previous.getOptions();
+        List<Form.FormOption> oldOptions = previous == null || previous.getOptions() == null ? List.<Form.FormOption>of() : previous.getOptions();
         long nextId = oldOptions.stream().mapToLong(Form.FormOption::getId).max().orElse(0) + 1;
-        var result = new ArrayList<Form.FormOption>();
-        for (var request : requests) {
-            var option = new Form.FormOption();
+        List<Form.FormOption> result = new ArrayList<>();
+        for (FormOptionRequest request : requests) {
+            Form.FormOption option = new Form.FormOption();
             option.setId(request.id() == null ? nextId++ : request.id());
             option.setText(Boolean.TRUE.equals(request.other()) ? "Outros" : clean(request.text()));
             option.setOther(Boolean.TRUE.equals(request.other()));
@@ -69,7 +70,7 @@ public class FormMapper {
     private String clean(String value) { return value == null ? "" : value.strip(); }
 
     public FormWriteRequest toWriteRequest(Form form) {
-        var questions = form.getQuestions() == null ? List.<FormQuestionRequest>of() : form.getQuestions().stream()
+        List<FormQuestionRequest> questions = form.getQuestions() == null ? List.<FormQuestionRequest>of() : form.getQuestions().stream()
                 .map(question -> new FormQuestionRequest(question.getId(), FormQuestionType.fromValue(question.getType()), question.getQuestion(),
                         question.getRequired(), question.getMultiple(), question.getOptions() == null ? List.of()
                         : question.getOptions().stream().map(option -> new FormOptionRequest(option.getId(), option.getText(), option.getOther())).toList(),

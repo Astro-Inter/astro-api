@@ -1,5 +1,10 @@
 package com.astro.api.form;
 
+import jakarta.validation.metadata.ContainerElementTypeDescriptor;
+import jakarta.validation.metadata.ConstraintDescriptor;
+import jakarta.validation.metadata.PropertyDescriptor;
+import jakarta.validation.ValidatorFactory;
+import java.io.InputStream;
 import com.astro.api.form.dto.request.FormOptionRequest;
 import com.astro.api.form.dto.request.FormQuestionRequest;
 import com.astro.api.form.dto.request.FormWriteRequest;
@@ -31,13 +36,13 @@ class FormContractTest {
 
     @Test void everyRequestConstraintReferencesAnExistingPortugueseMessage() throws Exception {
         Properties messages = new Properties();
-        try (var source = getClass().getResourceAsStream("/ValidationMessages.properties")) {
+        try (InputStream source = getClass().getResourceAsStream("/ValidationMessages.properties")) {
             assertNotNull(source);
             messages.load(new InputStreamReader(source, StandardCharsets.UTF_8));
         }
-        try (var factory = Validation.buildDefaultValidatorFactory()) {
+        try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
             for (Class<?> type : new Class<?>[]{FormWriteRequest.class, FormQuestionRequest.class, FormOptionRequest.class}) {
-                for (var property : factory.getValidator().getConstraintsForClass(type).getConstrainedProperties()) {
+                for (PropertyDescriptor property : factory.getValidator().getConstraintsForClass(type).getConstrainedProperties()) {
                     assertMessages(property, messages);
                 }
             }
@@ -45,7 +50,7 @@ class FormContractTest {
     }
 
     private void assertMessages(ElementDescriptor element, Properties messages) {
-        for (var constraint : element.getConstraintDescriptors()) {
+        for (ConstraintDescriptor<?> constraint : element.getConstraintDescriptors()) {
             String template = constraint.getMessageTemplate();
             assertTrue(template.matches("\\{form\\.[A-Za-z.]+}"), template);
             String key = template.substring(1, template.length() - 1);
@@ -55,7 +60,7 @@ class FormContractTest {
             assertFalse(message.contains("\uFFFD"), key);
         }
         if (element instanceof ContainerDescriptor container) {
-            for (var nested : container.getConstrainedContainerElementTypes()) assertMessages(nested, messages);
+            for (ContainerElementTypeDescriptor nested : container.getConstrainedContainerElementTypes()) assertMessages(nested, messages);
         }
     }
 }

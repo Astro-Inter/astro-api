@@ -65,7 +65,7 @@ public class FormController {
     @Operation(summary = "Cria um formulário pendente ou um rascunho com respostas vazias")
     public ResponseEntity<ApiResult<FormDetailsResponse>> create(@Valid @RequestBody FormWriteRequest body,
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
-        var form = service.create(body, principal);
+        FormDetailsResponse form = service.create(body, principal);
         return ResponseEntity.created(URI.create("/forms/" + form.id())).body(ApiResult.success(
                 "Formulário criado com sucesso", form, request.getRequestURI()));
     }

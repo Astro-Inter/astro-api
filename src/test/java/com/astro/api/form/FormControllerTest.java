@@ -1,5 +1,8 @@
 package com.astro.api.form;
 
+import com.astro.api.form.dto.request.FormWriteRequest;
+import org.mockito.ArgumentCaptor;
+import com.astro.api.form.model.Form;
 import com.astro.api.auth.security.*;
 import com.astro.api.common.handler.GlobalExceptionHandler;
 import com.astro.api.form.controller.FormController;
@@ -55,7 +58,7 @@ class FormControllerTest {
     }
 
     @Test void detailsUsePortugueseFieldsAndStandardErrors() throws Exception {
-        var form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.DRAFT);
+        Form form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.DRAFT);
         when(service.findById(formId(1), principal)).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
         mvc.perform(get("/forms/" + formId(1))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(formId(1)))
@@ -69,7 +72,7 @@ class FormControllerTest {
     }
 
     @Test void creationUsesPortugueseContractAndIgnoresForgedServerFieldsAndAnswers() throws Exception {
-        var form = FormTestFixtures.form(42, 1, 10, 20, FormStatus.PENDING);
+        Form form = FormTestFixtures.form(42, 1, 10, 20, FormStatus.PENDING);
         when(service.create(any(), eq(principal))).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
         mvc.perform(post("/forms").contentType("application/json").content("""
                 {"titulo":"Inspeção","id_gestor":20,"status":"PENDENTE","id_workspace":999,
@@ -79,7 +82,7 @@ class FormControllerTest {
                 .andExpect(status().isCreated()).andExpect(header().string("Location", "/forms/" + formId(42)))
                 .andExpect(jsonPath("$.data.id_workspace").value(1))
                 .andExpect(jsonPath("$.data.id_gestor_remetente").value(10));
-        var request = org.mockito.ArgumentCaptor.forClass(com.astro.api.form.dto.request.FormWriteRequest.class);
+        ArgumentCaptor<FormWriteRequest> request = org.mockito.ArgumentCaptor.forClass(com.astro.api.form.dto.request.FormWriteRequest.class);
         verify(service).create(request.capture(), eq(principal));
         assertEquals(com.astro.api.form.model.FormQuestionType.TEXT, request.getValue().questions().getFirst().type());
     }
@@ -94,7 +97,7 @@ class FormControllerTest {
     }
 
     @Test void updateUsesValidatedIdentityAndMapsConcurrentConflicts() throws Exception {
-        var form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.DRAFT);
+        Form form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.DRAFT);
         when(service.update(eq(formId(1)), any(), eq(principal))).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
         mvc.perform(put("/forms/" + formId(1)).contentType("application/json").content("{\"titulo\":\"Rascunho\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("RASCUNHO"));
@@ -116,7 +119,7 @@ class FormControllerTest {
     }
 
     @Test void publicationDoesNotAcceptAReplacementFormOrAnswersAndMapsItsStateErrors() throws Exception {
-        var form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.PENDING);
+        Form form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.PENDING);
         when(service.publish(formId(1), principal)).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
         mvc.perform(post("/forms/" + formId(1) + "/publish").contentType("application/json").content("{\"status\":\"CONCLUIDO\",\"resposta\":[\"Forjada\"]}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("PENDENTE"))

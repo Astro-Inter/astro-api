@@ -1,5 +1,6 @@
 package com.astro.api.form.service;
 
+import com.astro.api.form.dto.request.FormOptionRequest;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.form.dto.request.FormWriteRequest;
 import com.astro.api.form.dto.request.FormQuestionRequest;
@@ -20,7 +21,7 @@ public class FormValidationService {
     private final Map<FormQuestionType, FormQuestionStrategy> strategies = new EnumMap<>(FormQuestionType.class);
 
     public FormValidationService(List<FormQuestionStrategy> implementations) {
-        for (var strategy : implementations) {
+        for (FormQuestionStrategy strategy : implementations) {
             if (strategies.putIfAbsent(strategy.supportedType(), strategy) != null) {
                 throw new IllegalStateException("Estratégia duplicada para " + strategy.supportedType());
             }
@@ -37,15 +38,15 @@ public class FormValidationService {
         require(body.managerId() == null || body.managerId() > 0, "Gestor deve ter identificador positivo");
         require(body.unitId() == null || body.unitId() > 0, "Unidade deve ter identificador positivo");
         require(body.nrCode() == null || body.nrCode() > 0, "NR deve ter código positivo");
-        var questions = body.questions() == null ? List.<FormQuestionRequest>of() : body.questions();
+        List<FormQuestionRequest> questions = body.questions() == null ? List.<FormQuestionRequest>of() : body.questions();
         require(questions.size() <= 100, "O formulário aceita até 100 perguntas");
         if (mode == FormValidationMode.PUBLISH) {
             require(body.title() != null && !body.title().isBlank(), "Informe o título do formulário");
             require(body.managerId() != null, "Selecione o gestor destinatário");
             require(!questions.isEmpty(), "Adicione pelo menos uma pergunta");
         }
-        var ids = new HashSet<Long>();
-        for (var question : questions) {
+        Set<Long> ids = new HashSet<Long>();
+        for (FormQuestionRequest question : questions) {
             require(question != null && question.type() != null, "Informe um tipo de pergunta válido");
             require(question.id() == null || (question.id() > 0 && ids.add(question.id())),
                     "Os identificadores das perguntas devem ser positivos e únicos");
@@ -63,14 +64,14 @@ public class FormValidationService {
     public void validateIdentifiers(FormWriteRequest request, List<Form.FormQuestion> existingQuestions) {
         Map<Long, Form.FormQuestion> questionsById = existingQuestions.stream()
                 .collect(Collectors.toMap(Form.FormQuestion::getId, question -> question));
-        for (var question : request.questions() == null ? List.<FormQuestionRequest>of() : request.questions()) {
+        for (FormQuestionRequest question : request.questions() == null ? List.<FormQuestionRequest>of() : request.questions()) {
             require(question.id() == null || questionsById.containsKey(question.id()),
                     "Identificador de pergunta desconhecido; omita o ID de novas perguntas");
-            var previousQuestion = question.id() == null ? null : questionsById.get(question.id());
-            var optionIds = previousQuestion == null || previousQuestion.getOptions() == null ? Set.<Long>of()
+            Form.FormQuestion previousQuestion = question.id() == null ? null : questionsById.get(question.id());
+            Set<Long> optionIds = previousQuestion == null || previousQuestion.getOptions() == null ? Set.<Long>of()
                     : previousQuestion.getOptions().stream().map(Form.FormOption::getId).collect(Collectors.toSet());
             if (question.options() != null) {
-                for (var option : question.options()) {
+                for (FormOptionRequest option : question.options()) {
                     require(option.id() == null || optionIds.contains(option.id()),
                             "Identificador de opção desconhecido; omita o ID de novas opções");
                 }
