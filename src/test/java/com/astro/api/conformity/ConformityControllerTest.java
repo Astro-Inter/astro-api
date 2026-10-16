@@ -30,7 +30,7 @@ class ConformityControllerTest {
     @AfterEach void cleanUp() { SecurityContextHolder.clearContext(); }
     ConformityResponse response() {
         return new ConformityResponse(2L, 3L, "Colaborador", "col@example.com", 10, "NR 10", null,
-                "CONCLUSAO_EVENTO", true, 42L, "Sem validade");
+                "CONCLUSAO_EVENTO", true, 42L, "Sem validade", "https://example.com/profile-photo", "C");
     }
     @Test void listsTheAuthenticatedScopeWithoutExposingCredentials() throws Exception {
         when(service.findAll(principal)).thenReturn(List.of(response()));
@@ -38,6 +38,8 @@ class ConformityControllerTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].id").value(2))
                 .andExpect(jsonPath("$.data[0].origin").value("CONCLUSAO_EVENTO"))
                 .andExpect(jsonPath("$.data[0].status").value("Sem validade"))
+                .andExpect(jsonPath("$.data[0].profilePhotoUrl").value("https://example.com/profile-photo"))
+                .andExpect(jsonPath("$.data[0].avatarInitials").value("C"))
                 .andExpect(jsonPath("$.data[0].password").doesNotExist())
                 .andExpect(jsonPath("$.data[0].senha").doesNotExist())
                 .andExpect(jsonPath("$.data[0].firebaseUid").doesNotExist())
@@ -49,6 +51,8 @@ class ConformityControllerTest {
         when(service.findById(2L, principal)).thenReturn(response());
         mvc.perform(get("/conformities/2")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.eventCompletionId").value(42))
+                .andExpect(jsonPath("$.data.profilePhotoUrl").value("https://example.com/profile-photo"))
+                .andExpect(jsonPath("$.data.avatarInitials").value("C"))
                 .andExpect(jsonPath("$.data.password").doesNotExist())
                 .andExpect(jsonPath("$.data.firebaseUid").doesNotExist());
         when(service.findById(99L, principal)).thenThrow(

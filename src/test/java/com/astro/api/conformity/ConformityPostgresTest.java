@@ -419,6 +419,9 @@ class ConformityPostgresTest {
             com.astro.api.conformity.service.ConformityImportService.class,
             com.astro.api.conformity.service.ConformitySpreadsheetReader.class})
     static class Config {
+        @Bean com.astro.api.user.service.UserAvatarService userAvatarService() {
+            return org.mockito.Mockito.mock(com.astro.api.user.service.UserAvatarService.class);
+        }
         @Bean DataSource dataSource() { return database; }
         @Bean LocalContainerEntityManagerFactoryBean entityManagerFactory(DataSource source) {
             var factory = new LocalContainerEntityManagerFactoryBean();
