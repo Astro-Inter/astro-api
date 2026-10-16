@@ -22,6 +22,8 @@ Todos os endpoints exigem autenticação Firebase validada e perfil GESTOR ou GE
 
 `GET /conformities` consulta `vw_conformidades` e retorna somente aplicáveis, ordenados por nome, colaborador, NR e ID. A view escolhe um registro do par: aplicável primeiro, maior validade com nulos por último e maior ID em empate. Origem, validade, ID e conclusão são do mesmo registro; origens desconhecidas são preservadas. O histórico autorizado inclui colaboradores inativos e NRs revogadas.
 
+As respostas de conformidade incluem `profilePhotoUrl` (URL temporária da foto ou `null` quando indisponível) e `avatarInitials` para exibir as iniciais quando não houver foto. A busca reutiliza `UserAvatarService` e a regra de iniciais de colaboradores, após a autorização de acesso. Na listagem, as fotos são consultadas em lote, inclusive quando um colaborador aparece em várias NRs. Detalhes, criação, edição e alteração de aplicabilidade usam os mesmos campos de resposta.
+
 `GET /conformities/{id}` consulta a tabela e os relacionamentos, inclusive para registros não aplicáveis ou não selecionados na view. Status usa `CURRENT_DATE` do PostgreSQL: antes de hoje = Vencida; hoje ou depois = Válida; nulo = Sem validade. Nenhum status é persistido.
 
 `POST /conformities` recebe `collaboratorId`, `nrId` e `expiresAt` (ISO `yyyy-MM-dd`, opcional ou nulo). Exige colaborador ATIVO e NR não revogada. Cria MANUAL/aplicável/sem conclusão. Qualquer aplicável do par causa 409; registros não aplicáveis são preservados.

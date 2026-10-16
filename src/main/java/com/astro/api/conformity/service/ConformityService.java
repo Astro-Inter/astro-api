@@ -14,6 +14,8 @@ import com.astro.api.user.repository.CollaboratorRepository;
 import com.astro.api.conformity.dto.response.ConformityResponse;
 import com.astro.api.conformity.mapper.ConformityMapper;
 import com.astro.api.conformity.repository.ConformityRepository;
+import com.astro.api.conformity.repository.ConformityProjection;
+import com.astro.api.user.service.UserAvatarService;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
@@ -25,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -34,21 +37,27 @@ public class ConformityService {
     private final ConformityMapper conformityMapper;
     private final CollaboratorRepository collaboratorRepository;
     private final NrCatalogRepository nrCatalogRepository;
+    private final UserAvatarService userAvatarService;
 
     public ConformityService(ConformityRepository conformityRepository, UserRepository userRepository, ConformityMapper conformityMapper,
-                             CollaboratorRepository collaboratorRepository, NrCatalogRepository nrCatalogRepository) {
+                             CollaboratorRepository collaboratorRepository, NrCatalogRepository nrCatalogRepository,
+                             UserAvatarService userAvatarService) {
         this.conformityRepository = conformityRepository;
         this.userRepository = userRepository;
         this.conformityMapper = conformityMapper;
         this.collaboratorRepository = collaboratorRepository;
         this.nrCatalogRepository = nrCatalogRepository;
+        this.userAvatarService = userAvatarService;
     }
 
     @Transactional(readOnly = true)
     public List<ConformityResponse> findAll(AuthenticatedUser principal) {
         User manager = requireManager(principal);
-        return conformityRepository.findAllInScope(principal.firebaseUid(), manager.getUnit().workspace.id)
-                .stream().map(conformityMapper::toResponse).toList();
+        List<ConformityProjection> conformities = conformityRepository.findAllInScope(principal.firebaseUid(), manager.getUnit().workspace.id);
+        Map<Long, String> profilePhotoUrls = userAvatarService.findUrls(conformities.stream()
+                .map(ConformityProjection::getCollaboratorId).toList());
+        return conformities.stream().map(conformity -> conformityMapper.toResponse(conformity,
+                profilePhotoUrls.get(conformity.getCollaboratorId()))).toList();
     }
 
     @Transactional(readOnly = true)
@@ -144,7 +153,8 @@ public class ConformityService {
 
     private ConformityResponse details(Long conformityId, AuthenticatedUser principal, User manager) {
         return conformityRepository.findDetailsInScope(conformityId, principal.firebaseUid(), manager.getUnit().workspace.id)
-                .map(conformityMapper::toResponse)
+                .map(conformity -> conformityMapper.toResponse(conformity,
+                        userAvatarService.findUrl(conformity.getCollaboratorId())))
                 .orElseThrow(() -> new ResourceNotFoundException("Conformidade não encontrada"));
     }
 

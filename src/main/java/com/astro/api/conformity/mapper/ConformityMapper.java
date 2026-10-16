@@ -8,6 +8,7 @@ import com.astro.api.conformity.dto.request.UpdateConformityRequest;
 import com.astro.api.conformity.model.ConformityImportRow;
 import com.astro.api.conformity.dto.response.ConformityImportResponse.RejectedRow;
 import org.springframework.stereotype.Component;
+import static com.astro.api.user.mapper.UserAvatarMapper.initials;
 
 @Component
 public class ConformityMapper {
@@ -25,9 +26,10 @@ public class ConformityMapper {
         entity.setEventCompletionId(null);
         return entity;
     }
-    public ConformityResponse toResponse(ConformityProjection row) {
+    public ConformityResponse toResponse(ConformityProjection row, String profilePhotoUrl) {
         return new ConformityResponse(row.getId(), row.getCollaboratorId(), row.getCollaboratorName(),
                 row.getCollaboratorEmail(), row.getNrId(), row.getNrTitle(), row.getExpiresAt(), row.getOrigin(),
-                Boolean.TRUE.equals(row.getApplicable()), row.getEventCompletionId(), row.getStatus());
+                Boolean.TRUE.equals(row.getApplicable()), row.getEventCompletionId(), row.getStatus(),
+                profilePhotoUrl, initials(row.getCollaboratorName()));
     }
 }
