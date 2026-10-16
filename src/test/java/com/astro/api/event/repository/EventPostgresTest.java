@@ -2,7 +2,7 @@ package com.astro.api.event.repository;
 
 import com.astro.api.event.mapper.EventMapper;
 import com.astro.api.event.service.EventService;
-import com.astro.api.conformidade.repository.NrCatalogRepository;
+import com.astro.api.conformity.repository.NrCatalogRepository;
 import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.user.repository.UserRepository;
 import jakarta.persistence.EntityManagerFactory;
@@ -287,7 +287,7 @@ class EventPostgresTest {
     }
     @Configuration @EnableTransactionManagement
     @EnableJpaRepositories(basePackageClasses={EventRepository.class,UserRepository.class,RoleRepository.class,NrCatalogRepository.class},
-            excludeFilters=@ComponentScan.Filter(type=FilterType.ASSIGNABLE_TYPE,classes=com.astro.api.conformidade.repository.NrDocumentRepository.class))
+            excludeFilters=@ComponentScan.Filter(type=FilterType.ASSIGNABLE_TYPE,classes=com.astro.api.conformity.repository.NrDocumentRepository.class))
     static class Config {
         @Bean DataSource source() { return dataSource(); }
         @Bean LocalContainerEntityManagerFactoryBean entityManagerFactory(DataSource source) {

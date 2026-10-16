@@ -1,6 +1,6 @@
 package com.astro.api.unit.repository;
 
-import com.astro.api.conformidade.model.NrDocument;
+import com.astro.api.conformity.model.NrDocument;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.mongodb.core.MongoTemplate;

@@ -3,7 +3,7 @@ package com.astro.api.unit.service;
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.security.Role;
 import com.astro.api.common.exception.BusinessException;
-import com.astro.api.conformidade.model.NrDocument;
+import com.astro.api.conformity.model.NrDocument;
 import com.astro.api.unit.dto.request.UnitNrRequest;
 import com.astro.api.unit.dto.request.UpdateUnitNrsRequest;
 import com.astro.api.unit.dto.response.UnitNrOptionResponse;

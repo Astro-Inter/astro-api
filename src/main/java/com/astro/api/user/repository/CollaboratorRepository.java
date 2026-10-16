@@ -10,6 +10,13 @@ import java.util.List;
 import java.util.Optional;
 
 public interface CollaboratorRepository extends JpaRepository<User, Long> {
+    @Query(value = """
+            SELECT u.id_usuario FROM usuario u JOIN unidade un ON un.id_unidade = u.unidade_id
+            WHERE u.cpf = :cpf AND u.tipo = 'COLABORADOR' AND un.workspace_id = :workspaceId
+              AND u.unidade_id IN (SELECT id_unidade FROM fn_seleciona_unidades(:firebaseUid))
+            """, nativeQuery = true)
+    Optional<Long> findIdByCpfInScope(@Param("cpf") String cpf, @Param("firebaseUid") String firebaseUid,
+                                     @Param("workspaceId") Long workspaceId);
     @Query(value = "SELECT ativo FROM cargo WHERE id_cargo = :roleId AND workspace_id = :workspaceId FOR SHARE", nativeQuery = true)
     Boolean lockRoleActive(@Param("roleId") Long roleId, @Param("workspaceId") Long workspaceId);
 

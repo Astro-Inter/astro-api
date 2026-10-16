@@ -14,6 +14,15 @@ import static org.mockito.Mockito.*;
 
 class SpreadsheetImportServiceTest {
     @Test
+    void keepsTheWorkspaceImportLimitAtFiveMegabytes() throws Exception {
+        var file = mock(org.springframework.web.multipart.MultipartFile.class);
+        when(file.getSize()).thenReturn(5L*1024*1024 + 1);
+        var service = new SpreadsheetImportService(mock(UserRepository.class));
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.multipart.MaxUploadSizeExceededException.class,
+                () -> service.read(file));
+        verify(file, never()).getInputStream();
+    }
+    @Test
     void keepsInvalidDuplicateRowsOutOfTheBatchAndUsesOnlyBatchLookups() {
         UserRepository userRepository = mock(UserRepository.class);
         SpreadsheetImportService service = new SpreadsheetImportService(userRepository);
