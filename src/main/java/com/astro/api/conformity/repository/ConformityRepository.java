@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ConformityRepository extends JpaRepository<Conformity, Long> {
+    Optional<Conformity> findByEventCompletionId(Long eventCompletionId);
+
     // Explicit NULLS LAST and ID ordering must match vw_conformidades; Limit restricts the result.
     @Query("""
             SELECT c FROM Conformity c WHERE c.collaboratorId = :collaboratorId AND c.nrId = :nrId

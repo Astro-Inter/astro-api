@@ -7,6 +7,7 @@ import com.astro.api.event.dto.request.CreateEventRequest;
 import com.astro.api.event.dto.request.UpdateEventRequest;
 import com.astro.api.event.dto.response.EventCalendarResponse;
 import com.astro.api.event.dto.response.CollaboratorEventResponse;
+import com.astro.api.event.dto.response.CollaboratorEventDetailsResponse;
 import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.service.EventService;
@@ -79,6 +80,25 @@ public class EventController {
                 authenticatedUser.firebaseUid());
         return ResponseEntity.ok(ApiResult.success(
                 "Eventos do colaborador retornados com sucesso", events, request.getRequestURI()));
+    }
+
+    @GetMapping("/collaborator/{eventId}")
+    @PreAuthorize("hasAnyRole('COLABORADOR', 'GESTOR', 'GESTOR_WORKSPACE')")
+    @Operation(summary = "Retorna os detalhes do evento na turma do colaborador autenticado")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Detalhes retornados com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado"),
+            @ApiResponse(responseCode = "403", description = "Não autorizado"),
+            @ApiResponse(responseCode = "404", description = "Evento não encontrado para o colaborador")
+    })
+    public ResponseEntity<ApiResult<CollaboratorEventDetailsResponse>> findCollaboratorEventDetails(
+            @PathVariable Long eventId,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            HttpServletRequest request) {
+        CollaboratorEventDetailsResponse event = eventService.findDetailsForCollaborator(
+                eventId, authenticatedUser.firebaseUid());
+        return ResponseEntity.ok(ApiResult.success(
+                "Detalhes do evento retornados com sucesso", event, request.getRequestURI()));
     }
 
     @GetMapping("/eligible-candidates")

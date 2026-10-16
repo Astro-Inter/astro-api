@@ -14,6 +14,9 @@ import com.astro.api.event.model.Event;
 import com.astro.api.event.model.EventClass;
 import com.astro.api.event.model.EventClassParticipant;
 import com.astro.api.event.model.EventStatus;
+import com.astro.api.conformity.repository.ConformityRepository;
+import com.astro.api.conformity.repository.EventConclusionRepository;
+import com.astro.api.conformity.repository.EventEvidenceRepository;
 import com.astro.api.event.repository.EventClassParticipantRepository;
 import com.astro.api.event.repository.EventClassRepository;
 import com.astro.api.event.repository.EventRepository;
@@ -23,6 +26,7 @@ import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.workspace.model.Workspace;
+import com.astro.api.common.storage.R2StorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -71,7 +75,11 @@ class EventServiceTest {
                 roleRepository,
                 nrCatalogRepository,
                 new EventMapper(),
-                viewedService);
+                viewedService,
+                mock(EventConclusionRepository.class),
+                mock(ConformityRepository.class),
+                mock(EventEvidenceRepository.class),
+                mock(R2StorageService.class));
         workspace = new Workspace();
         workspace.id = 10L;
         manager = createUser(1L, UserStatus.ATIVO, workspace);
