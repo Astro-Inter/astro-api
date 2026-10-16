@@ -15,6 +15,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -58,6 +60,28 @@ public class NotificationController {
                 notificationService.elapsedWholeHours(notification.getCreatedAt())
         )).toList();
         return ResponseEntity.ok(ApiResult.success("Notificações retornadas com sucesso", response,
+                request.getRequestURI()));
+    }
+
+    @PatchMapping("/{notificationId}/viewed")
+    @PreAuthorize("hasAnyRole('COLABORADOR', 'GESTOR', 'GESTOR_WORKSPACE')")
+    @Operation(summary = "Marca uma notificação do usuário autenticado como visualizada",
+            description = "A notificação é identificada pelo ID e a operação é idempotente.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Notificação marcada como visualizada"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado"),
+            @ApiResponse(responseCode = "403", description = "Não autorizado"),
+            @ApiResponse(responseCode = "404", description = "Notificação inexistente ou não pertencente ao usuário"),
+            @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
+    })
+    public ResponseEntity<ApiResult<Void>> markAsViewed(
+            @PathVariable String notificationId,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            HttpServletRequest request) {
+        Long userId = notificationService.requireNotificationOwner(
+                authenticatedUser.firebaseUid(), notificationId);
+        viewedService.markViewed(userId, NOTIFICATIONS_RESOURCE, notificationId);
+        return ResponseEntity.ok(ApiResult.success("Notificação marcada como visualizada", null,
                 request.getRequestURI()));
     }
 }
