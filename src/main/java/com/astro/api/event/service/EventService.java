@@ -4,6 +4,7 @@ import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.service.ViewedService;
+import com.astro.api.common.storage.R2StorageService;
 import com.astro.api.conformidade.repository.NrCatalogRepository;
 import com.astro.api.event.dto.request.CancelEventRequest;
 import com.astro.api.event.dto.request.CreateEventClassRequest;
@@ -13,23 +14,33 @@ import com.astro.api.event.dto.request.UpdateEventRequest;
 import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventCalendarResponse;
 import com.astro.api.event.dto.response.CollaboratorEventResponse;
+import com.astro.api.event.dto.response.CollaboratorEventDetailsResponse;
+import com.astro.api.event.dto.response.EventEvidenceResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.mapper.EventMapper;
 import com.astro.api.event.model.Event;
 import com.astro.api.event.model.EventClass;
 import com.astro.api.event.model.EventClassParticipant;
+import com.astro.api.event.model.EventConclusion;
+import com.astro.api.event.model.EventConclusionStatus;
+import com.astro.api.event.model.EventEvidence;
 import com.astro.api.event.model.EventStatus;
 import com.astro.api.event.repository.EventClassParticipantRepository;
 import com.astro.api.event.repository.EventClassRepository;
+import com.astro.api.event.repository.EventComplianceRepository;
+import com.astro.api.event.repository.EventConclusionRepository;
+import com.astro.api.event.repository.EventEvidenceRepository;
 import com.astro.api.event.repository.EventRepository;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.workspace.model.Workspace;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -52,7 +63,12 @@ public class EventService {
     private final NrCatalogRepository nrCatalogRepository;
     private final EventMapper eventMapper;
     private final ViewedService viewedService;
+    private final EventConclusionRepository eventConclusionRepository;
+    private final EventComplianceRepository eventComplianceRepository;
+    private final EventEvidenceRepository eventEvidenceRepository;
+    private final R2StorageService storageService;
 
+    @Autowired
     public EventService(
             EventRepository eventRepository,
             EventClassRepository eventClassRepository,
@@ -61,7 +77,11 @@ public class EventService {
             RoleRepository roleRepository,
             NrCatalogRepository nrCatalogRepository,
             EventMapper eventMapper,
-            ViewedService viewedService) {
+            ViewedService viewedService,
+            EventConclusionRepository eventConclusionRepository,
+            EventComplianceRepository eventComplianceRepository,
+            EventEvidenceRepository eventEvidenceRepository,
+            R2StorageService storageService) {
         this.eventRepository = eventRepository;
         this.eventClassRepository = eventClassRepository;
         this.eventClassParticipantRepository = eventClassParticipantRepository;
@@ -70,6 +90,10 @@ public class EventService {
         this.nrCatalogRepository = nrCatalogRepository;
         this.eventMapper = eventMapper;
         this.viewedService = viewedService;
+        this.eventConclusionRepository = eventConclusionRepository;
+        this.eventComplianceRepository = eventComplianceRepository;
+        this.eventEvidenceRepository = eventEvidenceRepository;
+        this.storageService = storageService;
     }
 
     @Transactional
@@ -152,6 +176,46 @@ public class EventService {
                         viewedEvents.contains(participation.getEventClass().getEvent().getId().toString()),
                         classStatus(participation.getEventClass(), now)))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public CollaboratorEventDetailsResponse findDetailsForCollaborator(Long eventId, String firebaseUid) {
+        User user = findAuthenticatedUser(firebaseUid);
+        EventClassParticipant participation = eventClassParticipantRepository
+                .findFirstByEventClass_Event_IdAndUser_Id(eventId, user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Evento não encontrado para o colaborador"));
+
+        EventClass eventClass = participation.getEventClass();
+        Event event = eventClass.getEvent();
+        EventConclusion conclusion = eventConclusionRepository
+                .findByParticipation_Id(participation.getId())
+                .orElse(null);
+        boolean completed = conclusion != null && conclusion.getStatus() == EventConclusionStatus.CONCLUIDO;
+        LocalDate validity = !completed || event.getNrId() == null
+                ? null
+                : eventComplianceRepository.findByConclusion_Id(conclusion.getId())
+                        .map(compliance -> compliance.getValidityDate())
+                        .orElse(null);
+        List<EventEvidenceResponse> evidences = !completed
+                ? List.of()
+                : eventEvidenceRepository.findByConclusion_IdOrderById(conclusion.getId()).stream()
+                        .map(evidence -> eventMapper.toEvidenceResponse(
+                                evidence, storageService.getDownloadUrl(evidence.getObjectPath())))
+                        .toList();
+
+        User manager = event.getManager();
+        return new CollaboratorEventDetailsResponse(
+                event.getId(),
+                event.getTitle(),
+                eventClass.getEndDate(),
+                event.getDescription(),
+                validity,
+                event.getExternalLink(),
+                manager.getId(),
+                manager.getName(),
+                event.isMandatoryEvidence(),
+                event.getCompletionMode(),
+                evidences);
     }
 
     @Transactional

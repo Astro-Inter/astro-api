@@ -3,12 +3,14 @@ package com.astro.api.event.mapper;
 import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventCalendarResponse;
 import com.astro.api.event.dto.response.CollaboratorEventResponse;
+import com.astro.api.event.dto.response.EventEvidenceResponse;
 import com.astro.api.event.dto.response.EventClassResponse;
 import com.astro.api.event.dto.response.EventParticipantResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.model.Event;
 import com.astro.api.event.model.EventClass;
 import com.astro.api.event.model.EventClassParticipant;
+import com.astro.api.event.model.EventEvidence;
 import com.astro.api.user.model.User;
 import org.springframework.stereotype.Component;
 
@@ -78,6 +80,15 @@ public class EventMapper {
                 classStatus,
                 eventClass.getName(),
                 event.getStatus());
+    }
+
+    public EventEvidenceResponse toEvidenceResponse(EventEvidence evidence, String downloadUrl) {
+        return new EventEvidenceResponse(
+                evidence.getId(),
+                evidence.getOriginalName(),
+                downloadUrl,
+                evidence.getMimeType(),
+                evidence.getSizeBytes());
     }
 
     private EventParticipantResponse toParticipantResponse(EventClassParticipant classParticipant) {
