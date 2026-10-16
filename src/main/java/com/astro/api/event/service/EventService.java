@@ -1,6 +1,5 @@
 package com.astro.api.event.service;
 
-import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.service.ViewedService;
@@ -10,22 +9,23 @@ import com.astro.api.event.dto.request.CreateEventClassRequest;
 import com.astro.api.event.dto.request.CreateEventRequest;
 import com.astro.api.event.dto.request.UpdateEventClassRequest;
 import com.astro.api.event.dto.request.UpdateEventRequest;
-import com.astro.api.event.dto.response.EventCandidateResponse;
-import com.astro.api.event.dto.response.EventCalendarResponse;
 import com.astro.api.event.dto.response.CollaboratorEventResponse;
+import com.astro.api.event.dto.response.EventCalendarResponse;
+import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.mapper.EventMapper;
 import com.astro.api.event.model.Event;
 import com.astro.api.event.model.EventClass;
 import com.astro.api.event.model.EventClassParticipant;
 import com.astro.api.event.model.EventStatus;
+import com.astro.api.event.repository.EventCandidateRepository;
 import com.astro.api.event.repository.EventClassParticipantRepository;
 import com.astro.api.event.repository.EventClassRepository;
 import com.astro.api.event.repository.EventRepository;
-import com.astro.api.event.repository.EventCandidateRepository;
+import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.user.model.User;
-import com.astro.api.user.model.UserType;
 import com.astro.api.user.model.UserStatus;
+import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.workspace.model.Workspace;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -240,7 +241,7 @@ public class EventService {
             EventClass eventClass = item.eventClass();
             if (item.editable() && eventClass.getId() != null && !eventClass.getName().equals(item.request().name())) {
                 String temporaryName;
-                do { temporaryName = "_" + java.util.UUID.randomUUID(); } while (!reservedNames.add(temporaryName));
+                do { temporaryName = "_" + UUID.randomUUID(); } while (!reservedNames.add(temporaryName));
                 eventClass.setName(temporaryName);
                 changed = true;
             }

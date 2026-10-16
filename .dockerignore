@@ -1,6 +1,7 @@
 .git
 .github
 target
+.test-database
 .env
 .env.*
 !.env.example

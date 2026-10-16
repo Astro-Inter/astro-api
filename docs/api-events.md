@@ -61,13 +61,23 @@ da NR, e o mapper converte a projection no DTO.
 ### Instalação do objeto SQL
 
 Antes de implantar esta revisão da API, instale
-`src/main/resources/db/functions/fn_seleciona_candidatos_evento.sql` no schema das
-tabelas Astro. O script é idempotente para a mesma assinatura, não altera tabelas,
-triggers ou índices e não é executado automaticamente pela aplicação. Ele está
-versionado nesta PR para que o contrato de banco seja revisado junto da chamada.
+[`database/functions/18_fn_seleciona_candidatos_evento.sql`](https://github.com/Astro-Inter/banco-de-dados/blob/488f301e5a2b8c2a0f382f3632018f41ae576651/database/functions/18_fn_seleciona_candidatos_evento.sql)
+do repositório `Astro-Inter/banco-de-dados` no schema das tabelas Astro. A
+[PR #36 do banco](https://github.com/Astro-Inter/banco-de-dados/pull/36) já foi
+mesclada. O script é idempotente para a mesma assinatura, não altera tabelas,
+triggers ou índices e não é executado automaticamente pela aplicação. O SQL da
+função é mantido exclusivamente no repositório do banco e não integra o JAR da API.
 A instalação usa uma conexão autorizada para DDL; o usuário da API mantém seus
 privilégios de leitura nas tabelas e EXECUTE na função. SECURITY INVOKER conserva
 as políticas e permissões de acesso existentes.
+
+Os testes PostgreSQL de eventos leem esse script externo por
+`EVENT_CANDIDATES_SQL_PATH`. Ao habilitar `MANAGER_TEST_DATABASE_URL` localmente,
+defina também essa variável com o caminho do arquivo no clone do banco. A ausência
+do caminho interrompe a preparação dos testes com uma mensagem explícita. No CI,
+o checkout esparso do banco é fixado no commit
+`488f301e5a2b8c2a0f382f3632018f41ae576651`, em `.test-database/`, diretório ignorado
+pelo Git e pelo build da imagem. O Maven não baixa nem instala SQL em produção.
 
 A função foi escolhida porque esta leitura recebe identidade autenticada e NR
 opcional. Uma procedure é desnecessária para um SELECT; uma view não recebe esses

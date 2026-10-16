@@ -3,9 +3,10 @@ package com.astro.api.event.controller;
 import com.astro.api.auth.security.*;
 import com.astro.api.auth.security.Role;
 import com.astro.api.auth.service.*;
+import com.astro.api.common.handler.GlobalExceptionHandler;
 import com.astro.api.config.CorsConfig;
 import com.astro.api.event.service.EventService;
-import com.astro.api.common.handler.GlobalExceptionHandler;
+import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
 import jakarta.servlet.Filter;
 import org.junit.jupiter.api.*;
@@ -17,7 +18,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
+
 import java.util.*;
+
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -43,7 +46,7 @@ class EventSecurityTest {
     @AfterEach void close() { context.close(); }
 
     @Test void requiresAuthenticationAndAdministrativeProfile() throws Exception {
-        when(tokens.verify("invalid")).thenThrow(mock(com.google.firebase.auth.FirebaseAuthException.class));
+        when(tokens.verify("invalid")).thenThrow(mock(FirebaseAuthException.class));
         for (String path : List.of("/events/1", "/events/eligible-candidates", "/events?startDate=2026-10-01T00:00:00&endDate=2026-11-01T00:00:00")) {
             mvc.perform(get(path)).andExpect(status().isUnauthorized());
             mvc.perform(get(path).header("Authorization", "Bearer invalid")).andExpect(status().isUnauthorized());
