@@ -1,5 +1,7 @@
 package com.astro.api.controller;
 
+import java.util.Map;
+import org.springframework.test.web.servlet.MvcResult;
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.security.Role;
 import com.astro.api.common.handler.GlobalExceptionHandler;
@@ -174,25 +176,25 @@ class EventControllerIntegrationTest {
 
     @Test
     void creationValidatesMetadataNestedElementsIdsAndEnumsWithPortugueseMessages() throws Exception {
-        var base=new java.util.LinkedHashMap<String,Object>();
+        Map<String, Object> base=new java.util.LinkedHashMap<String,Object>();
         base.put("title","Evento");base.put("description","Descrição");base.put("completionMode","GESTOR");base.put("mandatoryEvidence",false);
-        var item=new java.util.LinkedHashMap<String,Object>();item.put("name","Grupo");item.put("startDate","2026-10-15T08:00:00");item.put("endDate","2026-10-15T09:00:00");item.put("participantIds",List.of(2));
+        Map<String, Object> item=new java.util.LinkedHashMap<String,Object>();item.put("name","Grupo");item.put("startDate","2026-10-15T08:00:00");item.put("endDate","2026-10-15T09:00:00");item.put("participantIds",List.of(2));
         base.put("eventClasses",List.of(item));
-        for (var invalid:List.of(java.util.Map.entry("title","😀😀"),java.util.Map.entry("description","😀a"),java.util.Map.entry("title","  ab  "),java.util.Map.entry("title","x".repeat(256)),
+        for (Map.Entry<String, String> invalid:List.of(java.util.Map.entry("title","😀😀"),java.util.Map.entry("description","😀a"),java.util.Map.entry("title","  ab  "),java.util.Map.entry("title","x".repeat(256)),
                 java.util.Map.entry("description","  "),java.util.Map.entry("description","ab"),
                 java.util.Map.entry("externalLink","ftp://example.com"),java.util.Map.entry("externalLink","https://exa mple.com"),
                 java.util.Map.entry("externalLink","https://example.com/"+"x".repeat(2048)))) {
-            var body=new java.util.LinkedHashMap<>(base);body.put(invalid.getKey(),invalid.getValue());
-            var result=mockMvc.perform(post("/events").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(body)))
+            Map<String, Object> body=new java.util.LinkedHashMap<>(base);body.put(invalid.getKey(),invalid.getValue());
+            MvcResult result=mockMvc.perform(post("/events").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(body)))
                     .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Erro de validação")).andReturn();
             org.junit.jupiter.api.Assertions.assertFalse(result.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8).contains("{event."));
         }
         for (Object badIds:List.of(java.util.Arrays.asList((Integer)null),List.of(0),List.of(-1),List.of())) {
-            var badItem=new java.util.LinkedHashMap<>(item);badItem.put("participantIds",badIds);
-            var body=new java.util.LinkedHashMap<>(base);body.put("eventClasses",List.of(badItem));
+            Map<String, Object> badItem=new java.util.LinkedHashMap<>(item);badItem.put("participantIds",badIds);
+            Map<String, Object> body=new java.util.LinkedHashMap<>(base);body.put("eventClasses",List.of(badItem));
             mockMvc.perform(post("/events").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(body))).andExpect(status().isBadRequest());
         }
-        var body=new java.util.LinkedHashMap<>(base);body.put("eventClasses",java.util.Arrays.asList((Object)null));
+        Map<String, Object> body=new java.util.LinkedHashMap<>(base);body.put("eventClasses",java.util.Arrays.asList((Object)null));
         mockMvc.perform(post("/events").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(body))).andExpect(status().isBadRequest());
         body=new java.util.LinkedHashMap<>(base);body.put("completionMode","UNKNOWN");
         mockMvc.perform(post("/events").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(body))).andExpect(status().isBadRequest());
@@ -252,7 +254,7 @@ class EventControllerIntegrationTest {
     @Test
     void cancellationRequiresNormalizedReasonAndResolvesPortugueseMessages() throws Exception {
         for(String reason:List.of(""," "," ab ","😀😀","x".repeat(1001))) {
-            var result=mockMvc.perform(patch("/events/1/cancellation").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(new CancelEventRequest(reason))))
+            MvcResult result=mockMvc.perform(patch("/events/1/cancellation").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(new CancelEventRequest(reason))))
                     .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Erro de validação")).andReturn();
             org.junit.jupiter.api.Assertions.assertFalse(result.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8).contains("{event."));
         }
@@ -262,7 +264,7 @@ class EventControllerIntegrationTest {
 
     @Test
     void updateRejectsDescriptionBelowTheDatabaseMinimumAfterTrimming() throws Exception {
-        var body=new UpdateEventRequest("Evento","  ab  ",null,List.of(new UpdateEventClassRequest(2L,"Grupo",LocalDateTime.of(2026,10,15,8,0),LocalDateTime.of(2026,10,15,9,0),List.of(3L))));
+        UpdateEventRequest body=new UpdateEventRequest("Evento","  ab  ",null,List.of(new UpdateEventClassRequest(2L,"Grupo",LocalDateTime.of(2026,10,15,8,0),LocalDateTime.of(2026,10,15,9,0),List.of(3L))));
         mockMvc.perform(patch("/events/1").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Erro de validação"));
         org.mockito.Mockito.verifyNoInteractions(eventService);

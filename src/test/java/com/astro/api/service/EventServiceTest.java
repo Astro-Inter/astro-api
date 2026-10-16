@@ -1,5 +1,12 @@
 package com.astro.api.service;
 
+import com.astro.api.event.dto.request.UpdateEventRequest;
+import com.astro.api.event.dto.response.CollaboratorEventResponse;
+import com.astro.api.event.dto.response.EventCalendarResponse;
+import com.astro.api.event.dto.response.EventCandidateResponse;
+import com.astro.api.event.dto.response.EventResponse;
+import com.astro.api.event.repository.EventCalendarProjection;
+import com.astro.api.event.repository.EventCandidateProjection;
 import com.astro.api.role.model.Role;
 import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.common.exception.BusinessException;
@@ -100,7 +107,7 @@ class EventServiceTest {
         when(eventClassParticipantRepository.saveAll(any())).thenAnswer(
                 invocation -> invocation.getArgument(0));
 
-        var response = service.create(createRequest(null, List.of(2L)), "manager");
+        EventResponse response = service.create(createRequest(null, List.of(2L)), "manager");
 
         assertEquals(EventStatus.ATIVO, response.status());
         assertEquals(1, response.eventClasses().size());
@@ -186,13 +193,13 @@ class EventServiceTest {
                 event,
                 LocalDateTime.now().minusHours(2),
                 LocalDateTime.now().minusHours(1));
-        var start = LocalDateTime.of(2026, 10, 1, 0, 0);
-        var end = LocalDateTime.of(2026, 11, 1, 0, 0);
-        var row = mock(com.astro.api.event.repository.EventCalendarProjection.class);
+        LocalDateTime start = LocalDateTime.of(2026, 10, 1, 0, 0);
+        LocalDateTime end = LocalDateTime.of(2026, 11, 1, 0, 0);
+        EventCalendarProjection row = mock(com.astro.api.event.repository.EventCalendarProjection.class);
         when(row.getEventTitle()).thenReturn("Event");
         when(row.getStatus()).thenReturn(EventStatus.ATIVO);
         when(eventClassRepository.findCalendar(workspace, start, end)).thenReturn(List.of(row));
-        var response = service.findAll(start, end, "manager");
+        List<EventCalendarResponse> response = service.findAll(start, end, "manager");
         assertEquals(1, response.size());
         assertEquals("Event", response.getFirst().eventTitle());
         assertEquals(EventStatus.ATIVO, response.getFirst().status());
@@ -223,7 +230,7 @@ class EventServiceTest {
         when(eventClassRepository.findByEventOrderByStartDate(event)).thenReturn(List.of(eventClass));
         when(eventClassParticipantRepository.findByEventClassIn(List.of(eventClass))).thenReturn(List.of());
 
-        var response = service.cancel(30L, new CancelEventRequest("Valid reason"), "manager");
+        EventResponse response = service.cancel(30L, new CancelEventRequest("Valid reason"), "manager");
 
         assertEquals(EventStatus.CANCELADO, response.status());
         assertNotNull(event.getCancellationDate());
@@ -238,12 +245,12 @@ class EventServiceTest {
         EventClass started = createEventClass(event, LocalDateTime.of(2026, 10, 14, 12, 0), LocalDateTime.of(2026, 10, 14, 13, 0));
         when(eventRepository.findByIdAndManager_Unit_Workspace(30L, workspace)).thenReturn(Optional.of(event));
         when(eventClassRepository.findByEventOrderByStartDate(event)).thenReturn(List.of(future, started));
-        var first = new com.astro.api.event.model.EventClassParticipant();
+        EventClassParticipant first = new com.astro.api.event.model.EventClassParticipant();
         first.setId(91L); first.setEventClass(future); first.setUser(createUser(3L, UserStatus.ATIVO, workspace));
-        var second = new com.astro.api.event.model.EventClassParticipant();
+        EventClassParticipant second = new com.astro.api.event.model.EventClassParticipant();
         second.setId(92L); second.setEventClass(future); second.setUser(createUser(2L, UserStatus.ATIVO, workspace));
         when(eventClassParticipantRepository.findByEventClassIn(List.of(future, started))).thenReturn(List.of(first, second));
-        var response = service.findById(30L, "manager");
+        EventResponse response = service.findById(30L, "manager");
         assertEquals(1L, response.managerId());
         org.junit.jupiter.api.Assertions.assertTrue(response.canEdit());
         org.junit.jupiter.api.Assertions.assertTrue(response.canCancel());
@@ -261,7 +268,7 @@ class EventServiceTest {
         Event event = createEvent(EventStatus.ATIVO);
         event.setManager(createUser(99L, UserStatus.ATIVO, workspace));
         when(eventRepository.findByIdAndManager_Unit_Workspace(30L, workspace)).thenReturn(Optional.of(event));
-        var response = service.findById(30L, "manager");
+        EventResponse response = service.findById(30L, "manager");
         org.junit.jupiter.api.Assertions.assertFalse(response.canEdit());
         org.junit.jupiter.api.Assertions.assertFalse(response.canCancel());
         org.junit.jupiter.api.Assertions.assertFalse(response.detailsEditable());
@@ -278,10 +285,10 @@ class EventServiceTest {
     void finalEventStatesDisableEveryPermission() {
         for (EventStatus status : List.of(EventStatus.CANCELADO, EventStatus.CONCLUIDO)) {
             Event event = createEvent(status);
-            var future = createEventClass(event, LocalDateTime.of(2026, 10, 15, 8, 0), LocalDateTime.of(2026, 10, 15, 9, 0));
+            EventClass future = createEventClass(event, LocalDateTime.of(2026, 10, 15, 8, 0), LocalDateTime.of(2026, 10, 15, 9, 0));
             when(eventRepository.findByIdAndManager_Unit_Workspace(30L, workspace)).thenReturn(Optional.of(event));
             when(eventClassRepository.findByEventOrderByStartDate(event)).thenReturn(List.of(future));
-            var response = service.findById(30L, "manager");
+            EventResponse response = service.findById(30L, "manager");
             org.junit.jupiter.api.Assertions.assertFalse(response.canEdit());
             org.junit.jupiter.api.Assertions.assertFalse(response.canCancel());
             org.junit.jupiter.api.Assertions.assertFalse(response.detailsEditable());
@@ -291,8 +298,8 @@ class EventServiceTest {
 
     @Test
     void requiresBothCalendarLimitsAndReturnsEmptyCalendar() {
-        var start = LocalDateTime.of(2026, 10, 1, 0, 0);
-        var end = start.plusDays(1);
+        LocalDateTime start = LocalDateTime.of(2026, 10, 1, 0, 0);
+        LocalDateTime end = start.plusDays(1);
         assertThrows(BusinessException.class, () -> service.findAll(null, end, "manager"));
         assertThrows(BusinessException.class, () -> service.findAll(start, null, "manager"));
         assertThrows(BusinessException.class, () -> service.findAll(start, start, "manager"));
@@ -301,13 +308,13 @@ class EventServiceTest {
 
     @Test
     void candidatesUseWorkspaceCreatorAndNrFiltersAndCanonicalWorkModel() {
-        var row = mock(com.astro.api.event.repository.EventCandidateProjection.class);
+        EventCandidateProjection row = mock(com.astro.api.event.repository.EventCandidateProjection.class);
         when(row.getId()).thenReturn(3L); when(row.getRoleId()).thenReturn(103L);
         when(row.getUnitId()).thenReturn(7L); when(row.getUnitName()).thenReturn("Sede");
         when(row.getWorkModel()).thenReturn("HIBRIDO");
         when(nrCatalogRepository.existsById(10)).thenReturn(true);
         when(candidateRepository.findEligibleCandidates("manager",10)).thenReturn(List.of(row));
-        var response = service.findEligibleCandidates(10,"manager").getFirst();
+        EventCandidateResponse response = service.findEligibleCandidates(10,"manager").getFirst();
         assertEquals(7L,response.unitId()); assertEquals("Sede",response.unitName());
         assertEquals(com.astro.api.user.model.WorkModel.HIBRIDO,response.workModel());
         verify(candidateRepository).findEligibleCandidates("manager",10);
@@ -318,12 +325,12 @@ class EventServiceTest {
 
     @Test
     void rejectsPartiallyOverlappingParticipantsAndDuplicateNormalizedClassNames() {
-        var start=LocalDateTime.of(2026,10,15,8,0);
-        var a=new CreateEventClassRequest("A",start,start.plusHours(1),List.of(2L,3L));
-        var b=new CreateEventClassRequest("B",start,start.plusHours(1),List.of(3L,4L));
-        var request=new CreateEventRequest("Evento","Descrição",null,null,CompletionMode.GESTOR,false,List.of(a,b));
+        LocalDateTime start=LocalDateTime.of(2026,10,15,8,0);
+        CreateEventClassRequest a=new CreateEventClassRequest("A",start,start.plusHours(1),List.of(2L,3L));
+        CreateEventClassRequest b=new CreateEventClassRequest("B",start,start.plusHours(1),List.of(3L,4L));
+        CreateEventRequest request=new CreateEventRequest("Evento","Descrição",null,null,CompletionMode.GESTOR,false,List.of(a,b));
         assertThrows(BusinessException.class,()->service.create(request,"manager"));
-        var duplicateName=new CreateEventClassRequest(" A ",start,start.plusHours(1),List.of(4L));
+        CreateEventClassRequest duplicateName=new CreateEventClassRequest(" A ",start,start.plusHours(1),List.of(4L));
         assertThrows(BusinessException.class,()->service.create(new CreateEventRequest("Evento","Descrição",null,null,CompletionMode.GESTOR,false,List.of(a,duplicateName)),"manager"));
         verify(userRepository,never()).findEventParticipantsInWorkspace(any(),any());
         verifyNoInteractions(eventRepository);
@@ -331,9 +338,9 @@ class EventServiceTest {
 
     @Test
     void rejectsNullClassesAndNullNonpositiveRepeatedOrEmptyParticipants() {
-        var start=LocalDateTime.of(2026,10,15,8,0);
+        LocalDateTime start=LocalDateTime.of(2026,10,15,8,0);
         for (List<Long> ids : java.util.Arrays.asList(null,List.<Long>of(),java.util.Arrays.asList((Long)null),List.of(0L),List.of(-1L),List.of(2L,2L))) {
-            var item=new CreateEventClassRequest("A",start,start.plusHours(1),ids);
+            CreateEventClassRequest item=new CreateEventClassRequest("A",start,start.plusHours(1),ids);
             assertThrows(BusinessException.class,()->service.create(new CreateEventRequest("Evento","Descrição",null,null,CompletionMode.GESTOR,false,List.of(item)),"manager"));
         }
         assertThrows(BusinessException.class,()->service.create(new CreateEventRequest("Evento","Descrição",null,null,CompletionMode.GESTOR,false,java.util.Arrays.asList((CreateEventClassRequest)null)),"manager"));
@@ -343,9 +350,9 @@ class EventServiceTest {
     @Test
     void rejectsMissingParticipantsAndInvalidClassDates() {
         assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,()->service.create(createRequest(null,List.of(999L)),"manager"));
-        var start=LocalDateTime.of(2026,10,15,8,0);
+        LocalDateTime start=LocalDateTime.of(2026,10,15,8,0);
         for (LocalDateTime end:List.of(start,start.minusHours(1))) {
-            var item=new CreateEventClassRequest("A",start,end,List.of(2L));
+            CreateEventClassRequest item=new CreateEventClassRequest("A",start,end,List.of(2L));
             assertThrows(BusinessException.class,()->service.create(new CreateEventRequest("Evento","Descrição",null,null,CompletionMode.GESTOR,false,List.of(item)),"manager"));
         }
     }
@@ -353,12 +360,12 @@ class EventServiceTest {
     @Test
     void updateRejectsPartialOverlapWithoutChangingManagedClasses() {
         Event event=createEvent(EventStatus.ATIVO);
-        var start=LocalDateTime.of(2026,10,15,8,0);
+        LocalDateTime start=LocalDateTime.of(2026,10,15,8,0);
         EventClass a=createEventClass(event,start,start.plusHours(1));
         EventClass b=createEventClass(event,start,start.plusHours(1));b.setId(41L);b.setName("B");
         when(eventRepository.findLockedInWorkspace(30L,workspace)).thenReturn(Optional.of(event));
         when(eventClassRepository.findByEventOrderByStartDate(event)).thenReturn(List.of(a,b));
-        var request=new com.astro.api.event.dto.request.UpdateEventRequest("Changed","Descrição",null,List.of(
+        UpdateEventRequest request=new com.astro.api.event.dto.request.UpdateEventRequest("Changed","Descrição",null,List.of(
                 new com.astro.api.event.dto.request.UpdateEventClassRequest(40L,"New A",start,start.plusHours(1),List.of(2L,3L)),
                 new com.astro.api.event.dto.request.UpdateEventClassRequest(41L,"New B",start,start.plusHours(1),List.of(3L,4L))));
         assertThrows(BusinessException.class,()->service.update(30L,request,"manager"));
@@ -368,17 +375,17 @@ class EventServiceTest {
 
     @Test
     void updatePreservesUnchangedParticipantRecordsInsteadOfDeletingAndRecreating() {
-        Event event=createEvent(EventStatus.ATIVO);var start=LocalDateTime.of(2026,10,15,8,0);
+        Event event=createEvent(EventStatus.ATIVO);LocalDateTime start=LocalDateTime.of(2026,10,15,8,0);
         EventClass a=createEventClass(event,start,start.plusHours(1));
         User user=createUser(2L,UserStatus.ATIVO,workspace);
-        var participation=new com.astro.api.event.model.EventClassParticipant();participation.setId(90L);participation.setEventClass(a);participation.setUser(user);
+        EventClassParticipant participation=new com.astro.api.event.model.EventClassParticipant();participation.setId(90L);participation.setEventClass(a);participation.setUser(user);
         when(eventRepository.findLockedInWorkspace(30L,workspace)).thenReturn(Optional.of(event));
         when(eventClassRepository.findByEventOrderByStartDate(event)).thenReturn(List.of(a));
         when(eventClassParticipantRepository.findByEventClassIn(List.of(a))).thenReturn(List.of(participation));
         when(userRepository.findEventParticipantsInWorkspace(any(),eq(workspace))).thenReturn(List.of(user));
-        var body=new com.astro.api.event.dto.request.UpdateEventRequest("Event","Descrição",null,List.of(
+        UpdateEventRequest body=new com.astro.api.event.dto.request.UpdateEventRequest("Event","Descrição",null,List.of(
                 new com.astro.api.event.dto.request.UpdateEventClassRequest(40L,"Class",start,start.plusHours(2),List.of(2L))));
-        var response=service.update(30L,body,"manager");
+        EventResponse response=service.update(30L,body,"manager");
         assertEquals(90L,response.eventClasses().getFirst().participants().getFirst().participationId());
         verify(eventClassParticipantRepository).deleteAll(List.of());
         verify(eventClassParticipantRepository).saveAll(List.of());
@@ -393,7 +400,7 @@ class EventServiceTest {
             assertThrows(BusinessException.class,()->service.cancel(30L,new CancelEventRequest(reason),"manager"));
             assertEquals(EventStatus.ATIVO,event.getStatus());
         }
-        var response=service.cancel(30L,new CancelEventRequest("  Motivo válido  "),"manager");
+        EventResponse response=service.cancel(30L,new CancelEventRequest("  Motivo válido  "),"manager");
         assertEquals("Motivo válido",response.cancellationReason());
         assertEquals(java.time.Instant.parse("2026-10-14T12:00:00Z"),response.cancellationDate());
         org.junit.jupiter.api.Assertions.assertFalse(response.canEdit());org.junit.jupiter.api.Assertions.assertFalse(response.canCancel());
@@ -424,7 +431,7 @@ class EventServiceTest {
                 .thenReturn(List.of(pastParticipation, futureParticipation));
         when(viewedService.findViewed(2L, "events", List.of(31L, 32L))).thenReturn(Set.of("31"));
 
-        var response = service.findForCollaborator("collaborator");
+        List<CollaboratorEventResponse> response = service.findForCollaborator("collaborator");
 
         assertEquals(2, response.size());
         assertEquals("CANCELADO", response.getFirst().classStatus());

@@ -48,7 +48,7 @@ class EventSecurityTest {
             mvc.perform(get(path)).andExpect(status().isUnauthorized());
             mvc.perform(get(path).header("Authorization", "Bearer invalid")).andExpect(status().isUnauthorized());
         }
-        var token = mock(FirebaseToken.class); when(token.getUid()).thenReturn("uid");
+        FirebaseToken token = mock(FirebaseToken.class); when(token.getUid()).thenReturn("uid");
         when(tokens.verify("valid")).thenReturn(token);
         for (Role role : List.of(Role.COLABORADOR, Role.ADMIN)) {
             when(authorization.getRole("uid")).thenReturn(Optional.of(role));
@@ -57,7 +57,7 @@ class EventSecurityTest {
         verifyNoInteractions(service);
     }
     @Test void permitsBothManagerProfilesAndResolvesCandidatesBeforeParameterizedRoute() throws Exception {
-        var token = mock(FirebaseToken.class); when(token.getUid()).thenReturn("uid");
+        FirebaseToken token = mock(FirebaseToken.class); when(token.getUid()).thenReturn("uid");
         when(tokens.verify("valid")).thenReturn(token);
         for (Role role : List.of(Role.GESTOR, Role.GESTOR_WORKSPACE)) {
             when(authorization.getRole("uid")).thenReturn(Optional.of(role));
