@@ -3,6 +3,7 @@ package com.astro.api.event.service;
 import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ResourceNotFoundException;
+import com.astro.api.common.storage.R2StorageService;
 import com.astro.api.common.service.ViewedService;
 import com.astro.api.conformity.repository.NrCatalogRepository;
 import com.astro.api.event.dto.request.CancelEventRequest;
@@ -14,20 +15,30 @@ import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventCalendarResponse;
 import com.astro.api.event.dto.response.CollaboratorEventResponse;
 import com.astro.api.event.dto.response.EventResponse;
+import com.astro.api.event.dto.response.EventCompletionResponse;
 import com.astro.api.event.mapper.EventMapper;
 import com.astro.api.event.model.Event;
 import com.astro.api.event.model.EventClass;
 import com.astro.api.event.model.EventClassParticipant;
 import com.astro.api.event.model.EventStatus;
+import com.astro.api.event.model.CompletionMode;
+import com.astro.api.event.model.EventCompletion;
+import com.astro.api.event.model.EventCompletionStatus;
+import com.astro.api.event.model.EventEvidence;
 import com.astro.api.event.repository.EventClassParticipantRepository;
 import com.astro.api.event.repository.EventClassRepository;
 import com.astro.api.event.repository.EventRepository;
+import com.astro.api.event.repository.EventCompletionRepository;
+import com.astro.api.event.repository.EventEvidenceRepository;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.workspace.model.Workspace;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -52,6 +63,9 @@ public class EventService {
     private final NrCatalogRepository nrCatalogRepository;
     private final EventMapper eventMapper;
     private final ViewedService viewedService;
+    private final EventCompletionRepository eventCompletionRepository;
+    private final EventEvidenceRepository eventEvidenceRepository;
+    private final R2StorageService storageService;
 
     public EventService(
             EventRepository eventRepository,
@@ -61,7 +75,10 @@ public class EventService {
             RoleRepository roleRepository,
             NrCatalogRepository nrCatalogRepository,
             EventMapper eventMapper,
-            ViewedService viewedService) {
+            ViewedService viewedService,
+            EventCompletionRepository eventCompletionRepository,
+            EventEvidenceRepository eventEvidenceRepository,
+            R2StorageService storageService) {
         this.eventRepository = eventRepository;
         this.eventClassRepository = eventClassRepository;
         this.eventClassParticipantRepository = eventClassParticipantRepository;
@@ -70,6 +87,9 @@ public class EventService {
         this.nrCatalogRepository = nrCatalogRepository;
         this.eventMapper = eventMapper;
         this.viewedService = viewedService;
+        this.eventCompletionRepository = eventCompletionRepository;
+        this.eventEvidenceRepository = eventEvidenceRepository;
+        this.storageService = storageService;
     }
 
     @Transactional
@@ -152,6 +172,43 @@ public class EventService {
                         viewedEvents.contains(participation.getEventClass().getEvent().getId().toString()),
                         classStatus(participation.getEventClass(), now)))
                 .toList();
+    }
+
+    @Transactional
+    public EventCompletionResponse requestCompletion(
+            Long eventId, List<MultipartFile> files, String firebaseUid) {
+        User collaborator = findAuthenticatedUser(firebaseUid);
+        if (collaborator.getStatus() != UserStatus.ATIVO) {
+            throw new BusinessException("Colaborador não está ATIVO");
+        }
+        EventClassParticipant participation = eventClassParticipantRepository
+                .findByEventClass_Event_IdAndUser_Id(eventId, collaborator.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Participação no evento não encontrada"));
+        Event event = participation.getEventClass().getEvent();
+        ensureCollaboratorCompletionAllowed(event, participation.getEventClass());
+        List<MultipartFile> evidenceFiles = files == null ? List.of() : files;
+        validateEvidenceFiles(event, evidenceFiles);
+
+        EventCompletion completion = eventCompletionRepository.findByParticipation_Id(participation.getId())
+                .map(existing -> prepareResubmission(existing))
+                .orElseGet(() -> newPendingCompletion(participation));
+        completion = eventCompletionRepository.save(completion);
+
+        List<EventEvidence> previousEvidence = eventEvidenceRepository.findByCompletion_Id(completion.getId());
+        List<EventEvidence> evidence = new ArrayList<>();
+        try {
+            for (MultipartFile file : evidenceFiles) {
+                evidence.add(uploadEvidence(completion, file));
+            }
+        } catch (RuntimeException exception) {
+            evidence.forEach(item -> storageService.deleteEventEvidence(item.getObjectPath()));
+            throw exception;
+        }
+        eventEvidenceRepository.deleteByCompletion_Id(completion.getId());
+        eventEvidenceRepository.saveAll(evidence);
+        scheduleEvidenceObjectCleanup(previousEvidence, evidence);
+
+        return new EventCompletionResponse(completion.getId(), completion.getStatus(), completion.getCompletionDate());
     }
 
     @Transactional
@@ -513,6 +570,118 @@ public class EventService {
         if (!isEventClassEditable(eventClass)) {
             throw new BusinessException("Turma já iniciada");
         }
+    }
+
+    private void ensureCollaboratorCompletionAllowed(Event event, EventClass eventClass) {
+        if (event.getStatus() != EventStatus.ATIVO) {
+            throw new BusinessException("Evento cancelado não aceita conclusão");
+        }
+        if (event.getCompletionMode() != CompletionMode.COLABORADOR) {
+            throw new BusinessException("Este evento não permite conclusão pelo colaborador");
+        }
+        LocalDateTime now = LocalDateTime.now();
+        if (now.isBefore(eventClass.getStartDate()) || now.isAfter(eventClass.getEndDate())) {
+            throw new BusinessException("A conclusão só pode ser enviada durante a turma");
+        }
+    }
+
+    private void validateEvidenceFiles(Event event, List<MultipartFile> files) {
+        if (files.size() > 3) {
+            throw new BusinessException("A conclusão permite no máximo 3 evidências");
+        }
+        if (event.isMandatoryEvidence() && files.isEmpty()) {
+            throw new BusinessException("Este evento exige ao menos uma evidência");
+        }
+        for (MultipartFile file : files) {
+            if (file == null || file.isEmpty()) {
+                throw new BusinessException("A evidência não pode estar vazia");
+            }
+            if (file.getSize() > 50L * 1024 * 1024) {
+                throw new BusinessException("Cada evidência deve ter no máximo 50 MB");
+            }
+            evidenceName(file);
+            evidenceMimeType(file);
+        }
+    }
+
+    private EventCompletion newPendingCompletion(EventClassParticipant participation) {
+        EventCompletion completion = new EventCompletion();
+        completion.setParticipation(participation);
+        completion.setStatus(EventCompletionStatus.PENDENTE);
+        completion.setCompletionDate(LocalDateTime.now());
+        return completion;
+    }
+
+    private EventCompletion prepareResubmission(EventCompletion completion) {
+        if (completion.getStatus() == EventCompletionStatus.PENDENTE) {
+            throw new BusinessException("A conclusão já está pendente de validação");
+        }
+        if (completion.getStatus() == EventCompletionStatus.CONCLUIDO) {
+            throw new BusinessException("A conclusão já foi validada");
+        }
+        completion.setStatus(EventCompletionStatus.PENDENTE);
+        completion.setCompletionDate(LocalDateTime.now());
+        completion.setValidationDate(null);
+        completion.setExpirationDate(null);
+        completion.setRejectionReason(null);
+        return completion;
+    }
+
+    private EventEvidence uploadEvidence(EventCompletion completion, MultipartFile file) {
+        String mimeType = evidenceMimeType(file);
+        EventEvidence evidence = new EventEvidence();
+        evidence.setCompletion(completion);
+        evidence.setOriginalName(evidenceName(file));
+        evidence.setMimeType(mimeType);
+        evidence.setSizeBytes(file.getSize());
+        evidence.setObjectPath(storageService.uploadEventEvidence(completion.getId(), file, mimeType));
+        return evidence;
+    }
+
+    private String evidenceName(MultipartFile file) {
+        String originalName = file.getOriginalFilename();
+        if (originalName == null) {
+            throw new BusinessException("A evidência deve possuir um nome de arquivo");
+        }
+        String name = originalName.replace('\\', '/');
+        name = name.substring(name.lastIndexOf('/') + 1).trim();
+        if (name.isEmpty() || name.length() > 255) {
+            throw new BusinessException("O nome da evidência deve ter entre 1 e 255 caracteres");
+        }
+        return name;
+    }
+
+    private String evidenceMimeType(MultipartFile file) {
+        String mimeType = file.getContentType();
+        if (mimeType == null || mimeType.isBlank()) {
+            return "application/octet-stream";
+        }
+        mimeType = mimeType.trim();
+        if (mimeType.length() > 127 || !mimeType.matches("^[A-Za-z0-9.+-]+/[A-Za-z0-9.+-]+$")) {
+            throw new BusinessException("O tipo MIME da evidência é inválido");
+        }
+        return mimeType;
+    }
+
+    private void scheduleEvidenceObjectCleanup(
+            List<EventEvidence> previousEvidence, List<EventEvidence> newEvidence) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            previousEvidence.forEach(item -> storageService.deleteEventEvidence(item.getObjectPath()));
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                previousEvidence.forEach(item -> storageService.deleteEventEvidence(item.getObjectPath()));
+            }
+
+            @Override
+            public void afterCompletion(int status) {
+                if (status == STATUS_ROLLED_BACK) {
+                    newEvidence.forEach(item -> storageService.deleteEventEvidence(item.getObjectPath()));
+                }
+            }
+        });
     }
 
     private boolean isEventClassEditable(EventClass eventClass) {

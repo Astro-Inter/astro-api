@@ -9,6 +9,7 @@ import com.astro.api.event.dto.response.EventCalendarResponse;
 import com.astro.api.event.dto.response.CollaboratorEventResponse;
 import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventResponse;
+import com.astro.api.event.dto.response.EventCompletionResponse;
 import com.astro.api.event.service.EventService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -17,6 +18,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,8 +28,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -79,6 +83,29 @@ public class EventController {
                 authenticatedUser.firebaseUid());
         return ResponseEntity.ok(ApiResult.success(
                 "Eventos do colaborador retornados com sucesso", events, request.getRequestURI()));
+    }
+
+    @PostMapping(value = "/{eventId}/completion", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('COLABORADOR')")
+    @Operation(summary = "Envia a solicitação de conclusão de um evento pelo colaborador",
+            description = "Recebe de zero a três arquivos no campo opcional files. Cada arquivo pode ter até 50 MB; eventos que exigem evidência precisam receber ao menos um arquivo.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Solicitação enviada para validação"),
+            @ApiResponse(responseCode = "400", description = "Dados ou regras de negócio inválidos"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado"),
+            @ApiResponse(responseCode = "403", description = "Não autorizado"),
+            @ApiResponse(responseCode = "404", description = "Evento ou participação não encontrada"),
+            @ApiResponse(responseCode = "413", description = "Upload excede o limite permitido")
+    })
+    public ResponseEntity<ApiResult<EventCompletionResponse>> requestCompletion(
+            @PathVariable Long eventId,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            HttpServletRequest request) {
+        EventCompletionResponse completion = eventService.requestCompletion(
+                eventId, files, authenticatedUser.firebaseUid());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResult.success(
+                "Solicitação de conclusão enviada para validação", completion, request.getRequestURI()));
     }
 
     @GetMapping("/eligible-candidates")

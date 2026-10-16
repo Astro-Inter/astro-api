@@ -23,6 +23,7 @@ import java.time.temporal.ChronoUnit;
 public class R2StorageService {
 
     private static final int MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+    private static final int MAX_EVIDENCE_SIZE = 50 * 1024 * 1024;
 
     private final ObjectProvider<S3Presigner> presigner;
     private final R2Properties properties;
@@ -60,10 +61,39 @@ public class R2StorageService {
         return objectPath;
     }
 
+    public String uploadEventEvidence(Long completionId, MultipartFile file, String contentType) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException("A evidência não pode estar vazia.");
+        }
+        if (file.getSize() > MAX_EVIDENCE_SIZE) {
+            throw new BusinessException("Cada evidência deve ter no máximo 50 MB.");
+        }
+        byte[] bytes;
+        try (InputStream input = file.getInputStream()) {
+            bytes = input.readNBytes(MAX_EVIDENCE_SIZE + 1);
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Não foi possível ler a evidência enviada.", exception);
+        }
+        if (bytes.length == 0 || bytes.length > MAX_EVIDENCE_SIZE) {
+            throw new BusinessException("Cada evidência deve ter entre 1 byte e 50 MB.");
+        }
+        String objectPath = "eventos/conclusoes/" + completionId + "/" + UUID.randomUUID();
+        properties.validateEvidenceBucket();
+        client.getObject().putObject(PutObjectRequest.builder().bucket(properties.evidenceBucket())
+                .key(objectPath).contentType(contentType).build(), RequestBody.fromBytes(bytes));
+        return objectPath;
+    }
+
     public void deleteObject(String objectPath) {
         properties.validate();
         client.getObject().deleteObject(DeleteObjectRequest.builder()
                 .bucket(properties.bucket()).key(objectPath).build());
+    }
+
+    public void deleteEventEvidence(String objectPath) {
+        properties.validateEvidenceBucket();
+        client.getObject().deleteObject(DeleteObjectRequest.builder()
+                .bucket(properties.evidenceBucket()).key(objectPath).build());
     }
 
     private String imageExtension(byte[] bytes) {

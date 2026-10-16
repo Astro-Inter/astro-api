@@ -77,7 +77,7 @@ class R2StorageServiceTest {
     @Test
     void shouldRejectMissingConfigurationAndInvalidExpiration() {
         assertThrows(IllegalStateException.class, () -> new R2Config().r2Presigner(
-                new R2Properties("", "", "", "", Duration.ofMinutes(15))));
+                new R2Properties("", "", "", "", "", Duration.ofMinutes(15))));
         for (Duration duration : new Duration[]{Duration.ZERO, Duration.ofSeconds(-1), Duration.ofDays(8)}) {
             assertThrows(IllegalStateException.class, () -> new R2Config().r2Presigner(properties(duration)));
         }
@@ -85,7 +85,7 @@ class R2StorageServiceTest {
 
     private R2Properties properties(Duration duration) {
         return new R2Properties("https://account.r2.cloudflarestorage.com", "photos",
-                "test-access-key", "test-secret-key", duration);
+                "evidences", "test-access-key", "test-secret-key", duration);
     }
 
     @SuppressWarnings("unchecked")

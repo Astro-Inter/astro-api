@@ -42,7 +42,7 @@ public class ConformityController {
     @Operation(summary = "Importa conformidades de uma planilha Excel",
             description = "Parte multipart file: XLS/XLSX até 10 MB, primeira aba, cabeçalhos CPF, NR e Data de validade. Aceita datas reais do Excel ou dd/MM/yyyy e yyyy-MM-dd; data vazia e fórmulas são rejeitadas. Normaliza CPF com zeros à esquerda. A primeira linha válida confirmada do CPF/NR prevalece; repetições são rejeitadas. Sem aplicável, cria MANUAL; com aplicáveis, atualiza somente a validade do representante (maior validade, nulos por último, maior ID). Cada linha usa transação independente; retorna totais e rejeições por linha. Novas inclusões exigem colaborador ATIVO e NR não revogada; atualização de histórico autorizado preserva origem, aplicabilidade e conclusão.")
     @ApiResponses({@ApiResponse(responseCode = "200", description = "Resultado do lote, inclusive rejeições"),
-            @ApiResponse(responseCode = "413", description = "Arquivo maior que 10 MB ou requisição maior que 11 MB")})
+            @ApiResponse(responseCode = "413", description = "Arquivo maior que 10 MB")})
     public ResponseEntity<ApiResult<ConformityImportResponse>> importFile(@RequestPart("file") MultipartFile file,
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Importação processada", conformityImportService.importFile(file, principal), request.getRequestURI()));

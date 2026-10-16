@@ -6,10 +6,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface EventClassParticipantRepository extends JpaRepository<EventClassParticipant, Long> {
     List<EventClassParticipant> findByEventClassIn(List<EventClass> eventClasses);
 
     List<EventClassParticipant> findByUser_IdOrderByEventClass_StartDateAsc(Long userId);
+
+    Optional<EventClassParticipant> findByEventClass_Event_IdAndUser_Id(Long eventId, Long userId);
 }
