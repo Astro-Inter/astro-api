@@ -10,5 +10,7 @@ import java.util.List;
 public interface EventEvidenceRepository extends JpaRepository<EventEvidence, Long> {
     List<EventEvidence> findByCompletion_Id(Long completionId);
 
+    List<EventEvidence> findByCompletion_IdOrderById(Long completionId);
+
     void deleteByCompletion_Id(Long completionId);
 }

@@ -133,5 +133,17 @@ public class R2StorageService {
         return new PresignedDownload(signed.url().toExternalForm(), signed.expiration().truncatedTo(ChronoUnit.SECONDS));
     }
 
+    public String getEventEvidenceDownloadUrl(String objectPath) {
+        if (objectPath == null || objectPath.isBlank()) {
+            return null;
+        }
+        properties.validateEvidenceBucket();
+        GetObjectPresignRequest request = GetObjectPresignRequest.builder()
+                .signatureDuration(properties.presignedUrlDuration().truncatedTo(ChronoUnit.SECONDS))
+                .getObjectRequest(builder -> builder.bucket(properties.evidenceBucket()).key(objectPath))
+                .build();
+        return presigner.getObject().presignGetObject(request).url().toExternalForm();
+    }
+
     public record PresignedDownload(String url, Instant expiresAt) { }
 }

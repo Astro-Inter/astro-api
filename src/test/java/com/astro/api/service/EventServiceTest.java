@@ -14,18 +14,19 @@ import com.astro.api.event.model.Event;
 import com.astro.api.event.model.EventClass;
 import com.astro.api.event.model.EventClassParticipant;
 import com.astro.api.event.model.EventStatus;
+import com.astro.api.conformity.repository.ConformityRepository;
 import com.astro.api.event.repository.EventClassParticipantRepository;
 import com.astro.api.event.repository.EventClassRepository;
 import com.astro.api.event.repository.EventRepository;
 import com.astro.api.event.repository.EventCompletionRepository;
 import com.astro.api.event.repository.EventEvidenceRepository;
 import com.astro.api.event.service.EventService;
-import com.astro.api.common.storage.R2StorageService;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.workspace.model.Workspace;
+import com.astro.api.common.storage.R2StorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -56,6 +57,7 @@ class EventServiceTest {
     private EventCompletionRepository eventCompletionRepository;
     private EventEvidenceRepository eventEvidenceRepository;
     private R2StorageService storageService;
+    private ConformityRepository conformityRepository;
     private EventService service;
     private User manager;
     private Workspace workspace;
@@ -72,6 +74,7 @@ class EventServiceTest {
         eventCompletionRepository = mock(EventCompletionRepository.class);
         eventEvidenceRepository = mock(EventEvidenceRepository.class);
         storageService = mock(R2StorageService.class);
+        conformityRepository = mock(ConformityRepository.class);
         service = new EventService(
                 eventRepository,
                 eventClassRepository,
@@ -83,7 +86,8 @@ class EventServiceTest {
                 viewedService,
                 eventCompletionRepository,
                 eventEvidenceRepository,
-                storageService);
+                storageService,
+                conformityRepository);
         workspace = new Workspace();
         workspace.id = 10L;
         manager = createUser(1L, UserStatus.ATIVO, workspace);

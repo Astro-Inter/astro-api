@@ -5,6 +5,8 @@ import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.storage.R2StorageService;
 import com.astro.api.common.service.ViewedService;
+import com.astro.api.conformity.model.Conformity;
+import com.astro.api.conformity.repository.ConformityRepository;
 import com.astro.api.conformity.repository.NrCatalogRepository;
 import com.astro.api.event.dto.request.CancelEventRequest;
 import com.astro.api.event.dto.request.CreateEventClassRequest;
@@ -14,6 +16,8 @@ import com.astro.api.event.dto.request.UpdateEventRequest;
 import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventCalendarResponse;
 import com.astro.api.event.dto.response.CollaboratorEventResponse;
+import com.astro.api.event.dto.response.CollaboratorEventDetailsResponse;
+import com.astro.api.event.dto.response.EventEvidenceResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.dto.response.EventCompletionResponse;
 import com.astro.api.event.mapper.EventMapper;
@@ -41,6 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -66,6 +71,7 @@ public class EventService {
     private final EventCompletionRepository eventCompletionRepository;
     private final EventEvidenceRepository eventEvidenceRepository;
     private final R2StorageService storageService;
+    private final ConformityRepository conformityRepository;
 
     public EventService(
             EventRepository eventRepository,
@@ -78,7 +84,8 @@ public class EventService {
             ViewedService viewedService,
             EventCompletionRepository eventCompletionRepository,
             EventEvidenceRepository eventEvidenceRepository,
-            R2StorageService storageService) {
+            R2StorageService storageService,
+            ConformityRepository conformityRepository) {
         this.eventRepository = eventRepository;
         this.eventClassRepository = eventClassRepository;
         this.eventClassParticipantRepository = eventClassParticipantRepository;
@@ -88,6 +95,7 @@ public class EventService {
         this.eventMapper = eventMapper;
         this.viewedService = viewedService;
         this.eventCompletionRepository = eventCompletionRepository;
+        this.conformityRepository = conformityRepository;
         this.eventEvidenceRepository = eventEvidenceRepository;
         this.storageService = storageService;
     }
@@ -174,6 +182,47 @@ public class EventService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public CollaboratorEventDetailsResponse findDetailsForCollaborator(Long eventId, String firebaseUid) {
+        User user = findAuthenticatedUser(firebaseUid);
+        EventClassParticipant participation = eventClassParticipantRepository
+                .findFirstByEventClass_Event_IdAndUser_Id(eventId, user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Evento não encontrado para o colaborador"));
+
+        EventClass eventClass = participation.getEventClass();
+        Event event = eventClass.getEvent();
+        EventCompletion conclusion = eventCompletionRepository
+                .findByParticipation_Id(participation.getId())
+                .orElse(null);
+        boolean completed = conclusion != null && conclusion.getStatus() == EventCompletionStatus.CONCLUIDO;
+        LocalDate validity = !completed || event.getNrId() == null
+                ? null
+                : conformityRepository.findByEventCompletionId(conclusion.getId())
+                        .map(Conformity::getExpiresAt)
+                        .orElse(null);
+        List<EventEvidenceResponse> evidences = !completed
+                ? List.of()
+                : eventEvidenceRepository.findByCompletion_IdOrderById(conclusion.getId()).stream()
+                        .map(evidence -> eventMapper.toEvidenceResponse(
+                                evidence, storageService.getEventEvidenceDownloadUrl(evidence.getObjectPath())))
+                        .toList();
+
+        User manager = event.getManager();
+        return new CollaboratorEventDetailsResponse(
+                event.getId(),
+                event.getTitle(),
+                eventClass.getEndDate(),
+                classStatus(eventClass, LocalDateTime.now()),
+                event.getDescription(),
+                validity,
+                event.getExternalLink(),
+                manager.getId(),
+                manager.getName(),
+                event.isMandatoryEvidence(),
+                event.getCompletionMode(),
+                evidences);
+    }
+
     @Transactional
     public EventCompletionResponse requestCompletion(
             Long eventId, List<MultipartFile> files, String firebaseUid) {
@@ -194,7 +243,7 @@ public class EventService {
                 .orElseGet(() -> newPendingCompletion(participation));
         completion = eventCompletionRepository.save(completion);
 
-        List<EventEvidence> previousEvidence = eventEvidenceRepository.findByCompletion_Id(completion.getId());
+        List<com.astro.api.event.model.EventEvidence> previousEvidence = eventEvidenceRepository.findByCompletion_Id(completion.getId());
         List<EventEvidence> evidence = new ArrayList<>();
         try {
             for (MultipartFile file : evidenceFiles) {

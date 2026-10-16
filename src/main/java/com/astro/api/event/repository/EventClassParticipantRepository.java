@@ -14,5 +14,7 @@ public interface EventClassParticipantRepository extends JpaRepository<EventClas
 
     List<EventClassParticipant> findByUser_IdOrderByEventClass_StartDateAsc(Long userId);
 
+    Optional<EventClassParticipant> findFirstByEventClass_Event_IdAndUser_Id(Long eventId, Long userId);
+
     Optional<EventClassParticipant> findByEventClass_Event_IdAndUser_Id(Long eventId, Long userId);
 }
