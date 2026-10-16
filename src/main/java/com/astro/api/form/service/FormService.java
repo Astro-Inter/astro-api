@@ -1,5 +1,6 @@
 package com.astro.api.form.service;
 
+import com.astro.api.form.repository.FormRepositoryCustom;
 import com.astro.api.form.model.Form;
 import com.astro.api.form.repository.FormRepository;
 import com.astro.api.auth.security.AuthenticatedUser;
@@ -38,7 +39,7 @@ public class FormService {
     }
 
     public FormDetailsResponse create(FormWriteRequest body, AuthenticatedUser principal) {
-        var scope = access.requireManager(principal);
+        FormScope scope = access.requireManager(principal);
         if (body == null || (body.status() != null && body.status() != FormStatus.DRAFT && body.status() != FormStatus.PENDING)) {
             throw new BusinessException("Crie o formulário como RASCUNHO ou PENDENTE");
         }
@@ -59,7 +60,7 @@ public class FormService {
     }
 
     public FormDetailsResponse update(String id, FormWriteRequest body, AuthenticatedUser principal) {
-        var scope = access.requireManager(principal);
+        FormScope scope = access.requireManager(principal);
         Form form = requireForm(id, scope);
         access.requireManagement(form, scope);
         requireMutable(form);
@@ -77,7 +78,7 @@ public class FormService {
     }
 
     public void delete(String id, AuthenticatedUser principal) {
-        var scope = access.requireManager(principal);
+        FormScope scope = access.requireManager(principal);
         Form form = requireForm(id, scope);
         access.requireManagement(form, scope);
         requireMutable(form);
@@ -87,7 +88,7 @@ public class FormService {
     }
 
     public FormDetailsResponse publish(String id, AuthenticatedUser principal) {
-        var scope = access.requireManager(principal);
+        FormScope scope = access.requireManager(principal);
         Form form = requireForm(id, scope);
         access.requireManagement(form, scope);
         requireMutable(form);
@@ -116,11 +117,11 @@ public class FormService {
     }
 
     public FormPageResponse findAll(AuthenticatedUser principal, String search, FormStatus status, int page, int size) {
-        var scope = access.requireManager(principal);
+        FormScope scope = access.requireManager(principal);
         if (page < 0 || size < 1 || size > 100 || (search != null && search.length() > 240)) {
             throw new BusinessException("Use page >= 0, size entre 1 e 100 e busca de até 240 caracteres");
         }
-        var listing = formRepository.findAll(scope, search, status, page, size);
+        FormRepositoryCustom.Listing listing = formRepository.findAll(scope, search, status, page, size);
         return mapper.toPage(listing.forms(), page, size, listing.total());
     }
 

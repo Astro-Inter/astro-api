@@ -1,5 +1,8 @@
 package com.astro.api.form.service;
 
+import com.astro.api.conformity.model.NrCatalog;
+import com.astro.api.unit.model.Unit;
+import com.astro.api.user.model.User;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.conformity.repository.NrCatalogRepository;
@@ -25,7 +28,7 @@ public class FormReferenceService {
     @Transactional(readOnly = true)
     public void validate(FormWriteRequest body, FormScope scope) {
         if (body.managerId() != null) {
-            var manager = users.findById(body.managerId()).filter(user -> user.getUnit() != null
+            User manager = users.findById(body.managerId()).filter(user -> user.getUnit() != null
                     && user.getUnit().workspace != null && scope.workspaceId().equals(user.getUnit().workspace.id)
                     && (user.getType() == UserType.GESTOR || user.getType() == UserType.GESTOR_WORKSPACE))
                     .orElseThrow(() -> new ResourceNotFoundException("Gestor destinatário não encontrado no workspace"));
@@ -34,13 +37,13 @@ public class FormReferenceService {
             }
         }
         if (body.unitId() != null) {
-            var unit = units.findById(body.unitId()).filter(value -> value.workspace != null
+            Unit unit = units.findById(body.unitId()).filter(value -> value.workspace != null
                     && scope.workspaceId().equals(value.workspace.id))
                     .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada no workspace"));
             if (!unit.isActive) throw new BusinessException("A unidade vinculada deve estar ativa");
         }
         if (body.nrCode() != null) {
-            var nrCatalogEntry = nrs.findById(body.nrCode()).orElseThrow(() -> new ResourceNotFoundException("NR não encontrada"));
+            NrCatalog nrCatalogEntry = nrs.findById(body.nrCode()).orElseThrow(() -> new ResourceNotFoundException("NR não encontrada"));
             if (nrCatalogEntry.isRevoked()) throw new BusinessException("A NR vinculada não pode estar revogada");
         }
     }

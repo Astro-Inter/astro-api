@@ -1,5 +1,7 @@
 package com.astro.api.form.strategy;
 
+import java.util.Set;
+import com.astro.api.form.dto.request.FormOptionRequest;
 import com.astro.api.form.dto.request.FormQuestionRequest;
 import com.astro.api.form.model.FormQuestionType;
 import org.springframework.stereotype.Component;
@@ -12,12 +14,12 @@ public class OptionQuestionStrategy implements FormQuestionStrategy {
     public FormQuestionType supportedType() { return FormQuestionType.OPTION; }
     public void validate(FormQuestionRequest question, FormValidationMode mode) {
         QuestionRules.noFileLimits(question);
-        var options = question.options() == null ? List.<com.astro.api.form.dto.request.FormOptionRequest>of() : question.options();
+        List<FormOptionRequest> options = question.options() == null ? List.<com.astro.api.form.dto.request.FormOptionRequest>of() : question.options();
         QuestionRules.require(options.size() <= 100 && (mode == FormValidationMode.DRAFT || options.size() >= 2),
                 "Perguntas de alternativa devem ter de 2 a 100 opções para publicação");
         int otherCount = 0;
-        var ids = new HashSet<Long>();
-        for (var option : options) {
+        Set<Long> ids = new HashSet<Long>();
+        for (FormOptionRequest option : options) {
             QuestionRules.require(option != null, "Opção inválida");
             QuestionRules.require(option.id() == null || (option.id() > 0 && ids.add(option.id())),
                     "Os identificadores das opções devem ser positivos e únicos na pergunta");

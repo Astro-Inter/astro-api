@@ -1,5 +1,6 @@
 package com.astro.api.form;
 
+import org.springframework.test.web.servlet.MockMvc;
 import com.astro.api.auth.security.*;
 import com.astro.api.auth.security.Role;
 import com.astro.api.auth.service.AuthorizationService;
@@ -27,13 +28,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class FormSecurityTest {
     @Test void requiresFirebaseAndManagerAuthority() throws Exception {
-        try (var context = new AnnotationConfigWebApplicationContext()) {
+        try (AnnotationConfigWebApplicationContext context = new AnnotationConfigWebApplicationContext()) {
             context.setServletContext(new MockServletContext()); context.register(Config.class); context.refresh();
-            var mvc = MockMvcBuilders.webAppContextSetup(context)
+            MockMvc mvc = MockMvcBuilders.webAppContextSetup(context)
                     .addFilters(context.getBean("springSecurityFilterChain", Filter.class)).build();
-            var tokens = context.getBean(FirebaseTokenService.class);
-            var authorization = context.getBean(AuthorizationService.class);
-            var service = context.getBean(FormService.class);
+            FirebaseTokenService tokens = context.getBean(FirebaseTokenService.class);
+            AuthorizationService authorization = context.getBean(AuthorizationService.class);
+            FormService service = context.getBean(FormService.class);
             mvc.perform(get("/forms")).andExpect(result -> assertTrue(result.getResponse().getStatus() >= 400));
             when(tokens.verify("invalid")).thenThrow(mock(com.google.firebase.auth.FirebaseAuthException.class));
             mvc.perform(get("/forms").header("Authorization", "Bearer invalid"))
