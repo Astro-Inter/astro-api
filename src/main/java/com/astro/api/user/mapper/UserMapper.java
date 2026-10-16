@@ -1,6 +1,6 @@
 package com.astro.api.user.mapper;
 
-import com.astro.api.conformidade.model.NrDocument;
+import com.astro.api.conformity.model.NrDocument;
 import com.astro.api.user.dto.response.UserProfileResponse;
 import com.astro.api.user.model.User;
 import org.springframework.stereotype.Component;

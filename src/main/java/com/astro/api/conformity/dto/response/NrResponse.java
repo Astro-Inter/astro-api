@@ -1,4 +1,4 @@
-package com.astro.api.conformidade.dto.response;
+package com.astro.api.conformity.dto.response;
 
 public record NrResponse(Integer code, String title) {
 }

@@ -1,4 +1,4 @@
-package com.astro.api.conformidade.model;
+package com.astro.api.conformity.model;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;

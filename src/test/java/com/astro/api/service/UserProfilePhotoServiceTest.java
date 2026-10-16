@@ -2,7 +2,7 @@ package com.astro.api.user.service;
 
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.storage.R2StorageService;
-import com.astro.api.conformidade.repository.NrDocumentRepository;
+import com.astro.api.conformity.repository.NrDocumentRepository;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 import com.astro.api.user.mapper.UserMapper;
