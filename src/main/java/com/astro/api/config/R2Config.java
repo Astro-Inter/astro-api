@@ -21,7 +21,7 @@ public class R2Config {
     @Bean(destroyMethod = "close")
     @Lazy
     public S3Client r2Client(R2Properties properties) {
-        properties.validate();
+        properties.validateConnection();
         return S3Client.builder()
                 .endpointOverride(URI.create(properties.endpoint()))
                 .region(Region.of("auto"))
@@ -38,7 +38,7 @@ public class R2Config {
     @Bean(destroyMethod = "close")
     @Lazy
     public S3Presigner r2Presigner(R2Properties properties) {
-        properties.validate();
+        properties.validateConnection();
         return S3Presigner.builder()
                 .endpointOverride(URI.create(properties.endpoint()))
                 .region(Region.of("auto"))

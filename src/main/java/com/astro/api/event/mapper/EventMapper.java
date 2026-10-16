@@ -10,7 +10,7 @@ import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.model.Event;
 import com.astro.api.event.model.EventClass;
 import com.astro.api.event.model.EventClassParticipant;
-import com.astro.api.conformity.model.EventEvidence;
+import com.astro.api.event.model.EventEvidence;
 import com.astro.api.user.model.User;
 import org.springframework.stereotype.Component;
 

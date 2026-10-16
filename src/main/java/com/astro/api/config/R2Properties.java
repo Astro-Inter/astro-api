@@ -9,15 +9,22 @@ import java.time.Duration;
 public record R2Properties(
         String endpoint,
         String bucket,
+        String evidenceBucket,
         String accessKeyId,
         String secretAccessKey,
         Duration presignedUrlDuration) {
 
     public void validate() {
-        if (endpoint == null || endpoint.isBlank() || bucket == null || bucket.isBlank()
-                || accessKeyId == null || accessKeyId.isBlank()
+        validateConnection();
+        if (bucket == null || bucket.isBlank()) {
+            throw new IllegalStateException("Configure R2_BUCKET (ou R2_BUCKET_AVATARS) para acessar fotos de perfil.");
+        }
+    }
+
+    public void validateConnection() {
+        if (endpoint == null || endpoint.isBlank() || accessKeyId == null || accessKeyId.isBlank()
                 || secretAccessKey == null || secretAccessKey.isBlank()) {
-            throw new IllegalStateException("Configure R2_ENDPOINT, R2_BUCKET (ou R2_BUCKET_AVATARS), R2_ACCESS_KEY_ID e R2_SECRET_ACCESS_KEY para acessar fotos de perfil.");
+            throw new IllegalStateException("Configure R2_ENDPOINT, R2_ACCESS_KEY_ID e R2_SECRET_ACCESS_KEY para acessar o armazenamento R2.");
         }
         URI uri = URI.create(endpoint);
         if (!"https".equals(uri.getScheme()) || uri.getHost() == null
@@ -27,6 +34,13 @@ public record R2Properties(
         if (presignedUrlDuration == null || presignedUrlDuration.compareTo(Duration.ofSeconds(1)) < 0
                 || presignedUrlDuration.compareTo(Duration.ofDays(7)) > 0) {
             throw new IllegalStateException("R2_PRESIGNED_URL_DURATION deve estar entre 1s e 7d.");
+        }
+    }
+
+    public void validateEvidenceBucket() {
+        validateConnection();
+        if (evidenceBucket == null || evidenceBucket.isBlank()) {
+            throw new IllegalStateException("Configure R2_BUCKET_EVIDENCIAS para acessar evidências de eventos.");
         }
     }
 }

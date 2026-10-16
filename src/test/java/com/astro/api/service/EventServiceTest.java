@@ -15,11 +15,11 @@ import com.astro.api.event.model.EventClass;
 import com.astro.api.event.model.EventClassParticipant;
 import com.astro.api.event.model.EventStatus;
 import com.astro.api.conformity.repository.ConformityRepository;
-import com.astro.api.conformity.repository.EventConclusionRepository;
-import com.astro.api.conformity.repository.EventEvidenceRepository;
 import com.astro.api.event.repository.EventClassParticipantRepository;
 import com.astro.api.event.repository.EventClassRepository;
 import com.astro.api.event.repository.EventRepository;
+import com.astro.api.event.repository.EventCompletionRepository;
+import com.astro.api.event.repository.EventEvidenceRepository;
 import com.astro.api.event.service.EventService;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.user.model.User;
@@ -54,6 +54,10 @@ class EventServiceTest {
     private RoleRepository roleRepository;
     private NrCatalogRepository nrCatalogRepository;
     private ViewedService viewedService;
+    private EventCompletionRepository eventCompletionRepository;
+    private EventEvidenceRepository eventEvidenceRepository;
+    private R2StorageService storageService;
+    private ConformityRepository conformityRepository;
     private EventService service;
     private User manager;
     private Workspace workspace;
@@ -67,6 +71,10 @@ class EventServiceTest {
         roleRepository = mock(RoleRepository.class);
         nrCatalogRepository = mock(NrCatalogRepository.class);
         viewedService = mock(ViewedService.class);
+        eventCompletionRepository = mock(EventCompletionRepository.class);
+        eventEvidenceRepository = mock(EventEvidenceRepository.class);
+        storageService = mock(R2StorageService.class);
+        conformityRepository = mock(ConformityRepository.class);
         service = new EventService(
                 eventRepository,
                 eventClassRepository,
@@ -76,10 +84,10 @@ class EventServiceTest {
                 nrCatalogRepository,
                 new EventMapper(),
                 viewedService,
-                mock(EventConclusionRepository.class),
-                mock(ConformityRepository.class),
-                mock(EventEvidenceRepository.class),
-                mock(R2StorageService.class));
+                eventCompletionRepository,
+                eventEvidenceRepository,
+                storageService,
+                conformityRepository);
         workspace = new Workspace();
         workspace.id = 10L;
         manager = createUser(1L, UserStatus.ATIVO, workspace);

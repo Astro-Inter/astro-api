@@ -13,7 +13,9 @@ import com.astro.api.event.dto.response.EventCalendarResponse;
 import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.CollaboratorEventResponse;
 import com.astro.api.event.dto.response.EventResponse;
+import com.astro.api.event.dto.response.EventCompletionResponse;
 import com.astro.api.event.model.CompletionMode;
+import com.astro.api.event.model.EventCompletionStatus;
 import com.astro.api.event.model.EventStatus;
 import com.astro.api.event.service.EventService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.support.WebDataBinderFactory;
@@ -40,6 +43,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -133,6 +137,21 @@ class EventControllerIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true));
 
         verify(eventService).create(any(CreateEventRequest.class), anyString());
+    }
+
+    @Test
+    void collaboratorSendsCompletionWithEvidenceFiles() throws Exception {
+        when(eventService.requestCompletion(anyLong(), any(), anyString())).thenReturn(
+                new EventCompletionResponse(9L, EventCompletionStatus.PENDENTE, LocalDateTime.of(2026, 10, 16, 10, 0)));
+        MockMultipartFile evidence = new MockMultipartFile(
+                "files", "certificado.pdf", "application/pdf", new byte[]{1, 2, 3});
+
+        mockMvc.perform(multipart("/events/{eventId}/completion", 1L).file(evidence))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.status").value("PENDENTE"));
+
+        verify(eventService).requestCompletion(anyLong(), any(), anyString());
     }
 
     @Test

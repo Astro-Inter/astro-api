@@ -1,4 +1,4 @@
-package com.astro.api.conformity.model;
+package com.astro.api.event.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -9,14 +9,12 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "evidencia", uniqueConstraints =
-        @UniqueConstraint(columnNames = "caminho_objeto"))
+@Table(name = "evidencia")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -28,17 +26,17 @@ public class EventEvidence {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "conclusao_evento_id", nullable = false)
-    private EventConclusion conclusion;
+    private EventCompletion completion;
 
-    @Column(name = "nome_original", nullable = false)
+    @Column(name = "nome_original", nullable = false, length = 255)
     private String originalName;
 
-    @Column(name = "caminho_objeto", nullable = false, length = 2048)
+    @Column(name = "caminho_objeto", nullable = false, unique = true, length = 2048)
     private String objectPath;
 
     @Column(name = "mime_type", nullable = false, length = 127)
     private String mimeType;
 
     @Column(name = "tamanho_byte", nullable = false)
-    private Long sizeBytes;
+    private long sizeBytes;
 }
