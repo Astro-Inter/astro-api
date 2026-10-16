@@ -10,6 +10,7 @@ public record CollaboratorEventDetailsResponse(
         Long eventId,
         String eventTitle,
         LocalDateTime classLimitDate,
+        String classStatus,
         String eventDescription,
         LocalDate complianceValidity,
         String externalLink,

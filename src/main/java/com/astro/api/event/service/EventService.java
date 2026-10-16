@@ -207,6 +207,7 @@ public class EventService {
                 event.getId(),
                 event.getTitle(),
                 eventClass.getEndDate(),
+                classStatus(eventClass, LocalDateTime.now()),
                 event.getDescription(),
                 validity,
                 event.getExternalLink(),
