@@ -30,10 +30,12 @@ import com.astro.api.conformity.dto.request.ConformityApplicabilityRequest;
         @ApiResponse(responseCode = "403", description = "Gestor ativo necessário"),
         @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")})
 public class ConformityController {
-    private final ConformityService service;
-    private final ConformityImportService importService;
-    public ConformityController(ConformityService service, ConformityImportService importService) {
-        this.service = service; this.importService = importService;
+    private final ConformityService conformityService;
+    private final ConformityImportService conformityImportService;
+
+    public ConformityController(ConformityService conformityService, ConformityImportService conformityImportService) {
+        this.conformityService = conformityService;
+        this.conformityImportService = conformityImportService;
     }
 
     @PostMapping(value = "/import", consumes = "multipart/form-data")
@@ -43,7 +45,7 @@ public class ConformityController {
             @ApiResponse(responseCode = "413", description = "Arquivo maior que 10 MB ou requisição maior que 11 MB")})
     public ResponseEntity<ApiResult<ConformityImportResponse>> importFile(@RequestPart("file") MultipartFile file,
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
-        return ResponseEntity.ok(ApiResult.success("Importação processada", importService.importFile(file, principal), request.getRequestURI()));
+        return ResponseEntity.ok(ApiResult.success("Importação processada", conformityImportService.importFile(file, principal), request.getRequestURI()));
     }
 
     @PatchMapping("/{conformityId}/applicability")
@@ -56,7 +58,7 @@ public class ConformityController {
             @Valid @RequestBody ConformityApplicabilityRequest body,
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Aplicabilidade atualizada com sucesso",
-                service.changeApplicability(conformityId, body, principal), request.getRequestURI()));
+                conformityService.changeApplicability(conformityId, body, principal), request.getRequestURI()));
     }
 
     @PutMapping("/{conformityId}")
@@ -69,7 +71,7 @@ public class ConformityController {
             @Valid @RequestBody UpdateConformityRequest body,
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Conformidade atualizada com sucesso",
-                service.update(conformityId, body, principal), request.getRequestURI()));
+                conformityService.update(conformityId, body, principal), request.getRequestURI()));
     }
 
     @PostMapping
@@ -80,9 +82,9 @@ public class ConformityController {
             @ApiResponse(responseCode = "409", description = "Registro aplicável já existente")})
     public ResponseEntity<ApiResult<ConformityResponse>> create(@Valid @RequestBody CreateConformityRequest body,
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
-        var result = service.create(body, principal);
-        return ResponseEntity.created(URI.create("/conformities/" + result.id()))
-                .body(ApiResult.success("Conformidade criada com sucesso", result, request.getRequestURI()));
+        ConformityResponse conformityResponse = conformityService.create(body, principal);
+        return ResponseEntity.created(URI.create("/conformities/" + conformityResponse.id()))
+                .body(ApiResult.success("Conformidade criada com sucesso", conformityResponse, request.getRequestURI()));
     }
 
     @GetMapping("/{conformityId}")
@@ -93,7 +95,7 @@ public class ConformityController {
     public ResponseEntity<ApiResult<ConformityResponse>> findById(@PathVariable Long conformityId,
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Conformidade retornada com sucesso",
-                service.findById(conformityId, principal), request.getRequestURI()));
+                conformityService.findById(conformityId, principal), request.getRequestURI()));
     }
 
     @GetMapping
@@ -103,6 +105,6 @@ public class ConformityController {
     public ResponseEntity<ApiResult<List<ConformityResponse>>> findAll(
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Conformidades retornadas com sucesso",
-                service.findAll(principal), request.getRequestURI()));
+                conformityService.findAll(principal), request.getRequestURI()));
     }
 }
