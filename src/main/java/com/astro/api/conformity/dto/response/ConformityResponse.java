@@ -7,4 +7,5 @@ public record ConformityResponse(
         Long id, Long collaboratorId, String collaboratorName, String collaboratorEmail,
         Integer nrId, String nrTitle, LocalDate expiresAt, String origin, boolean applicable,
         Long eventCompletionId,
-        @Schema(allowableValues = {"Vencida", "Válida", "Sem validade"}) String status) { }
+        @Schema(allowableValues = {"Vencida", "Válida", "Sem validade"}) String status,
+        String profilePhotoUrl, String avatarInitials) { }
