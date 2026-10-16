@@ -5,7 +5,14 @@ import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.service.ViewedService;
 import com.astro.api.common.storage.R2StorageService;
-import com.astro.api.conformidade.repository.NrCatalogRepository;
+import com.astro.api.conformity.model.Conformity;
+import com.astro.api.conformity.model.EventConclusion;
+import com.astro.api.conformity.model.EventConclusionStatus;
+import com.astro.api.conformity.model.EventEvidence;
+import com.astro.api.conformity.repository.ConformityRepository;
+import com.astro.api.conformity.repository.EventConclusionRepository;
+import com.astro.api.conformity.repository.EventEvidenceRepository;
+import com.astro.api.conformity.repository.NrCatalogRepository;
 import com.astro.api.event.dto.request.CancelEventRequest;
 import com.astro.api.event.dto.request.CreateEventClassRequest;
 import com.astro.api.event.dto.request.CreateEventRequest;
@@ -21,21 +28,14 @@ import com.astro.api.event.mapper.EventMapper;
 import com.astro.api.event.model.Event;
 import com.astro.api.event.model.EventClass;
 import com.astro.api.event.model.EventClassParticipant;
-import com.astro.api.event.model.EventConclusion;
-import com.astro.api.event.model.EventConclusionStatus;
-import com.astro.api.event.model.EventEvidence;
 import com.astro.api.event.model.EventStatus;
 import com.astro.api.event.repository.EventClassParticipantRepository;
 import com.astro.api.event.repository.EventClassRepository;
-import com.astro.api.event.repository.EventComplianceRepository;
-import com.astro.api.event.repository.EventConclusionRepository;
-import com.astro.api.event.repository.EventEvidenceRepository;
 import com.astro.api.event.repository.EventRepository;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.workspace.model.Workspace;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -64,11 +64,10 @@ public class EventService {
     private final EventMapper eventMapper;
     private final ViewedService viewedService;
     private final EventConclusionRepository eventConclusionRepository;
-    private final EventComplianceRepository eventComplianceRepository;
+    private final ConformityRepository conformityRepository;
     private final EventEvidenceRepository eventEvidenceRepository;
     private final R2StorageService storageService;
 
-    @Autowired
     public EventService(
             EventRepository eventRepository,
             EventClassRepository eventClassRepository,
@@ -79,7 +78,7 @@ public class EventService {
             EventMapper eventMapper,
             ViewedService viewedService,
             EventConclusionRepository eventConclusionRepository,
-            EventComplianceRepository eventComplianceRepository,
+            ConformityRepository conformityRepository,
             EventEvidenceRepository eventEvidenceRepository,
             R2StorageService storageService) {
         this.eventRepository = eventRepository;
@@ -91,7 +90,7 @@ public class EventService {
         this.eventMapper = eventMapper;
         this.viewedService = viewedService;
         this.eventConclusionRepository = eventConclusionRepository;
-        this.eventComplianceRepository = eventComplianceRepository;
+        this.conformityRepository = conformityRepository;
         this.eventEvidenceRepository = eventEvidenceRepository;
         this.storageService = storageService;
     }
@@ -193,8 +192,8 @@ public class EventService {
         boolean completed = conclusion != null && conclusion.getStatus() == EventConclusionStatus.CONCLUIDO;
         LocalDate validity = !completed || event.getNrId() == null
                 ? null
-                : eventComplianceRepository.findByConclusion_Id(conclusion.getId())
-                        .map(compliance -> compliance.getValidityDate())
+                : conformityRepository.findByEventCompletionId(conclusion.getId())
+                        .map(Conformity::getExpiresAt)
                         .orElse(null);
         List<EventEvidenceResponse> evidences = !completed
                 ? List.of()

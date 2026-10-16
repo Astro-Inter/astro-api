@@ -1,6 +1,6 @@
 package com.astro.api.unit.mapper;
 
-import com.astro.api.conformidade.model.NrDocument;
+import com.astro.api.conformity.model.NrDocument;
 import com.astro.api.unit.dto.response.UnitNrOptionResponse;
 import com.astro.api.unit.dto.response.UnitNrResponse;
 import com.astro.api.unit.dto.response.UnitResponse;

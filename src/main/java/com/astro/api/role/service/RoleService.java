@@ -10,7 +10,7 @@ import com.astro.api.role.model.Role;
 import com.astro.api.role.repository.RoleManagementRepository;
 import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.common.exception.BusinessException;
-import com.astro.api.conformidade.repository.NrDocumentRepository;
+import com.astro.api.conformity.repository.NrDocumentRepository;
 import com.astro.api.workspace.model.Workspace;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;

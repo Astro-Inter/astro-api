@@ -4,7 +4,7 @@ import com.astro.api.role.model.Role;
 import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.service.ViewedService;
-import com.astro.api.conformidade.repository.NrCatalogRepository;
+import com.astro.api.conformity.repository.NrCatalogRepository;
 import com.astro.api.event.dto.request.CancelEventRequest;
 import com.astro.api.event.dto.request.CreateEventClassRequest;
 import com.astro.api.event.dto.request.CreateEventRequest;
@@ -14,9 +14,9 @@ import com.astro.api.event.model.Event;
 import com.astro.api.event.model.EventClass;
 import com.astro.api.event.model.EventClassParticipant;
 import com.astro.api.event.model.EventStatus;
-import com.astro.api.event.repository.EventComplianceRepository;
-import com.astro.api.event.repository.EventConclusionRepository;
-import com.astro.api.event.repository.EventEvidenceRepository;
+import com.astro.api.conformity.repository.ConformityRepository;
+import com.astro.api.conformity.repository.EventConclusionRepository;
+import com.astro.api.conformity.repository.EventEvidenceRepository;
 import com.astro.api.event.repository.EventClassParticipantRepository;
 import com.astro.api.event.repository.EventClassRepository;
 import com.astro.api.event.repository.EventRepository;
@@ -77,7 +77,7 @@ class EventServiceTest {
                 new EventMapper(),
                 viewedService,
                 mock(EventConclusionRepository.class),
-                mock(EventComplianceRepository.class),
+                mock(ConformityRepository.class),
                 mock(EventEvidenceRepository.class),
                 mock(R2StorageService.class));
         workspace = new Workspace();
