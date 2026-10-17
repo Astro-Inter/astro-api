@@ -56,59 +56,61 @@ public class AccountService {
     }
 
     @Transactional(readOnly = true)
-    public AccountSummaryResponse findSummary(AuthenticatedUser principal) {
-        User user = requireAccount(principal);
+    public AccountSummaryResponse findSummary(AuthenticatedUser authenticatedUser) {
+        User user = requireAccount(authenticatedUser);
         return accountMapper.toSummary(user, userAvatarService.findUrl(user.getId()));
     }
 
     @Transactional(readOnly = true)
-    public AccountDetailsResponse findDetails(AuthenticatedUser principal) {
-        User user = requireAccount(principal);
+    public AccountDetailsResponse findDetails(AuthenticatedUser authenticatedUser) {
+        User user = requireAccount(authenticatedUser);
         return accountMapper.toDetails(user, userAvatarService.findUrl(user.getId()));
     }
 
-    public AccountDetailsResponse update(UpdateAccountDetailsRequest body, AuthenticatedUser principal) {
-        requirePrincipal(principal);
-        AtomicReference<EmailChange> emailChange = new AtomicReference<>();
+    public AccountDetailsResponse update(UpdateAccountDetailsRequest updateAccountDetailsRequest,
+                                         AuthenticatedUser authenticatedUser) {
+        requirePrincipal(authenticatedUser);
+        AtomicReference<EmailChange> emailChangeReference = new AtomicReference<>();
         try {
             // The template includes commit: a failed commit must compensate Firebase too.
             AccountDetailsResponse updatedAccount = transactionTemplate.execute(transaction ->
-                    updateAccount(body, principal, emailChange));
+                    updateAccount(updateAccountDetailsRequest, authenticatedUser, emailChangeReference));
             return updatedAccount;
         } catch (RuntimeException failure) {
-            EmailChange change = emailChange.get();
-            if (change != null) compensateEmail(change, failure);
+            EmailChange emailChange = emailChangeReference.get();
+            if (emailChange != null) compensateEmail(emailChange, failure);
             throw failure;
         }
     }
 
-    private AccountDetailsResponse updateAccount(UpdateAccountDetailsRequest body, AuthenticatedUser principal,
-                                                 AtomicReference<EmailChange> emailChange) {
-        User user = accountRepository.findForUpdateByFirebaseUid(principal.firebaseUid())
+    private AccountDetailsResponse updateAccount(UpdateAccountDetailsRequest updateAccountDetailsRequest,
+                                                 AuthenticatedUser authenticatedUser,
+                                                 AtomicReference<EmailChange> emailChangeReference) {
+        User user = accountRepository.findForUpdateByFirebaseUid(authenticatedUser.firebaseUid())
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
-        validateAccount(user, principal);
+        validateAccount(user, authenticatedUser);
         Long workspaceId = user.getUnit().workspace.id;
-        boolean roleChanged = user.getRole() == null || !Objects.equals(body.roleId(), user.getRole().getId());
-        boolean unitChanged = !Objects.equals(body.unitId(), user.getUnit().id);
-        if (principal.role() == Role.GESTOR && (roleChanged || unitChanged)) {
+        boolean roleChanged = user.getRole() == null || !Objects.equals(updateAccountDetailsRequest.roleId(), user.getRole().getId());
+        boolean unitChanged = !Objects.equals(updateAccountDetailsRequest.unitId(), user.getUnit().id);
+        if (authenticatedUser.role() == Role.GESTOR && (roleChanged || unitChanged)) {
             throw new AccessDeniedException("A alteração do próprio cargo ou unidade exige um gestor de workspace");
         }
-        com.astro.api.role.model.Role role = requireRole(body.roleId(), workspaceId, roleChanged);
-        Unit unit = requireUnit(body.unitId(), workspaceId, unitChanged);
-        checkConflicts(body, user.getId());
+        com.astro.api.role.model.Role role = requireRole(updateAccountDetailsRequest.roleId(), workspaceId, roleChanged);
+        Unit unit = requireUnit(updateAccountDetailsRequest.unitId(), workspaceId, unitChanged);
+        checkConflicts(updateAccountDetailsRequest, user.getId());
         String previousEmail = user.getEmail();
         // Generate the optional photo before changing the identity in either system.
         String profilePhotoUrl = userAvatarService.findUrl(user.getId());
-        accountMapper.applyUpdate(user, body, role, unit);
-        User saved = accountRepository.saveAndFlush(user);
-        synchronizeEmail(saved, previousEmail, emailChange);
-        AccountDetailsResponse updatedAccount = accountMapper.toDetails(saved, profilePhotoUrl);
+        accountMapper.applyUpdate(user, updateAccountDetailsRequest, role, unit);
+        User updatedUser = accountRepository.saveAndFlush(user);
+        synchronizeEmail(updatedUser, previousEmail, emailChangeReference);
+        AccountDetailsResponse updatedAccount = accountMapper.toDetails(updatedUser, profilePhotoUrl);
         return updatedAccount;
     }
 
     private com.astro.api.role.model.Role requireRole(Long roleId, Long workspaceId, boolean roleChanged) {
         com.astro.api.role.model.Role role = roleRepository.findById(roleId)
-                .filter(value -> value.getWorkspace() != null && workspaceId.equals(value.getWorkspace().id))
+                .filter(candidateRole -> candidateRole.getWorkspace() != null && workspaceId.equals(candidateRole.getWorkspace().id))
                 .orElseThrow(() -> new ResourceNotFoundException("Cargo não encontrado no workspace"));
         if (roleChanged && !Boolean.TRUE.equals(accountRepository.lockRoleActive(roleId, workspaceId))) {
             throw new BusinessException("O cargo deve estar ativo para uma nova vinculação");
@@ -118,7 +120,7 @@ public class AccountService {
 
     private Unit requireUnit(Long unitId, Long workspaceId, boolean unitChanged) {
         Unit unit = unitRepository.findById(unitId)
-                .filter(value -> value.workspace != null && workspaceId.equals(value.workspace.id))
+                .filter(candidateUnit -> candidateUnit.workspace != null && workspaceId.equals(candidateUnit.workspace.id))
                 .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada no workspace"));
         if (unitChanged && !Boolean.TRUE.equals(accountRepository.lockUnitActive(unitId, workspaceId))) {
             throw new BusinessException("A unidade deve estar ativa para uma nova vinculação");
@@ -126,22 +128,22 @@ public class AccountService {
         return unit;
     }
 
-    private void checkConflicts(UpdateAccountDetailsRequest body, Long userId) {
-        if (accountRepository.existsByCpfAndIdNot(body.cpf(), userId)) {
+    private void checkConflicts(UpdateAccountDetailsRequest updateAccountDetailsRequest, Long userId) {
+        if (accountRepository.existsByCpfAndIdNot(updateAccountDetailsRequest.cpf(), userId)) {
             throw new ConflictException("Já existe um usuário com este CPF");
         }
-        if (accountRepository.existsByEmailIgnoreCaseAndIdNot(body.email(), userId)) {
+        if (accountRepository.existsByEmailIgnoreCaseAndIdNot(updateAccountDetailsRequest.email(), userId)) {
             throw new ConflictException("Já existe um usuário com este e-mail");
         }
     }
 
-    private void synchronizeEmail(User user, String previousEmail, AtomicReference<EmailChange> emailChange) {
+    private void synchronizeEmail(User user, String previousEmail, AtomicReference<EmailChange> emailChangeReference) {
         if (user.getEmail().equalsIgnoreCase(previousEmail)) return;
-        FirebaseIdentityService.EmailState previous = firebaseIdentityService.readEmailState(user.getFirebaseUid());
-        if (previous.email() == null || previousEmail == null || !previousEmail.equalsIgnoreCase(previous.email())) {
+        FirebaseIdentityService.EmailState previousEmailState = firebaseIdentityService.readEmailState(user.getFirebaseUid());
+        if (previousEmailState.email() == null || previousEmail == null || !previousEmail.equalsIgnoreCase(previousEmailState.email())) {
             throw new ConflictException("O e-mail da autenticação precisa ser reconciliado antes da edição");
         }
-        EmailChange change = new EmailChange(user.getId(), user.getFirebaseUid(), previous);
+        EmailChange emailChange = new EmailChange(user.getId(), user.getFirebaseUid(), previousEmailState);
         try {
             firebaseIdentityService.updateEmail(user.getFirebaseUid(), user.getEmail());
         } catch (ConflictException conflict) {
@@ -149,49 +151,49 @@ public class AccountService {
             throw conflict;
         } catch (RuntimeException failure) {
             // A timeout can occur after Firebase applied the change.
-            emailChange.set(change);
+            emailChangeReference.set(emailChange);
             throw failure;
         }
-        emailChange.set(change);
+        emailChangeReference.set(emailChange);
     }
 
-    private void compensateEmail(EmailChange change, RuntimeException original) {
+    private void compensateEmail(EmailChange emailChange, RuntimeException originalFailure) {
         try {
-            firebaseIdentityService.restoreEmail(change.firebaseUid(), change.previous());
+            firebaseIdentityService.restoreEmail(emailChange.firebaseUid(), emailChange.previousEmailState());
         } catch (RuntimeException compensationFailure) {
-            original.addSuppressed(compensationFailure);
+            originalFailure.addSuppressed(compensationFailure);
             try {
                 transactionTemplate.executeWithoutResult(transaction -> {
-                    if (accountRepository.deactivateAfterEmailFailure(change.userId(), change.firebaseUid()) != 1) {
+                    if (accountRepository.deactivateAfterEmailFailure(emailChange.userId(), emailChange.firebaseUid()) != 1) {
                         throw new IllegalStateException("Conta não encontrada para contenção da falha");
                     }
                 });
             } catch (RuntimeException containmentFailure) {
-                original.addSuppressed(containmentFailure);
+                originalFailure.addSuppressed(containmentFailure);
             }
-            LOGGER.error("Falha na compensação de e-mail da conta {}; reconciliação operacional necessária", change.userId(), original);
-            throw new IllegalStateException("Falha de sincronização da autenticação da conta", original);
+            LOGGER.error("Falha na compensação de e-mail da conta {}; reconciliação operacional necessária", emailChange.userId(), originalFailure);
+            throw new IllegalStateException("Falha de sincronização da autenticação da conta", originalFailure);
         }
     }
 
-    private User requireAccount(AuthenticatedUser principal) {
-        requirePrincipal(principal);
-        User user = userRepository.findByFirebaseUid(principal.firebaseUid())
+    private User requireAccount(AuthenticatedUser authenticatedUser) {
+        requirePrincipal(authenticatedUser);
+        User user = userRepository.findByFirebaseUid(authenticatedUser.firebaseUid())
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
-        validateAccount(user, principal);
+        validateAccount(user, authenticatedUser);
         return user;
     }
 
-    private void requirePrincipal(AuthenticatedUser principal) {
-        if (principal == null || principal.firebaseUid() == null || principal.firebaseUid().isBlank()
-                || (principal.role() != Role.GESTOR && principal.role() != Role.GESTOR_WORKSPACE)) {
+    private void requirePrincipal(AuthenticatedUser authenticatedUser) {
+        if (authenticatedUser == null || authenticatedUser.firebaseUid() == null || authenticatedUser.firebaseUid().isBlank()
+                || (authenticatedUser.role() != Role.GESTOR && authenticatedUser.role() != Role.GESTOR_WORKSPACE)) {
             throw new AccessDeniedException("Gestor autenticado necessário");
         }
     }
 
-    private void validateAccount(User user, AuthenticatedUser principal) {
+    private void validateAccount(User user, AuthenticatedUser authenticatedUser) {
         if (user.getStatus() != UserStatus.ATIVO || user.getType() == null
-                || !user.getType().name().equals(principal.role().name())
+                || !user.getType().name().equals(authenticatedUser.role().name())
                 || user.getUnit() == null || user.getUnit().workspace == null
                 || user.getUnit().workspace.id == null) {
             throw new AccessDeniedException("Gestor ativo com workspace necessário");

@@ -42,9 +42,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AccountSecurityTest {
     AnnotationConfigWebApplicationContext context;
     MockMvc mvc;
-    AccountService accounts;
-    FirebaseTokenService tokens;
-    AuthorizationService authorization;
+    AccountService accountService;
+    FirebaseTokenService firebaseTokenService;
+    AuthorizationService authorizationService;
 
     @BeforeEach void open() {
         context = new AnnotationConfigWebApplicationContext();
@@ -53,23 +53,23 @@ class AccountSecurityTest {
         context.register(Config.class); context.refresh();
         mvc = MockMvcBuilders.webAppContextSetup(context)
                 .addFilters(context.getBean("springSecurityFilterChain", Filter.class)).build();
-        accounts = context.getBean(AccountService.class);
-        tokens = context.getBean(FirebaseTokenService.class);
-        authorization = context.getBean(AuthorizationService.class);
+        accountService = context.getBean(AccountService.class);
+        firebaseTokenService = context.getBean(FirebaseTokenService.class);
+        authorizationService = context.getBean(AuthorizationService.class);
     }
 
     @AfterEach void close() { context.close(); }
 
     void authenticate(Role role) throws Exception {
         FirebaseToken token = mock(FirebaseToken.class);
-        when(tokens.verify("valid")).thenReturn(token);
+        when(firebaseTokenService.verify("valid")).thenReturn(token);
         when(token.getUid()).thenReturn("own-uid");
         when(token.getEmail()).thenReturn("token@example.com");
-        when(authorization.getRole("own-uid")).thenReturn(Optional.of(role));
+        when(authorizationService.getRole("own-uid")).thenReturn(Optional.of(role));
     }
 
     @Test void rejectsMissingInvalidTokensAndOtherProfiles() throws Exception {
-        when(tokens.verify("invalid")).thenThrow(mock(FirebaseAuthException.class));
+        when(firebaseTokenService.verify("invalid")).thenThrow(mock(FirebaseAuthException.class));
         for (String path : new String[]{"/user/me/account-summary", "/user/me/account-details"}) {
             mvc.perform(get(path)).andExpect(status().isForbidden());
             mvc.perform(get(path).header("Authorization", "Bearer invalid"))
@@ -89,14 +89,14 @@ class AccountSecurityTest {
             mvc.perform(put("/user/me/account-details").header("Authorization", "Bearer valid")
                             .contentType("application/json").content(validUpdate())).andExpect(status().isForbidden());
         }
-        verifyNoInteractions(accounts);
+        verifyNoInteractions(accountService);
     }
 
     @Test void detailsExposeExactlyNineFieldsIncludingExplicitNullsAndStoredLinks() throws Exception {
         for (Role role : new Role[]{Role.GESTOR, Role.GESTOR_WORKSPACE}) {
             authenticate(role);
             AuthenticatedUser principal = new AuthenticatedUser("own-uid", "token@example.com", role);
-            when(accounts.findDetails(principal)).thenReturn(new AccountDetailsResponse("Maria Rosa", null,
+            when(accountService.findDetails(principal)).thenReturn(new AccountDetailsResponse("Maria Rosa", null,
                     "stored@example.com", 20L, "Engenheira", 10L, "Osasco", WorkModel.REMOTO, null));
             mvc.perform(get("/user/me/account-details?userId=999&workspaceId=2")
                             .header("Authorization", "Bearer valid"))
@@ -110,13 +110,13 @@ class AccountSecurityTest {
                     .andExpect(jsonPath("$.data.modalidade").value("REMOTO"))
                     .andExpect(content().string(org.hamcrest.Matchers.containsString("\"cpf\":null")))
                     .andExpect(content().string(org.hamcrest.Matchers.containsString("\"profilePhotoUrl\":null")));
-            verify(accounts).findDetails(principal);
+            verify(accountService).findDetails(principal);
         }
     }
 
     @Test void detailsUseTheStandardNotFoundErrorEnvelope() throws Exception {
         authenticate(Role.GESTOR);
-        when(accounts.findDetails(any())).thenThrow(new com.astro.api.common.exception.ResourceNotFoundException("Usuário não encontrado"));
+        when(accountService.findDetails(any())).thenThrow(new com.astro.api.common.exception.ResourceNotFoundException("Usuário não encontrado"));
         mvc.perform(get("/user/me/account-details").header("Authorization", "Bearer valid"))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.errors[0]").value("Usuário não encontrado"));
@@ -124,14 +124,14 @@ class AccountSecurityTest {
 
     @Test void mobileProfileKeepsItsExistingFieldsAndCollaboratorAccess() throws Exception {
         authenticate(Role.COLABORADOR);
-        UserService users = context.getBean(UserService.class);
-        when(users.findProfileByFirebaseUid("own-uid")).thenReturn(new UserProfileResponse(
+        UserService userService = context.getBean(UserService.class);
+        when(userService.findProfileByFirebaseUid("own-uid")).thenReturn(new UserProfileResponse(
                 "Maria Rosa", "Engenheira", "Osasco", "REMOTO", "stored@example.com", null, java.util.List.of()));
         mvc.perform(get("/user/me").header("Authorization", "Bearer valid"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data", aMapWithSize(7)))
                 .andExpect(jsonPath("$.data.nrs").isArray()).andExpect(jsonPath("$.data.nome").value("Maria Rosa"))
                 .andExpect(jsonPath("$.data.cargo").value("Engenheira"));
-        verifyNoInteractions(accounts);
+        verifyNoInteractions(accountService);
     }
 
     String validUpdate() {
@@ -142,37 +142,37 @@ class AccountSecurityTest {
         for (Role role : new Role[]{Role.GESTOR, Role.GESTOR_WORKSPACE}) {
             authenticate(role);
             AuthenticatedUser principal = new AuthenticatedUser("own-uid", "token@example.com", role);
-            UpdateAccountDetailsRequest body = new UpdateAccountDetailsRequest("Maria Rosa", "52998224725", "stored@example.com", 20L, 10L, WorkModel.REMOTO);
-            when(accounts.update(body, principal)).thenReturn(new AccountDetailsResponse("Maria Rosa", "52998224725",
+            UpdateAccountDetailsRequest requestBody = new UpdateAccountDetailsRequest("Maria Rosa", "52998224725", "stored@example.com", 20L, 10L, WorkModel.REMOTO);
+            when(accountService.update(requestBody, principal)).thenReturn(new AccountDetailsResponse("Maria Rosa", "52998224725",
                     "stored@example.com", 20L, "Engenheira", 10L, "Osasco", WorkModel.REMOTO, null));
             mvc.perform(put("/user/me/account-details?userId=999").header("Authorization", "Bearer valid")
                             .contentType("application/json").content(validUpdate()))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.success").value(true))
                     .andExpect(jsonPath("$.data", aMapWithSize(9)))
                     .andExpect(jsonPath("$.data.cpf").value("52998224725"));
-            verify(accounts).update(body, principal);
+            verify(accountService).update(requestBody, principal);
         }
     }
 
     @Test void putRejectsEachMissingOrNullFieldBeforeCallingTheService() throws Exception {
         authenticate(Role.GESTOR_WORKSPACE);
-        JsonMapper mapper = JsonMapper.builder().build();
+        JsonMapper jsonMapper = JsonMapper.builder().build();
         for (String field : new String[]{"name", "cpf", "email", "roleId", "unitId", "workModel"}) {
             for (boolean omitted : new boolean[]{true, false}) {
-                ObjectNode body = (ObjectNode) mapper.readTree(validUpdate());
-                if (omitted) body.remove(field); else body.putNull(field);
+                ObjectNode requestBody = (ObjectNode) jsonMapper.readTree(validUpdate());
+                if (omitted) requestBody.remove(field); else requestBody.putNull(field);
                 mvc.perform(put("/user/me/account-details").header("Authorization", "Bearer valid")
-                                .contentType("application/json").content(mapper.writeValueAsString(body)))
+                                .contentType("application/json").content(jsonMapper.writeValueAsString(requestBody)))
                         .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false))
                         .andExpect(jsonPath("$.errors").isNotEmpty());
             }
         }
-        verifyNoInteractions(accounts);
+        verifyNoInteractions(accountService);
     }
 
     @Test void putRejectsInvalidFormatsLimitsAndForbiddenFields() throws Exception {
         authenticate(Role.GESTOR_WORKSPACE);
-        JsonMapper mapper = JsonMapper.builder().build();
+        JsonMapper jsonMapper = JsonMapper.builder().build();
         List<String> invalid = List.of(
                 validUpdate().replace("Maria Rosa", " "), validUpdate().replace("Maria Rosa", "M"),
                 validUpdate().replace("Maria Rosa", "M".repeat(256)),
@@ -182,19 +182,19 @@ class AccountSecurityTest {
                 validUpdate().replace("\"roleId\":20", "\"roleId\":0"),
                 validUpdate().replace("\"unitId\":10", "\"unitId\":-1"),
                 validUpdate().replace("REMOTO", "INVALID"));
-        for (String body : invalid) {
+        for (String requestBody : invalid) {
             mvc.perform(put("/user/me/account-details").header("Authorization", "Bearer valid")
-                            .contentType("application/json").content(body))
+                            .contentType("application/json").content(requestBody))
                     .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false));
         }
         for (String field : new String[]{"nome", "modalidade", "userId", "firebaseUid", "workspaceId", "status", "tipo", "senha", "password", "passwordHash", "file", "profilePhotoUrl", "nrs"}) {
-            ObjectNode body = (ObjectNode) mapper.readTree(validUpdate());
-            body.put(field, "not-allowed");
+            ObjectNode requestBody = (ObjectNode) jsonMapper.readTree(validUpdate());
+            requestBody.put(field, "not-allowed");
             mvc.perform(put("/user/me/account-details").header("Authorization", "Bearer valid")
-                            .contentType("application/json").content(mapper.writeValueAsString(body)))
+                            .contentType("application/json").content(jsonMapper.writeValueAsString(requestBody)))
                     .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false));
         }
-        verifyNoInteractions(accounts);
+        verifyNoInteractions(accountService);
     }
 
     @Test void putUsesStandardErrorEnvelopesForConflictInvalidLinkAndForbiddenChanges() throws Exception {
@@ -205,7 +205,7 @@ class AccountSecurityTest {
                 new org.springframework.security.access.AccessDeniedException("Sem permissão"));
         int[] expectedStatuses = {409, 400, 403};
         for (int index = 0; index < failures.size(); index++) {
-            doThrow(failures.get(index)).when(accounts).update(any(), any());
+            doThrow(failures.get(index)).when(accountService).update(any(), any());
             mvc.perform(put("/user/me/account-details").header("Authorization", "Bearer valid")
                             .contentType("application/json").content(validUpdate()))
                     .andExpect(status().is(expectedStatuses[index])).andExpect(jsonPath("$.success").value(false))
@@ -217,7 +217,7 @@ class AccountSecurityTest {
         for (Role role : new Role[]{Role.GESTOR, Role.GESTOR_WORKSPACE}) {
             authenticate(role);
             AuthenticatedUser principal = new AuthenticatedUser("own-uid", "token@example.com", role);
-            when(accounts.findSummary(principal)).thenReturn(new AccountSummaryResponse("Maria Rosa", "stored@example.com", null));
+            when(accountService.findSummary(principal)).thenReturn(new AccountSummaryResponse("Maria Rosa", "stored@example.com", null));
             mvc.perform(get("/user/me/account-summary?userId=999&firebaseUid=foreign-uid")
                             .header("Authorization", "Bearer valid"))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.success").value(true))
@@ -226,7 +226,7 @@ class AccountSecurityTest {
                     .andExpect(jsonPath("$.data.email").value("stored@example.com"))
                     .andExpect(content().string(org.hamcrest.Matchers.containsString("\"profilePhotoUrl\":null")))
                     .andExpect(jsonPath("$.path").value("/user/me/account-summary"));
-            verify(accounts).findSummary(principal);
+            verify(accountService).findSummary(principal);
         }
     }
 
@@ -234,9 +234,9 @@ class AccountSecurityTest {
     @Import({SecurityConfig.class, CorsConfig.class, FirebaseAuthenticationFilter.class, AccountController.class,
             UserController.class, GlobalExceptionHandler.class})
     static class Config {
-        @Bean AccountService accounts() { return mock(AccountService.class); }
-        @Bean UserService users() { return mock(UserService.class); }
-        @Bean FirebaseTokenService tokens() { return mock(FirebaseTokenService.class); }
-        @Bean AuthorizationService authorization() { return mock(AuthorizationService.class); }
+        @Bean AccountService accountService() { return mock(AccountService.class); }
+        @Bean UserService userService() { return mock(UserService.class); }
+        @Bean FirebaseTokenService firebaseTokenService() { return mock(FirebaseTokenService.class); }
+        @Bean AuthorizationService authorizationService() { return mock(AuthorizationService.class); }
     }
 }

@@ -28,18 +28,18 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class AccountServiceTest {
-    final UserRepository users = mock(UserRepository.class);
-    final UserAvatarService avatars = mock(UserAvatarService.class);
-    final AccountRepository accounts = mock(AccountRepository.class);
-    final RoleRepository roles = mock(RoleRepository.class);
-    final UnitRepository units = mock(UnitRepository.class);
-    final FirebaseIdentityService identities = mock(FirebaseIdentityService.class);
-    final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
-    final AccountService service = new AccountService(users, avatars, new AccountMapper(), accounts, roles, units,
-            identities, transactions);
+    final UserRepository userRepository = mock(UserRepository.class);
+    final UserAvatarService userAvatarService = mock(UserAvatarService.class);
+    final AccountRepository accountRepository = mock(AccountRepository.class);
+    final RoleRepository roleRepository = mock(RoleRepository.class);
+    final UnitRepository unitRepository = mock(UnitRepository.class);
+    final FirebaseIdentityService firebaseIdentityService = mock(FirebaseIdentityService.class);
+    final PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
+    final AccountService accountService = new AccountService(userRepository, userAvatarService, new AccountMapper(), accountRepository, roleRepository, unitRepository,
+            firebaseIdentityService, transactionManager);
 
-    @BeforeEach void transactions() {
-        when(transactions.getTransaction(any())).thenAnswer(call -> new SimpleTransactionStatus());
+    @BeforeEach void configureTransactionManager() {
+        when(transactionManager.getTransaction(any())).thenAnswer(call -> new SimpleTransactionStatus());
     }
 
     static User account(Role role) {
@@ -54,21 +54,21 @@ class AccountServiceTest {
     @Test void summaryUsesTheTokenUidAndStoredIdentityForBothManagerProfiles() {
         for (Role role : new Role[]{Role.GESTOR, Role.GESTOR_WORKSPACE}) {
             User user = account(role);
-            when(users.findByFirebaseUid("own-uid")).thenReturn(Optional.of(user));
-            when(avatars.findUrl(100L)).thenReturn("https://r2.example.com/signed");
-            AccountSummaryResponse result = service.findSummary(new AuthenticatedUser("own-uid", "stale-token@example.com", role));
+            when(userRepository.findByFirebaseUid("own-uid")).thenReturn(Optional.of(user));
+            when(userAvatarService.findUrl(100L)).thenReturn("https://r2.example.com/signed");
+            AccountSummaryResponse result = accountService.findSummary(new AuthenticatedUser("own-uid", "stale-token@example.com", role));
             assertEquals("Maria Rosa", result.name());
             assertEquals("stored@example.com", result.email());
             assertEquals("https://r2.example.com/signed", result.profilePhotoUrl());
         }
-        verify(users, times(2)).findByFirebaseUid("own-uid");
-        verifyNoMoreInteractions(users);
+        verify(userRepository, times(2)).findByFirebaseUid("own-uid");
+        verifyNoMoreInteractions(userRepository);
     }
 
     @Test void summaryKeepsMissingNameAndPhotoNull() {
         User user = account(Role.GESTOR); user.setName(null);
-        when(users.findByFirebaseUid("own-uid")).thenReturn(Optional.of(user));
-        AccountSummaryResponse result = service.findSummary(new AuthenticatedUser("own-uid", null, Role.GESTOR));
+        when(userRepository.findByFirebaseUid("own-uid")).thenReturn(Optional.of(user));
+        AccountSummaryResponse result = accountService.findSummary(new AuthenticatedUser("own-uid", null, Role.GESTOR));
         assertNull(result.name()); assertNull(result.profilePhotoUrl());
     }
 
@@ -79,8 +79,8 @@ class AccountServiceTest {
             com.astro.api.role.model.Role managerRole = new com.astro.api.role.model.Role();
             managerRole.setId(20L); managerRole.setName("Engenheira");
             managerRole.setWorkspace(user.getUnit().workspace); user.setRole(managerRole);
-            when(users.findByFirebaseUid("own-uid")).thenReturn(Optional.of(user));
-            AccountDetailsResponse result = service.findDetails(new AuthenticatedUser("own-uid", null, role));
+            when(userRepository.findByFirebaseUid("own-uid")).thenReturn(Optional.of(user));
+            AccountDetailsResponse result = accountService.findDetails(new AuthenticatedUser("own-uid", null, role));
             assertEquals("52998224725", result.cpf());
             assertEquals(20L, result.roleId()); assertEquals("Engenheira", result.roleName());
             assertEquals(10L, result.unitId()); assertEquals("Osasco", result.unitName());
@@ -89,8 +89,8 @@ class AccountServiceTest {
     }
 
     @Test void detailsPreserveMissingCpfRoleModalityAndPhotoWithoutInventedValues() {
-        when(users.findByFirebaseUid("own-uid")).thenReturn(Optional.of(account(Role.GESTOR_WORKSPACE)));
-        AccountDetailsResponse result = service.findDetails(new AuthenticatedUser("own-uid", null, Role.GESTOR_WORKSPACE));
+        when(userRepository.findByFirebaseUid("own-uid")).thenReturn(Optional.of(account(Role.GESTOR_WORKSPACE)));
+        AccountDetailsResponse result = accountService.findDetails(new AuthenticatedUser("own-uid", null, Role.GESTOR_WORKSPACE));
         assertNull(result.cpf()); assertNull(result.workModel()); assertNull(result.roleId());
         assertNull(result.roleName()); assertNull(result.profilePhotoUrl());
     }
@@ -100,25 +100,25 @@ class AccountServiceTest {
         com.astro.api.role.model.Role managerRole = new com.astro.api.role.model.Role();
         Workspace foreignWorkspace = new Workspace(); foreignWorkspace.id = 2L;
         managerRole.setWorkspace(foreignWorkspace); user.setRole(managerRole);
-        when(users.findByFirebaseUid("own-uid")).thenReturn(Optional.of(user));
+        when(userRepository.findByFirebaseUid("own-uid")).thenReturn(Optional.of(user));
         assertThrows(AccessDeniedException.class,
-                () -> service.findDetails(new AuthenticatedUser("own-uid", null, Role.GESTOR)));
-        verifyNoInteractions(avatars);
+                () -> accountService.findDetails(new AuthenticatedUser("own-uid", null, Role.GESTOR)));
+        verifyNoInteractions(userAvatarService);
     }
 
     @Test void absentAccountIsNotFoundAndUnauthorizedOrInactiveAccountsNeverReadPhotos() {
         AuthenticatedUser principal = new AuthenticatedUser("own-uid", null, Role.GESTOR);
-        assertThrows(ResourceNotFoundException.class, () -> service.findSummary(principal));
-        assertThrows(AccessDeniedException.class, () -> service.findSummary(null));
-        assertThrows(AccessDeniedException.class, () -> service.findSummary(new AuthenticatedUser("", null, Role.GESTOR)));
-        assertThrows(AccessDeniedException.class, () -> service.findSummary(new AuthenticatedUser("own-uid", null, Role.COLABORADOR)));
+        assertThrows(ResourceNotFoundException.class, () -> accountService.findSummary(principal));
+        assertThrows(AccessDeniedException.class, () -> accountService.findSummary(null));
+        assertThrows(AccessDeniedException.class, () -> accountService.findSummary(new AuthenticatedUser("", null, Role.GESTOR)));
+        assertThrows(AccessDeniedException.class, () -> accountService.findSummary(new AuthenticatedUser("own-uid", null, Role.COLABORADOR)));
         User user = account(Role.GESTOR_WORKSPACE);
-        when(users.findByFirebaseUid("own-uid")).thenReturn(Optional.of(user));
-        assertThrows(AccessDeniedException.class, () -> service.findSummary(principal));
+        when(userRepository.findByFirebaseUid("own-uid")).thenReturn(Optional.of(user));
+        assertThrows(AccessDeniedException.class, () -> accountService.findSummary(principal));
         user.setType(UserType.GESTOR); user.setStatus(UserStatus.DESATIVADO);
-        assertThrows(AccessDeniedException.class, () -> service.findSummary(principal));
+        assertThrows(AccessDeniedException.class, () -> accountService.findSummary(principal));
         user.setStatus(UserStatus.ATIVO); user.setUnit(null);
-        assertThrows(AccessDeniedException.class, () -> service.findSummary(principal));
-        verifyNoInteractions(avatars);
+        assertThrows(AccessDeniedException.class, () -> accountService.findSummary(principal));
+        verifyNoInteractions(userAvatarService);
     }
 }

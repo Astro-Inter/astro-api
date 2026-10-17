@@ -40,9 +40,9 @@ public class AccountController {
             @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível (ApiResult de erro)")
     })
     public ResponseEntity<ApiResult<AccountSummaryResponse>> summary(
-            @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Resumo da conta retornado com sucesso",
-                accountService.findSummary(principal), request.getRequestURI()));
+                accountService.findSummary(authenticatedUser), request.getRequestURI()));
     }
 
     @GetMapping("/user/me/account-details")
@@ -55,9 +55,9 @@ public class AccountController {
             @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível (ApiResult de erro)")
     })
     public ResponseEntity<ApiResult<AccountDetailsResponse>> details(
-            @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Detalhes da conta retornados com sucesso",
-                accountService.findDetails(principal), request.getRequestURI()));
+                accountService.findDetails(authenticatedUser), request.getRequestURI()));
     }
 
     @PutMapping("/user/me/account-details")
@@ -71,9 +71,9 @@ public class AccountController {
             @ApiResponse(responseCode = "500", description = "Falha interna/Firebase; sem sucesso parcial, com compensação ou contenção (ApiResult de erro)"),
             @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível (ApiResult de erro)")
     })
-    public ResponseEntity<ApiResult<AccountDetailsResponse>> update(@Valid @RequestBody UpdateAccountDetailsRequest body,
-            @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
+    public ResponseEntity<ApiResult<AccountDetailsResponse>> update(@Valid @RequestBody UpdateAccountDetailsRequest updateAccountDetailsRequest,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Conta atualizada com sucesso",
-                accountService.update(body, principal), request.getRequestURI()));
+                accountService.update(updateAccountDetailsRequest, authenticatedUser), request.getRequestURI()));
     }
 }

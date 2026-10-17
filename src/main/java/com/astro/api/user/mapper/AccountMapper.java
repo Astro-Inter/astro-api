@@ -23,12 +23,12 @@ public class AccountMapper {
                 user.getWorkModel(), profilePhotoUrl);
     }
 
-    public void applyUpdate(User user, UpdateAccountDetailsRequest body, Role role, Unit unit) {
-        user.setName(body.name());
-        user.setCpf(body.cpf());
-        user.setEmail(body.email());
+    public void applyUpdate(User user, UpdateAccountDetailsRequest updateAccountDetailsRequest, Role role, Unit unit) {
+        user.setName(updateAccountDetailsRequest.name());
+        user.setCpf(updateAccountDetailsRequest.cpf());
+        user.setEmail(updateAccountDetailsRequest.email());
         user.setRole(role);
         user.setUnit(unit);
-        user.setWorkModel(body.workModel());
+        user.setWorkModel(updateAccountDetailsRequest.workModel());
     }
 }
