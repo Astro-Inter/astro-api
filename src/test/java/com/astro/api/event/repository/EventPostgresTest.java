@@ -3,6 +3,8 @@ package com.astro.api.event.repository;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.service.ViewedService;
+import com.astro.api.common.storage.R2StorageService;
+import com.astro.api.conformity.repository.ConformityRepository;
 import com.astro.api.conformity.repository.NrCatalogRepository;
 import com.astro.api.conformity.repository.NrDocumentRepository;
 import com.astro.api.event.dto.request.CancelEventRequest;
@@ -333,8 +335,11 @@ class EventPostgresTest {
         @Bean PlatformTransactionManager transactionManager(EntityManagerFactory factory) { return new JpaTransactionManager(factory); }
         @Bean EventMapper mapper() { return new EventMapper(); }
         @Bean EventService service(EventRepository events,EventClassRepository classes,EventClassParticipantRepository participants,
-                                   UserRepository users,RoleRepository roles,NrCatalogRepository nrs,EventMapper mapper,EventCandidateRepository candidates) {
-            return new EventService(events,classes,participants,users,roles,nrs,mapper,Clock.fixed(Instant.parse("2026-10-14T12:00:00Z"),ZoneOffset.UTC),candidates,Mockito.mock(ViewedService.class));
+                                   UserRepository users,RoleRepository roles,NrCatalogRepository nrs,EventMapper mapper,EventCandidateRepository candidates,
+                                   EventCompletionRepository completions,EventEvidenceRepository evidence,
+                                   ConformityRepository conformities) {
+            return new EventService(events,classes,participants,users,roles,nrs,mapper,Clock.fixed(Instant.parse("2026-10-14T12:00:00Z"),ZoneOffset.UTC),candidates,Mockito.mock(ViewedService.class),
+                    completions,evidence,Mockito.mock(R2StorageService.class),conformities);
         }
     }
 }

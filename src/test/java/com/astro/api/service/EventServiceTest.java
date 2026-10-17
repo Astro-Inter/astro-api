@@ -3,13 +3,18 @@ package com.astro.api.service;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.service.ViewedService;
+import com.astro.api.common.storage.R2StorageService;
+import com.astro.api.conformity.model.Conformity;
+import com.astro.api.conformity.repository.ConformityRepository;
 import com.astro.api.conformity.repository.NrCatalogRepository;
 import com.astro.api.event.dto.request.CancelEventRequest;
 import com.astro.api.event.dto.request.CreateEventClassRequest;
 import com.astro.api.event.dto.request.CreateEventRequest;
 import com.astro.api.event.dto.request.UpdateEventClassRequest;
 import com.astro.api.event.dto.request.UpdateEventRequest;
+import com.astro.api.event.dto.response.CollaboratorEventDetailsResponse;
 import com.astro.api.event.dto.response.CollaboratorEventResponse;
+import com.astro.api.event.dto.response.EventCompletionResponse;
 import com.astro.api.event.dto.response.EventCalendarResponse;
 import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventClassResponse;
@@ -20,12 +25,17 @@ import com.astro.api.event.model.CompletionMode;
 import com.astro.api.event.model.Event;
 import com.astro.api.event.model.EventClass;
 import com.astro.api.event.model.EventClassParticipant;
+import com.astro.api.event.model.EventCompletion;
+import com.astro.api.event.model.EventCompletionStatus;
+import com.astro.api.event.model.EventEvidence;
 import com.astro.api.event.model.EventStatus;
 import com.astro.api.event.repository.EventCalendarProjection;
 import com.astro.api.event.repository.EventCandidateProjection;
 import com.astro.api.event.repository.EventCandidateRepository;
 import com.astro.api.event.repository.EventClassParticipantRepository;
 import com.astro.api.event.repository.EventClassRepository;
+import com.astro.api.event.repository.EventCompletionRepository;
+import com.astro.api.event.repository.EventEvidenceRepository;
 import com.astro.api.event.repository.EventRepository;
 import com.astro.api.event.service.EventService;
 import com.astro.api.role.model.Role;
@@ -44,6 +54,7 @@ import org.springframework.security.access.AccessDeniedException;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Arrays;
@@ -70,6 +81,10 @@ class EventServiceTest {
     private RoleRepository roleRepository;
     private NrCatalogRepository nrCatalogRepository;
     private ViewedService viewedService;
+    private EventCompletionRepository eventCompletionRepository;
+    private EventEvidenceRepository eventEvidenceRepository;
+    private R2StorageService storageService;
+    private ConformityRepository conformityRepository;
     private EventService service;
     private EventCandidateRepository candidateRepository;
     private User manager;
@@ -85,6 +100,10 @@ class EventServiceTest {
         nrCatalogRepository = mock(NrCatalogRepository.class);
         candidateRepository = mock(EventCandidateRepository.class);
         viewedService = mock(ViewedService.class);
+        eventCompletionRepository = mock(EventCompletionRepository.class);
+        eventEvidenceRepository = mock(EventEvidenceRepository.class);
+        storageService = mock(R2StorageService.class);
+        conformityRepository = mock(ConformityRepository.class);
         service = new EventService(
                 eventRepository,
                 eventClassRepository,
@@ -94,7 +113,9 @@ class EventServiceTest {
                 nrCatalogRepository,
                 new EventMapper(), Clock.fixed(
                         Instant.parse("2026-10-14T12:00:00Z"), ZoneOffset.UTC),
-                candidateRepository, viewedService);
+                candidateRepository, viewedService,
+                eventCompletionRepository, eventEvidenceRepository,
+                storageService, conformityRepository);
         workspace = new Workspace();
         workspace.id = 10L;
         manager = createUser(1L, UserStatus.ATIVO, workspace);
@@ -452,6 +473,76 @@ class EventServiceTest {
         assertEquals(true, response.getFirst().viewed());
         assertEquals("PENDENTE", response.get(1).classStatus());
         assertEquals(false, response.get(1).viewed());
+    }
+
+    @Test
+    void collaboratorDetailsKeepCompletionEvidenceAndComplianceAfterMerge() {
+        User collaborator = createUser(2L, UserStatus.ATIVO, workspace);
+        when(userRepository.findByFirebaseUid("collaborator")).thenReturn(Optional.of(collaborator));
+        Event event = createEvent(EventStatus.ATIVO);
+        event.setNrId(10);
+        EventClass eventClass = createEventClass(event,
+                LocalDateTime.now().minusHours(1), LocalDateTime.now().plusHours(1));
+        EventClassParticipant participation = new EventClassParticipant();
+        participation.setId(90L);
+        participation.setEventClass(eventClass);
+        participation.setUser(collaborator);
+        when(eventClassParticipantRepository.findFirstByEventClass_Event_IdAndUser_Id(30L, 2L))
+                .thenReturn(Optional.of(participation));
+        EventCompletion completion = new EventCompletion();
+        completion.setId(70L);
+        completion.setStatus(EventCompletionStatus.CONCLUIDO);
+        when(eventCompletionRepository.findByParticipation_Id(90L)).thenReturn(Optional.of(completion));
+        Conformity conformity = new Conformity();
+        conformity.setExpiresAt(LocalDate.of(2027, 1, 1));
+        when(conformityRepository.findByEventCompletionId(70L)).thenReturn(Optional.of(conformity));
+        EventEvidence evidence = new EventEvidence();
+        evidence.setId(80L);
+        evidence.setOriginalName("certificate.pdf");
+        evidence.setObjectPath("test/certificate.pdf");
+        evidence.setMimeType("application/pdf");
+        evidence.setSizeBytes(3L);
+        when(eventEvidenceRepository.findByCompletion_IdOrderById(70L)).thenReturn(List.of(evidence));
+        when(storageService.getEventEvidenceDownloadUrl("test/certificate.pdf"))
+                .thenReturn("https://storage.example.com/certificate.pdf");
+
+        CollaboratorEventDetailsResponse response = service.findDetailsForCollaborator(30L, "collaborator");
+
+        assertEquals(30L, response.eventId());
+        assertEquals(manager.getId(), response.managerId());
+        assertEquals(conformity.getExpiresAt(), response.complianceValidity());
+        assertEquals(80L, response.evidences().getFirst().evidenceId());
+        assertEquals("https://storage.example.com/certificate.pdf", response.evidences().getFirst().url());
+    }
+
+    @Test
+    void collaboratorCanRequestCompletionAfterAdministrativeFlowMerge() {
+        User collaborator = createUser(2L, UserStatus.ATIVO, workspace);
+        when(userRepository.findByFirebaseUid("collaborator")).thenReturn(Optional.of(collaborator));
+        Event event = createEvent(EventStatus.ATIVO);
+        event.setCompletionMode(CompletionMode.COLABORADOR);
+        EventClass eventClass = createEventClass(event,
+                LocalDateTime.now().minusHours(1), LocalDateTime.now().plusHours(1));
+        EventClassParticipant participation = new EventClassParticipant();
+        participation.setId(90L);
+        participation.setEventClass(eventClass);
+        participation.setUser(collaborator);
+        when(eventClassParticipantRepository.findByEventClass_Event_IdAndUser_Id(30L, 2L))
+                .thenReturn(Optional.of(participation));
+        when(eventCompletionRepository.findByParticipation_Id(90L)).thenReturn(Optional.empty());
+        when(eventCompletionRepository.save(any(EventCompletion.class))).thenAnswer(invocation -> {
+            EventCompletion completion = invocation.getArgument(0);
+            completion.setId(70L);
+            return completion;
+        });
+        when(eventEvidenceRepository.findByCompletion_Id(70L)).thenReturn(List.of());
+
+        EventCompletionResponse response = service.requestCompletion(30L, List.of(), "collaborator");
+
+        assertEquals(70L, response.id());
+        assertEquals(EventCompletionStatus.PENDENTE, response.status());
+        assertNotNull(response.completionDate());
+        verifyNoInteractions(storageService);
     }
 
     private CreateEventRequest createRequest(Integer nrId, List<Long> participantIds) {

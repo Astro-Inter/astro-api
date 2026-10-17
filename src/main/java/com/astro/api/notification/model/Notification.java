@@ -24,6 +24,12 @@ public class Notification {
     @Field("mensagem")
     private String message;
 
+    @Field("title")
+    private String title;
+
+    @Field("event_id")
+    private Long eventId;
+
     @Field("data_criacao")
     private Instant createdAt;
 }

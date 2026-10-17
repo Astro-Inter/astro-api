@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.Collection;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface EventClassParticipantRepository extends JpaRepository<EventClassParticipant, Long> {
@@ -20,4 +21,8 @@ public interface EventClassParticipantRepository extends JpaRepository<EventClas
     boolean hasConclusions(@Param("ids") Collection<Long> ids);
 
     List<EventClassParticipant> findByUser_IdOrderByEventClass_StartDateAsc(Long userId);
+
+    Optional<EventClassParticipant> findFirstByEventClass_Event_IdAndUser_Id(Long eventId, Long userId);
+
+    Optional<EventClassParticipant> findByEventClass_Event_IdAndUser_Id(Long eventId, Long userId);
 }

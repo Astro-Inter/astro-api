@@ -14,8 +14,10 @@ import com.astro.api.event.dto.request.UpdateEventRequest;
 import com.astro.api.event.dto.response.CollaboratorEventResponse;
 import com.astro.api.event.dto.response.EventCalendarResponse;
 import com.astro.api.event.dto.response.EventCandidateResponse;
+import com.astro.api.event.dto.response.EventCompletionResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.model.CompletionMode;
+import com.astro.api.event.model.EventCompletionStatus;
 import com.astro.api.event.model.EventStatus;
 import com.astro.api.event.service.EventService;
 import com.astro.api.user.model.WorkModel;
@@ -26,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -50,6 +53,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -210,6 +214,21 @@ class EventControllerIntegrationTest {
         mockMvc.perform(post("/events").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(body))).andExpect(status().isBadRequest());
         mockMvc.perform(post("/events").contentType(MediaType.APPLICATION_JSON).content("{" )).andExpect(status().isBadRequest());
         Mockito.verifyNoInteractions(eventService);
+    }
+
+    @Test
+    void collaboratorSendsCompletionWithEvidenceFiles() throws Exception {
+        when(eventService.requestCompletion(anyLong(), any(), anyString())).thenReturn(
+                new EventCompletionResponse(9L, EventCompletionStatus.PENDENTE, LocalDateTime.of(2026, 10, 16, 10, 0)));
+        MockMultipartFile evidence = new MockMultipartFile(
+                "files", "certificado.pdf", "application/pdf", new byte[]{1, 2, 3});
+
+        mockMvc.perform(multipart("/events/{eventId}/completion", 1L).file(evidence))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.status").value("PENDENTE"));
+
+        verify(eventService).requestCompletion(anyLong(), any(), anyString());
     }
 
     @Test
