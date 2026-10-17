@@ -13,6 +13,19 @@ jobs:
   build-and-test:
     name: Build and test
     runs-on: ubuntu-latest
+    services:
+      forms-mongo:
+        image: mongo:8.2
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ping:1})'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      FORM_TEST_MONGODB_URI: mongodb://127.0.0.1:27017
+
     steps:
       - name: Check out source code
         uses: actions/checkout@v4

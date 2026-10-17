@@ -41,10 +41,10 @@ class ManagerHomeServiceTest {
                    {"id":202,"collaborator_name":"Maria Silva","event_title":"NR-12"}]}
                 """);
         when(homeRepository.findByFirebaseUid("manager")).thenReturn(Optional.of(userId(2L)));
-        when(formService.findTop3PendingForManager(2L)).thenReturn(List.of(form(301L, "Checklist",
-                Instant.parse("2026-10-15T12:00:00Z")), form(302L, "Pesquisa", null)));
+        when(formService.findTop3PendingForManager(2L)).thenReturn(List.of(form("00000000-0000-0000-0000-00000000012d", "Checklist",
+                Instant.parse("2026-10-15T12:00:00Z")), form("00000000-0000-0000-0000-00000000012e", "Pesquisa", null)));
         when(viewedService.findViewed(2L, "validations", List.of(201L, 202L))).thenReturn(Set.of("202"));
-        when(viewedService.findViewed(2L, "forms", List.of(301L, 302L))).thenReturn(Set.of("301"));
+        when(viewedService.findViewed(2L, "forms", List.of("00000000-0000-0000-0000-00000000012d", "00000000-0000-0000-0000-00000000012e"))).thenReturn(Set.of("00000000-0000-0000-0000-00000000012d"));
 
         ManagerHomeResponse response = service.loadManagerHome(manager);
 
@@ -53,10 +53,11 @@ class ManagerHomeServiceTest {
         assertEquals(2, response.pendingValidations().size());
         assertFalse(response.pendingValidations().getFirst().viewed());
         assertTrue(response.pendingValidations().get(1).viewed());
+        assertEquals("00000000-0000-0000-0000-00000000012d", response.pendingForms().getFirst().id());
         assertTrue(response.pendingForms().getFirst().viewed());
         assertNull(response.pendingForms().get(1).daysLeft());
         verify(viewedService).findViewed(2L, "validations", List.of(201L, 202L));
-        verify(viewedService).findViewed(2L, "forms", List.of(301L, 302L));
+        verify(viewedService).findViewed(2L, "forms", List.of("00000000-0000-0000-0000-00000000012d", "00000000-0000-0000-0000-00000000012e"));
         verifyNoMoreInteractions(viewedService);
     }
 
@@ -101,7 +102,7 @@ class ManagerHomeServiceTest {
         return () -> value;
     }
 
-    private Form form(Long id, String title, Instant dueDate) {
+    private Form form(String id, String title, Instant dueDate) {
         Form form = new Form();
         form.setId(id);
         form.setTitle(title);
