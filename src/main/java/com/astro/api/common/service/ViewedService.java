@@ -26,6 +26,10 @@ public class ViewedService {
         return ids.stream().filter(id -> Boolean.TRUE.equals(values.get(id))).collect(java.util.stream.Collectors.toSet());
     }
 
+    public void markViewed(Long userId, String resource, Object itemId) {
+        redisTemplate.opsForSet().add(key(userId, resource), String.valueOf(itemId));
+    }
+
     private String key(Long userId, String resource) {
         return "%s:viewed:%d".formatted(resource, userId);
     }

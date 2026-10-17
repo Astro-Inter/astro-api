@@ -1,35 +1,56 @@
 package com.astro.api.event.service;
 
-import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.service.ViewedService;
+import com.astro.api.common.storage.R2StorageService;
+import com.astro.api.conformity.model.Conformity;
+import com.astro.api.conformity.repository.ConformityRepository;
 import com.astro.api.conformity.repository.NrCatalogRepository;
 import com.astro.api.event.dto.request.CancelEventRequest;
 import com.astro.api.event.dto.request.CreateEventClassRequest;
 import com.astro.api.event.dto.request.CreateEventRequest;
 import com.astro.api.event.dto.request.UpdateEventClassRequest;
 import com.astro.api.event.dto.request.UpdateEventRequest;
-import com.astro.api.event.dto.response.EventCandidateResponse;
-import com.astro.api.event.dto.response.EventCalendarResponse;
+import com.astro.api.event.dto.response.CollaboratorEventDetailsResponse;
 import com.astro.api.event.dto.response.CollaboratorEventResponse;
+import com.astro.api.event.dto.response.EventCalendarResponse;
+import com.astro.api.event.dto.response.EventCandidateResponse;
+import com.astro.api.event.dto.response.EventCompletionResponse;
+import com.astro.api.event.dto.response.EventEvidenceResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.mapper.EventMapper;
+import com.astro.api.event.model.CompletionMode;
 import com.astro.api.event.model.Event;
 import com.astro.api.event.model.EventClass;
 import com.astro.api.event.model.EventClassParticipant;
+import com.astro.api.event.model.EventCompletion;
+import com.astro.api.event.model.EventCompletionStatus;
+import com.astro.api.event.model.EventEvidence;
 import com.astro.api.event.model.EventStatus;
+import com.astro.api.event.repository.EventCandidateRepository;
 import com.astro.api.event.repository.EventClassParticipantRepository;
 import com.astro.api.event.repository.EventClassRepository;
+import com.astro.api.event.repository.EventCompletionRepository;
+import com.astro.api.event.repository.EventEvidenceRepository;
 import com.astro.api.event.repository.EventRepository;
+import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
+import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.workspace.model.Workspace;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -38,6 +59,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -51,7 +73,13 @@ public class EventService {
     private final RoleRepository roleRepository;
     private final NrCatalogRepository nrCatalogRepository;
     private final EventMapper eventMapper;
+    private final Clock clock;
+    private final EventCandidateRepository candidateRepository;
     private final ViewedService viewedService;
+    private final EventCompletionRepository eventCompletionRepository;
+    private final EventEvidenceRepository eventEvidenceRepository;
+    private final R2StorageService storageService;
+    private final ConformityRepository conformityRepository;
 
     public EventService(
             EventRepository eventRepository,
@@ -60,8 +88,12 @@ public class EventService {
             UserRepository userRepository,
             RoleRepository roleRepository,
             NrCatalogRepository nrCatalogRepository,
-            EventMapper eventMapper,
-            ViewedService viewedService) {
+            EventMapper eventMapper, @Qualifier("eventClock") Clock clock,
+            EventCandidateRepository candidateRepository, ViewedService viewedService,
+            EventCompletionRepository eventCompletionRepository,
+            EventEvidenceRepository eventEvidenceRepository,
+            R2StorageService storageService,
+            ConformityRepository conformityRepository) {
         this.eventRepository = eventRepository;
         this.eventClassRepository = eventClassRepository;
         this.eventClassParticipantRepository = eventClassParticipantRepository;
@@ -69,7 +101,13 @@ public class EventService {
         this.roleRepository = roleRepository;
         this.nrCatalogRepository = nrCatalogRepository;
         this.eventMapper = eventMapper;
+        this.clock = clock;
+        this.candidateRepository = candidateRepository;
         this.viewedService = viewedService;
+        this.eventCompletionRepository = eventCompletionRepository;
+        this.conformityRepository = conformityRepository;
+        this.eventEvidenceRepository = eventEvidenceRepository;
+        this.storageService = storageService;
     }
 
     @Transactional
@@ -91,46 +129,35 @@ public class EventService {
                 eventClasses, request.eventClasses(), participants);
         eventClassParticipantRepository.saveAll(classParticipants);
 
-        return toResponse(event, eventClasses, classParticipants);
+        return toResponse(event, eventClasses, classParticipants, manager);
     }
 
+    @Transactional(readOnly = true)
+    public EventResponse findById(Long eventId, String firebaseUid) {
+        User manager = findAuthenticatedManager(firebaseUid);
+        Event event = findEventInWorkspace(eventId, getWorkspace(manager));
+        return toResponse(event, eventClassRepository.findByEventOrderByStartDate(event), manager);
+    }
+
+    @Transactional(readOnly = true)
     public List<EventCalendarResponse> findAll(
             LocalDateTime startDate,
             LocalDateTime endDate,
             String firebaseUid) {
         validatePeriod(startDate, endDate);
         Workspace workspace = getWorkspace(findAuthenticatedManager(firebaseUid));
-        List<Event> events = eventRepository.findByManager_Unit_Workspace(workspace);
-        if (events.isEmpty()) {
-            return List.of();
-        }
-        Map<Long, Event> eventsById = events.stream()
-                .collect(Collectors.toMap(Event::getId, Function.identity()));
-        return eventClassRepository.findByEventInOrderByStartDate(events).stream()
-                .filter(eventClass -> isInPeriod(eventClass, startDate, endDate))
-                .map(eventClass -> toCalendarResponse(
-                        eventsById.get(eventClass.getEvent().getId()),
-                        eventClass))
-                .toList();
+        return eventClassRepository.findCalendar(workspace, startDate, endDate).stream()
+                .map(eventMapper::toCalendarResponse).toList();
     }
 
+    @Transactional(readOnly = true)
     public List<EventCandidateResponse> findEligibleCandidates(Integer nrId, String firebaseUid) {
         User manager = findAuthenticatedManager(firebaseUid);
-        Workspace workspace = getWorkspace(manager);
-        List<User> eligibleUsers = userRepository
-                .findByUnit_WorkspaceAndStatus(workspace, UserStatus.ATIVO)
-                .stream()
-                .filter(user -> !user.getId().equals(manager.getId()))
-                .toList();
-        if (nrId != null) {
-            validateNrExists(nrId);
-            Set<Long> eligibleRoleIds = findEligibleRoleIds(nrId, eligibleUsers);
-            eligibleUsers = eligibleUsers.stream()
-                    .filter(user -> user.getRole() != null
-                            && eligibleRoleIds.contains(user.getRole().getId()))
-                    .toList();
-        }
-        return eligibleUsers.stream().map(eventMapper::toCandidateResponse).toList();
+        getWorkspace(manager);
+        if (nrId != null && nrId <= 0) throw new BusinessException("Identificador da NR deve ser positivo");
+        validateNrExists(nrId);
+        return candidateRepository.findEligibleCandidates(firebaseUid, nrId).stream()
+                .map(eventMapper::toCandidateResponse).toList();
     }
 
     @Transactional(readOnly = true)
@@ -154,73 +181,198 @@ public class EventService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public CollaboratorEventDetailsResponse findDetailsForCollaborator(Long eventId, String firebaseUid) {
+        User user = findAuthenticatedUser(firebaseUid);
+        EventClassParticipant participation = eventClassParticipantRepository
+                .findFirstByEventClass_Event_IdAndUser_Id(eventId, user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Evento não encontrado para o colaborador"));
+
+        EventClass eventClass = participation.getEventClass();
+        Event event = eventClass.getEvent();
+        EventCompletion conclusion = eventCompletionRepository
+                .findByParticipation_Id(participation.getId())
+                .orElse(null);
+        boolean completed = conclusion != null && conclusion.getStatus() == EventCompletionStatus.CONCLUIDO;
+        LocalDate validity = !completed || event.getNrId() == null
+                ? null
+                : conformityRepository.findByEventCompletionId(conclusion.getId())
+                        .map(Conformity::getExpiresAt)
+                        .orElse(null);
+        List<EventEvidenceResponse> evidences = !completed
+                ? List.of()
+                : eventEvidenceRepository.findByCompletion_IdOrderById(conclusion.getId()).stream()
+                        .map(evidence -> eventMapper.toEvidenceResponse(
+                                evidence, storageService.getEventEvidenceDownloadUrl(evidence.getObjectPath())))
+                        .toList();
+
+        User manager = event.getManager();
+        return new CollaboratorEventDetailsResponse(
+                event.getId(),
+                event.getTitle(),
+                eventClass.getEndDate(),
+                classStatus(eventClass, LocalDateTime.now()),
+                event.getDescription(),
+                validity,
+                event.getExternalLink(),
+                manager.getId(),
+                manager.getName(),
+                event.isMandatoryEvidence(),
+                event.getCompletionMode(),
+                evidences);
+    }
+
+    @Transactional
+    public EventCompletionResponse requestCompletion(
+            Long eventId, List<MultipartFile> files, String firebaseUid) {
+        User collaborator = findAuthenticatedUser(firebaseUid);
+        if (collaborator.getStatus() != UserStatus.ATIVO) {
+            throw new BusinessException("Colaborador não está ATIVO");
+        }
+        EventClassParticipant participation = eventClassParticipantRepository
+                .findByEventClass_Event_IdAndUser_Id(eventId, collaborator.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Participação no evento não encontrada"));
+        Event event = participation.getEventClass().getEvent();
+        ensureCollaboratorCompletionAllowed(event, participation.getEventClass());
+        List<MultipartFile> evidenceFiles = files == null ? List.of() : files;
+        validateEvidenceFiles(event, evidenceFiles);
+
+        EventCompletion completion = eventCompletionRepository.findByParticipation_Id(participation.getId())
+                .map(existing -> prepareResubmission(existing))
+                .orElseGet(() -> newPendingCompletion(participation));
+        completion = eventCompletionRepository.save(completion);
+
+        List<EventEvidence> previousEvidence = eventEvidenceRepository.findByCompletion_Id(completion.getId());
+        List<EventEvidence> evidence = new ArrayList<>();
+        try {
+            for (MultipartFile file : evidenceFiles) {
+                evidence.add(uploadEvidence(completion, file));
+            }
+        } catch (RuntimeException exception) {
+            evidence.forEach(item -> storageService.deleteEventEvidence(item.getObjectPath()));
+            throw exception;
+        }
+        eventEvidenceRepository.deleteByCompletion_Id(completion.getId());
+        eventEvidenceRepository.saveAll(evidence);
+        scheduleEvidenceObjectCleanup(previousEvidence, evidence);
+
+        return new EventCompletionResponse(completion.getId(), completion.getStatus(), completion.getCompletionDate());
+    }
+
     @Transactional
     public EventResponse update(Long eventId, UpdateEventRequest request, String firebaseUid) {
         User manager = findAuthenticatedManager(firebaseUid);
-        Event event = findEventInWorkspace(eventId, getWorkspace(manager));
+        Event event = findLockedEventInWorkspace(eventId, getWorkspace(manager));
         ensureManagerAndEditable(event, manager);
+        LocalDateTime editTime = LocalDateTime.now(clock);
         List<EventClass> existingClasses = eventClassRepository.findByEventOrderByStartDate(event);
-        List<EventClassParticipant> existingClassParticipants = eventClassParticipantRepository
-                .findByEventClassIn(existingClasses);
+        List<EventClassParticipant> existingParticipants = eventClassParticipantRepository.findByEventClassIn(existingClasses);
+        ensureMetadataEditable(event, request, existingClasses, editTime);
         List<UpdatedEventClass> updatedClasses = prepareUpdatedClasses(
-                event,
-                existingClasses,
-                existingClassParticipants,
-                request.eventClasses());
+                event, existingClasses, existingParticipants, request.eventClasses(), editTime);
+        List<EventClass> removedClasses = findRemovedClasses(existingClasses, updatedClasses);
+        if (removedClasses.stream().anyMatch(eventClass -> !editTime.isBefore(eventClass.getStartDate()))) {
+            throw new BusinessException("Turma já iniciada não pode ser removida");
+        }
         Set<Long> editableParticipantIds = validateUpdatedClasses(updatedClasses);
-        Map<Long, User> editableParticipants = findAndValidateEditableParticipants(
-                editableParticipantIds,
-                manager,
-                event.getNrId());
+        Map<Long, User> users = findAndValidateEditableParticipants(editableParticipantIds, manager, event.getNrId());
+        Map<Long, UpdatedEventClass> desiredById = updatedClasses.stream()
+                .filter(item -> item.eventClass().getId() != null)
+                .collect(Collectors.toMap(item -> item.eventClass().getId(), Function.identity()));
+        List<EventClassParticipant> removedParticipants = existingParticipants.stream().filter(participant -> {
+            UpdatedEventClass desired = desiredById.get(participant.getEventClass().getId());
+            return desired == null || !desired.request().participantIds().contains(participant.getUser().getId());
+        }).toList();
+        if (!removedParticipants.isEmpty() && eventClassParticipantRepository.hasConclusions(
+                removedParticipants.stream().map(EventClassParticipant::getId).toList())) {
+            throw new BusinessException("Participação com conclusão não pode ser removida");
+        }
 
-        event.setTitle(request.title().trim());
+        // Flush removals first: Hibernate otherwise inserts before deletes under unique constraints.
+        eventClassParticipantRepository.deleteAll(removedParticipants);
+        eventClassParticipantRepository.flush();
+        eventClassRepository.deleteAll(removedClasses);
+        eventClassRepository.flush();
+        releaseChangedClassNames(updatedClasses);
+        List<EventClass> classesToPersist = new ArrayList<>();
+        for (UpdatedEventClass item : updatedClasses) {
+            if (!item.editable()) continue;
+            EventClass eventClass = item.eventClass();
+            eventClass.setName(item.request().name());
+            eventClass.setStartDate(item.request().startDate());
+            eventClass.setEndDate(item.request().endDate());
+            classesToPersist.add(eventClass);
+        }
+        eventClassRepository.saveAll(classesToPersist);
+        eventClassRepository.flush();
+        List<EventClassParticipant> retained = new ArrayList<>(existingParticipants);
+        retained.removeAll(removedParticipants);
+        List<EventClassParticipant> additions = new ArrayList<>();
+        Map<Long, Set<Long>> retainedByClass = retained.stream().collect(Collectors.groupingBy(
+                participant -> participant.getEventClass().getId(),
+                Collectors.mapping(participant -> participant.getUser().getId(), Collectors.toSet())));
+        for (UpdatedEventClass item : updatedClasses) {
+            if (!item.editable()) continue;
+            Set<Long> retainedIds = retainedByClass.getOrDefault(item.eventClass().getId(), Set.of());
+            for (Long userId : item.request().participantIds()) {
+                if (!retainedIds.contains(userId)) additions.add(createClassParticipant(item.eventClass(), users.get(userId)));
+            }
+        }
+        eventClassParticipantRepository.saveAll(additions);
+        retained.addAll(additions);
+        event.setTitle(request.title());
         event.setDescription(request.description());
         event.setExternalLink(request.externalLink());
-        eventRepository.save(event);
+        eventRepository.saveAndFlush(event);
+        return toResponse(event, updatedClasses.stream().map(UpdatedEventClass::eventClass).toList(), retained, manager);
+    }
 
-        List<EventClass> removedClasses = findRemovedClasses(existingClasses, updatedClasses);
-        removedClasses.forEach(this::ensureEventClassEditable);
+    private void ensureMetadataEditable(Event event, UpdateEventRequest request,
+                                        List<EventClass> existingClasses, LocalDateTime editTime) {
+        boolean started = existingClasses.stream().anyMatch(eventClass -> !editTime.isBefore(eventClass.getStartDate()));
+        if (started && (!Objects.equals(event.getTitle(), request.title())
+                || !Objects.equals(event.getDescription(), request.description())
+                || !Objects.equals(event.getExternalLink(), request.externalLink()))) {
+            throw new BusinessException("Título, descrição e link não podem ser alterados após o início de uma turma");
+        }
+    }
 
-        List<UpdatedEventClass> editableClasses = updatedClasses.stream()
-                .filter(UpdatedEventClass::editable)
-                .toList();
-        List<EventClass> classesToPersist = editableClasses.stream()
-                .map(UpdatedEventClass::eventClass)
-                .toList();
-        List<EventClass> savedClasses = eventClassRepository.saveAll(classesToPersist);
-        List<EventClassParticipant> participantsToDelete = existingClassParticipants.stream()
-                .filter(classParticipant -> classesToPersist.contains(classParticipant.getEventClass())
-                        || removedClasses.contains(classParticipant.getEventClass()))
-                .toList();
-        eventClassParticipantRepository.deleteAll(participantsToDelete);
-        eventClassRepository.deleteAll(removedClasses);
-        List<EventClassParticipant> classParticipants = createUpdatedClassParticipants(
-                savedClasses,
-                editableClasses,
-                editableParticipants);
-        eventClassParticipantRepository.saveAll(classParticipants);
-        List<EventClassParticipant> responseParticipants = new ArrayList<>(existingClassParticipants);
-        responseParticipants.removeAll(participantsToDelete);
-        responseParticipants.addAll(classParticipants);
-        List<EventClass> responseClasses = updatedClasses.stream()
-                .map(UpdatedEventClass::eventClass)
-                .sorted((firstClass, secondClass) -> firstClass.getStartDate()
-                        .compareTo(secondClass.getStartDate()))
-                .toList();
-        return toResponse(event, responseClasses, responseParticipants);
+    private void releaseChangedClassNames(List<UpdatedEventClass> updatedClasses) {
+        boolean changed = false;
+        Set<String> reservedNames = updatedClasses.stream().map(item -> item.request().name()).collect(Collectors.toSet());
+        for (UpdatedEventClass item : updatedClasses) {
+            EventClass eventClass = item.eventClass();
+            reservedNames.add(eventClass.getName());
+        }
+        for (UpdatedEventClass item : updatedClasses) {
+            EventClass eventClass = item.eventClass();
+            if (item.editable() && eventClass.getId() != null && !eventClass.getName().equals(item.request().name())) {
+                String temporaryName;
+                do { temporaryName = "_" + UUID.randomUUID(); } while (!reservedNames.add(temporaryName));
+                eventClass.setName(temporaryName);
+                changed = true;
+            }
+        }
+        // Transactional temporary names allow swaps without violating uq_turma_evento_nome.
+        if (changed) eventClassRepository.flush();
     }
 
     @Transactional
     public EventResponse cancel(Long eventId, CancelEventRequest request, String firebaseUid) {
         User manager = findAuthenticatedManager(firebaseUid);
-        Event event = findEventInWorkspace(eventId, getWorkspace(manager));
+        Event event = findLockedEventInWorkspace(eventId, getWorkspace(manager));
         ensureManagerAndEditable(event, manager);
 
+        if (request.reason() == null
+                || request.reason().codePointCount(0, request.reason().length()) < 3
+                || request.reason().length() > 1000) {
+            throw new BusinessException("Motivo do cancelamento deve ter entre 3 e 1000 caracteres");
+        }
         event.setStatus(EventStatus.CANCELADO);
-        event.setCancellationDate(Instant.now());
-        event.setCancellationReason(request.reason().trim());
-        eventRepository.save(event);
-        return toResponse(event, eventClassRepository.findByEventOrderByStartDate(event));
+        event.setCancellationDate(clock.instant());
+        event.setCancellationReason(request.reason());
+        eventRepository.saveAndFlush(event);
+        return toResponse(event, eventClassRepository.findByEventOrderByStartDate(event), manager);
     }
 
     private void validateNrExists(Integer nrId) {
@@ -270,7 +422,8 @@ public class EventService {
             Event event,
             List<EventClass> existingClasses,
             List<EventClassParticipant> existingClassParticipants,
-            List<UpdateEventClassRequest> classRequests) {
+            List<UpdateEventClassRequest> classRequests, LocalDateTime editTime) {
+        if (classRequests == null || classRequests.isEmpty()) throw new BusinessException("Evento deve possuir ao menos uma turma");
         Map<Long, EventClass> existingClassesById = existingClasses.stream()
                 .collect(Collectors.toMap(EventClass::getId, Function.identity()));
         Map<Long, Set<Long>> existingParticipantIdsByClassId = existingClassParticipants.stream()
@@ -281,12 +434,17 @@ public class EventService {
                                 Collectors.toSet())));
         Set<Long> requestedClassIds = new HashSet<>();
         List<UpdatedEventClass> updatedClasses = new ArrayList<>();
+        Set<String> classNames = new HashSet<>();
         for (UpdateEventClassRequest classRequest : classRequests) {
+            if (classRequest == null) throw new BusinessException("Turma não pode ser nula");
+            validateClassName(classRequest.name(), classNames);
+            if (classRequest.participantIds() == null) throw new BusinessException("Turma deve possuir ao menos um participante");
+            validateUniqueParticipants(classRequest.participantIds(), new HashSet<>(classRequest.participantIds()));
             EventClass eventClass = classRequest.id() == null
                     ? newEventClass(event)
                     : getExistingEventClass(classRequest.id(), existingClassesById, requestedClassIds);
             validateDates(classRequest.startDate(), classRequest.endDate());
-            if (eventClass.getId() != null && !isEventClassEditable(eventClass)) {
+            if (eventClass.getId() != null && !editTime.isBefore(eventClass.getStartDate())) {
                 ensureStartedClassIsUnchanged(
                         eventClass,
                         classRequest,
@@ -294,9 +452,6 @@ public class EventService {
                 updatedClasses.add(new UpdatedEventClass(eventClass, classRequest, false));
                 continue;
             }
-            eventClass.setName(classRequest.name().trim());
-            eventClass.setStartDate(classRequest.startDate());
-            eventClass.setEndDate(classRequest.endDate());
             updatedClasses.add(new UpdatedEventClass(eventClass, classRequest, true));
         }
         return updatedClasses;
@@ -350,8 +505,8 @@ public class EventService {
             List<Long> classParticipantIds = updatedClass.request().participantIds();
             Set<Long> uniqueClassParticipantIds = new HashSet<>(classParticipantIds);
             validateUniqueParticipants(classParticipantIds, uniqueClassParticipantIds);
-            if (!allParticipantIds.addAll(uniqueClassParticipantIds)) {
-                throw new BusinessException("Participante repetido em duas turmas do evento");
+            for (Long participantId : uniqueClassParticipantIds) {
+                if (!allParticipantIds.add(participantId)) throw new BusinessException("Participante repetido em duas turmas do evento");
             }
             if (updatedClass.editable()) {
                 editableParticipantIds.addAll(uniqueClassParticipantIds);
@@ -374,41 +529,40 @@ public class EventService {
                 nrId);
     }
 
-    private List<EventClassParticipant> createUpdatedClassParticipants(
-            List<EventClass> savedClasses,
-            List<UpdatedEventClass> updatedClasses,
-            Map<Long, User> participants) {
-        List<EventClassParticipant> classParticipants = new ArrayList<>();
-        for (int classIndex = 0; classIndex < savedClasses.size(); classIndex++) {
-            EventClass eventClass = savedClasses.get(classIndex);
-            for (Long participantId : updatedClasses.get(classIndex).request().participantIds()) {
-                classParticipants.add(createClassParticipant(
-                        eventClass,
-                        participants.get(participantId)));
-            }
-        }
-        return classParticipants;
-    }
-
     private void validateClassesForCreation(List<CreateEventClassRequest> classRequests) {
         if (classRequests == null || classRequests.isEmpty()) {
             throw new BusinessException("Evento deve possuir ao menos uma turma");
         }
         Set<Long> allParticipantIds = new HashSet<>();
+        Set<String> classNames = new HashSet<>();
         for (CreateEventClassRequest classRequest : classRequests) {
+            if (classRequest == null) throw new BusinessException("Turma não pode ser nula");
+            validateClassName(classRequest.name(), classNames);
             if (classRequest.participantIds() == null || classRequest.participantIds().isEmpty()) {
                 throw new BusinessException("Turma deve possuir ao menos um participante");
             }
             validateDates(classRequest.startDate(), classRequest.endDate());
             Set<Long> classParticipantIds = new HashSet<>(classRequest.participantIds());
             validateUniqueParticipants(classRequest.participantIds(), classParticipantIds);
-            if (!allParticipantIds.addAll(classParticipantIds)) {
-                throw new BusinessException("Participante repetido em duas turmas do evento");
+            for (Long participantId : classParticipantIds) {
+                if (!allParticipantIds.add(participantId)) {
+                    throw new BusinessException("Participante repetido em duas turmas do evento");
+                }
             }
         }
     }
 
+    private void validateClassName(String name, Set<String> names) {
+        if (name == null || name.isBlank() || name.length() > 255) {
+            throw new BusinessException("Nome da turma deve ter entre 1 e 255 caracteres");
+        }
+        if (!names.add(name.trim())) throw new BusinessException("Nome de turma repetido no evento");
+    }
+
     private void validateUniqueParticipants(List<Long> requestedIds, Set<Long> uniqueIds) {
+        if (requestedIds == null || uniqueIds.stream().anyMatch(id -> id == null || id <= 0)) {
+            throw new BusinessException("Identificador do participante deve ser positivo");
+        }
         if (uniqueIds.size() != requestedIds.size()) {
             throw new BusinessException("Participante repetido na turma");
         }
@@ -422,7 +576,7 @@ public class EventService {
             Workspace workspace,
             User manager,
             Integer nrId) {
-        List<User> participants = userRepository.findAllById(participantIds);
+        List<User> participants = userRepository.findEventParticipantsInWorkspace(participantIds, workspace);
         Map<Long, User> usersById = participants.stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
         if (usersById.size() != participantIds.size()) {
@@ -473,7 +627,9 @@ public class EventService {
 
     private User findAuthenticatedManager(String firebaseUid) {
         return userRepository.findByFirebaseUid(firebaseUid)
-                .orElseThrow(() -> new ResourceNotFoundException("Usuário autenticado não encontrado"));
+                .filter(user -> user.getStatus() == UserStatus.ATIVO
+                        && (user.getType() == UserType.GESTOR || user.getType() == UserType.GESTOR_WORKSPACE))
+                .orElseThrow(() -> new AccessDeniedException("Gestor ativo necessário"));
     }
 
     private User findAuthenticatedUser(String firebaseUid) {
@@ -489,13 +645,20 @@ public class EventService {
     }
 
     private Event findEventInWorkspace(Long eventId, Workspace workspace) {
+        if (eventId == null || eventId <= 0) throw new BusinessException("Identificador do evento deve ser positivo");
         return eventRepository.findByIdAndManager_Unit_Workspace(eventId, workspace)
+                .orElseThrow(() -> new ResourceNotFoundException("Evento não encontrado"));
+    }
+
+    private Event findLockedEventInWorkspace(Long eventId, Workspace workspace) {
+        if (eventId == null || eventId <= 0) throw new BusinessException("Identificador do evento deve ser positivo");
+        return eventRepository.findLockedInWorkspace(eventId, workspace)
                 .orElseThrow(() -> new ResourceNotFoundException("Evento não encontrado"));
     }
 
     private void ensureManagerAndEditable(Event event, User manager) {
         if (!event.getManager().getId().equals(manager.getId())) {
-            throw new BusinessException("Operação não autorizada para este evento");
+            throw new AccessDeniedException("Operação não autorizada para este evento");
         }
         ensureEditable(event);
     }
@@ -513,6 +676,118 @@ public class EventService {
         if (!isEventClassEditable(eventClass)) {
             throw new BusinessException("Turma já iniciada");
         }
+    }
+
+    private void ensureCollaboratorCompletionAllowed(Event event, EventClass eventClass) {
+        if (event.getStatus() != EventStatus.ATIVO) {
+            throw new BusinessException("Evento cancelado não aceita conclusão");
+        }
+        if (event.getCompletionMode() != CompletionMode.COLABORADOR) {
+            throw new BusinessException("Este evento não permite conclusão pelo colaborador");
+        }
+        LocalDateTime now = LocalDateTime.now();
+        if (now.isBefore(eventClass.getStartDate()) || now.isAfter(eventClass.getEndDate())) {
+            throw new BusinessException("A conclusão só pode ser enviada durante a turma");
+        }
+    }
+
+    private void validateEvidenceFiles(Event event, List<MultipartFile> files) {
+        if (files.size() > 3) {
+            throw new BusinessException("A conclusão permite no máximo 3 evidências");
+        }
+        if (event.isMandatoryEvidence() && files.isEmpty()) {
+            throw new BusinessException("Este evento exige ao menos uma evidência");
+        }
+        for (MultipartFile file : files) {
+            if (file == null || file.isEmpty()) {
+                throw new BusinessException("A evidência não pode estar vazia");
+            }
+            if (file.getSize() > 50L * 1024 * 1024) {
+                throw new BusinessException("Cada evidência deve ter no máximo 50 MB");
+            }
+            evidenceName(file);
+            evidenceMimeType(file);
+        }
+    }
+
+    private EventCompletion newPendingCompletion(EventClassParticipant participation) {
+        EventCompletion completion = new EventCompletion();
+        completion.setParticipation(participation);
+        completion.setStatus(EventCompletionStatus.PENDENTE);
+        completion.setCompletionDate(LocalDateTime.now());
+        return completion;
+    }
+
+    private EventCompletion prepareResubmission(EventCompletion completion) {
+        if (completion.getStatus() == EventCompletionStatus.PENDENTE) {
+            throw new BusinessException("A conclusão já está pendente de validação");
+        }
+        if (completion.getStatus() == EventCompletionStatus.CONCLUIDO) {
+            throw new BusinessException("A conclusão já foi validada");
+        }
+        completion.setStatus(EventCompletionStatus.PENDENTE);
+        completion.setCompletionDate(LocalDateTime.now());
+        completion.setValidationDate(null);
+        completion.setExpirationDate(null);
+        completion.setRejectionReason(null);
+        return completion;
+    }
+
+    private EventEvidence uploadEvidence(EventCompletion completion, MultipartFile file) {
+        String mimeType = evidenceMimeType(file);
+        EventEvidence evidence = new EventEvidence();
+        evidence.setCompletion(completion);
+        evidence.setOriginalName(evidenceName(file));
+        evidence.setMimeType(mimeType);
+        evidence.setSizeBytes(file.getSize());
+        evidence.setObjectPath(storageService.uploadEventEvidence(completion.getId(), file, mimeType));
+        return evidence;
+    }
+
+    private String evidenceName(MultipartFile file) {
+        String originalName = file.getOriginalFilename();
+        if (originalName == null) {
+            throw new BusinessException("A evidência deve possuir um nome de arquivo");
+        }
+        String name = originalName.replace('\\', '/');
+        name = name.substring(name.lastIndexOf('/') + 1).trim();
+        if (name.isEmpty() || name.length() > 255) {
+            throw new BusinessException("O nome da evidência deve ter entre 1 e 255 caracteres");
+        }
+        return name;
+    }
+
+    private String evidenceMimeType(MultipartFile file) {
+        String mimeType = file.getContentType();
+        if (mimeType == null || mimeType.isBlank()) {
+            return "application/octet-stream";
+        }
+        mimeType = mimeType.trim();
+        if (mimeType.length() > 127 || !mimeType.matches("^[A-Za-z0-9.+-]+/[A-Za-z0-9.+-]+$")) {
+            throw new BusinessException("O tipo MIME da evidência é inválido");
+        }
+        return mimeType;
+    }
+
+    private void scheduleEvidenceObjectCleanup(
+            List<EventEvidence> previousEvidence, List<EventEvidence> newEvidence) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            previousEvidence.forEach(item -> storageService.deleteEventEvidence(item.getObjectPath()));
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                previousEvidence.forEach(item -> storageService.deleteEventEvidence(item.getObjectPath()));
+            }
+
+            @Override
+            public void afterCompletion(int status) {
+                if (status == STATUS_ROLLED_BACK) {
+                    newEvidence.forEach(item -> storageService.deleteEventEvidence(item.getObjectPath()));
+                }
+            }
+        });
     }
 
     private boolean isEventClassEditable(EventClass eventClass) {
@@ -546,22 +821,10 @@ public class EventService {
         return classParticipant;
     }
 
-    private boolean isInPeriod(
-            EventClass eventClass,
-            LocalDateTime startDate,
-            LocalDateTime endDate) {
-        return (startDate == null || !eventClass.getEndDate().isBefore(startDate))
-                && (endDate == null || !eventClass.getStartDate().isAfter(endDate));
-    }
-
     private void validatePeriod(LocalDateTime startDate, LocalDateTime endDate) {
-        if (startDate != null && endDate != null && !endDate.isAfter(startDate)) {
+        if (startDate == null || endDate == null || !endDate.isAfter(startDate)) {
             throw new BusinessException("Data final deve ser posterior à data inicial");
         }
-    }
-
-    private EventCalendarResponse toCalendarResponse(Event event, EventClass eventClass) {
-        return eventMapper.toCalendarResponse(event, eventClass);
     }
 
     private String classStatus(EventClass eventClass, LocalDateTime now) {
@@ -571,17 +834,27 @@ public class EventService {
         return eventClass.getEndDate().isBefore(now) ? "CONCLUIDO" : "PENDENTE";
     }
 
-    private EventResponse toResponse(Event event, List<EventClass> eventClasses) {
+    private EventResponse toResponse(Event event, List<EventClass> eventClasses, User manager) {
         List<EventClassParticipant> classParticipants = eventClassParticipantRepository
                 .findByEventClassIn(eventClasses);
-        return toResponse(event, eventClasses, classParticipants);
+        return toResponse(event, eventClasses, classParticipants, manager);
     }
 
     private EventResponse toResponse(
             Event event,
             List<EventClass> eventClasses,
-            List<EventClassParticipant> classParticipants) {
-        return eventMapper.toResponse(event, eventClasses, classParticipants);
+            List<EventClassParticipant> classParticipants, User manager) {
+        boolean ownerAndActive = event.getStatus() == EventStatus.ATIVO
+                && event.getManager().getId().equals(manager.getId());
+        LocalDateTime now = LocalDateTime.now(clock);
+        boolean detailsEditable = ownerAndActive
+                && eventClasses.stream().allMatch(eventClass -> now.isBefore(eventClass.getStartDate()));
+        Set<Long> editableClassIds = ownerAndActive ? eventClasses.stream()
+                .filter(eventClass -> now.isBefore(eventClass.getStartDate()))
+                .map(EventClass::getId).collect(Collectors.toSet()) : Set.of();
+        // An active owner may always add future classes, even when all current classes started.
+        return eventMapper.toResponse(event, eventClasses, classParticipants,
+                ownerAndActive, ownerAndActive, detailsEditable, editableClassIds);
     }
 
     private record UpdatedEventClass(

@@ -8,6 +8,7 @@ public record EventClassResponse(
         String name,
         LocalDateTime startDate,
         LocalDateTime endDate,
+        boolean editable,
         List<EventParticipantResponse> participants
 ) {
 }

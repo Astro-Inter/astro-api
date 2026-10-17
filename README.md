@@ -208,8 +208,8 @@ no painel do serviço, sem aspas envolvendo os valores:
 
 `POSTGRES_MAX_POOL_SIZE` é opcional e usa `3` por instância.
 `R2_PRESIGNED_URL_DURATION` é opcional e usa `1d` (24 horas).
-`R2_BUCKET_EVIDENCIAS` permanece no exemplo para outros fluxos; este endpoint
-usa exclusivamente o bucket de avatares.
+`R2_BUCKET_EVIDENCIAS` é obrigatório para o envio de evidências de conclusão
+de eventos; ele deve permitir leitura, escrita e exclusão de objetos.
 `OTEL_EXPORTER_OTLP_ENDPOINT` e `OTEL_EXPORTER_OTLP_HEADERS` são opcionais;
 preencha ambos apenas se for habilitar a exportação de logs ao Grafana.
 

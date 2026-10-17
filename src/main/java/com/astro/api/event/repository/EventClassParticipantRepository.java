@@ -4,12 +4,25 @@ import com.astro.api.event.model.EventClass;
 import com.astro.api.event.model.EventClassParticipant;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import java.util.Collection;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface EventClassParticipantRepository extends JpaRepository<EventClassParticipant, Long> {
+    @EntityGraph(attributePaths = {"user", "user.role", "user.role.workspace", "user.unit", "user.unit.workspace", "user.unit.address"})
     List<EventClassParticipant> findByEventClassIn(List<EventClass> eventClasses);
+    // Conclusions and evidence remain owned by their existing modules/database contracts.
+    @Query(value = "select exists (select 1 from conclusao_evento where turma_funcionario_id in (:ids))", nativeQuery = true)
+    boolean hasConclusions(@Param("ids") Collection<Long> ids);
 
     List<EventClassParticipant> findByUser_IdOrderByEventClass_StartDateAsc(Long userId);
+
+    Optional<EventClassParticipant> findFirstByEventClass_Event_IdAndUser_Id(Long eventId, Long userId);
+
+    Optional<EventClassParticipant> findByEventClass_Event_IdAndUser_Id(Long eventId, Long userId);
 }

@@ -22,13 +22,13 @@ public class Event {
     @Column(name = "titulo", nullable = false)
     private String title;
 
-    @Column(name = "descricao")
+    @Column(name = "descricao", nullable = false, columnDefinition = "text")
     private String description;
 
     @Column(name = "nr_id")
     private Integer nrId;
 
-    @Column(name = "link_externo")
+    @Column(name = "link_externo", length = 2048)
     private String externalLink;
 
     @Enumerated(EnumType.STRING)
@@ -49,6 +49,6 @@ public class Event {
     @Column(name = "data_cancelamento")
     private Instant cancellationDate;
 
-    @Column(name = "motivo_cancelamento")
+    @Column(name = "motivo_cancelamento", columnDefinition = "text")
     private String cancellationReason;
 }

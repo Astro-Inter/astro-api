@@ -32,7 +32,7 @@ class R2UploadTest {
         when(provider.getObject()).thenReturn(client);
         storage = new R2StorageService(null, new R2Properties(
                 "https://account.r2.cloudflarestorage.com", "photos",
-                "test-access-key", "test-secret-key", Duration.ofMinutes(15)), provider);
+                "evidences", "test-access-key", "test-secret-key", Duration.ofMinutes(15)), provider);
     }
 
     @Test
