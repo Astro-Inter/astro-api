@@ -43,9 +43,9 @@ class FormControllerTest {
                 new FormPageResponse(List.of(new FormSummaryResponse(formId(1), "Clima", "Pesquisa", 3, FormStatus.PENDING)), 1, 4, 9, 3));
         mvc.perform(get("/forms").param("search", "Clima").param("status", "PENDENTE").param("page", "1").param("size", "4")
                         .param("workspaceId", "999").param("firebaseUid", "fake"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].titulo").value("Clima"))
-                .andExpect(jsonPath("$.data.items[0].quantidade_perguntas").value(3))
-                .andExpect(jsonPath("$.data.items[0].perguntas").doesNotExist())
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].title").value("Clima"))
+                .andExpect(jsonPath("$.data.items[0].questionCount").value(3))
+                .andExpect(jsonPath("$.data.items[0].questions").doesNotExist())
                 .andExpect(jsonPath("$.data.totalPages").value(3));
         verify(service).findAll(principal, "Clima", FormStatus.PENDING, 1, 4);
     }
@@ -57,40 +57,40 @@ class FormControllerTest {
         verifyNoInteractions(service);
     }
 
-    @Test void detailsUsePortugueseFieldsAndStandardErrors() throws Exception {
+    @Test void detailsUseCamelCaseFieldsAndStandardErrors() throws Exception {
         Form form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.DRAFT);
         when(service.findById(formId(1), principal)).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
         mvc.perform(get("/forms/" + formId(1))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(formId(1)))
-                .andExpect(jsonPath("$.data.id_gestor").value(20))
-                .andExpect(jsonPath("$.data.perguntas[0].id_pergunta").value(1))
-                .andExpect(jsonPath("$.data.perguntas[0].resposta").isEmpty());
+                .andExpect(jsonPath("$.data.managerId").value(20))
+                .andExpect(jsonPath("$.data.questions[0].id").value(1))
+                .andExpect(jsonPath("$.data.questions[0].answer").isEmpty());
         when(service.findById("invalid", principal)).thenThrow(new com.astro.api.common.exception.BusinessException("UUID inválido"));
         mvc.perform(get("/forms/invalid")).andExpect(status().isBadRequest());
         when(service.findById(formId(99), principal)).thenThrow(new com.astro.api.common.exception.ResourceNotFoundException("Formulário não encontrado"));
         mvc.perform(get("/forms/" + formId(99))).andExpect(status().isNotFound());
     }
 
-    @Test void creationUsesPortugueseContractAndIgnoresForgedServerFieldsAndAnswers() throws Exception {
+    @Test void creationUsesCamelCaseContractAndIgnoresForgedServerFieldsAndAnswers() throws Exception {
         Form form = FormTestFixtures.form(42, 1, 10, 20, FormStatus.PENDING);
         when(service.create(any(), eq(principal))).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
         mvc.perform(post("/forms").contentType("application/json").content("""
-                {"titulo":"Inspeção","id_gestor":20,"status":"PENDENTE","id_workspace":999,
-                 "id_gestor_remetente":999,"respondido_em":"2026-10-15T12:00:00Z",
-                 "perguntas":[{"tipo":"texto","pergunta":"Descrição","obrigatoria":true,"resposta":["FORJADA"]}]}
+                {"title":"Inspeção","managerId":20,"status":"PENDENTE","workspaceId":999,
+                 "senderManagerId":999,"respondedAt":"2026-10-15T12:00:00Z",
+                 "questions":[{"type":"texto","question":"Descrição","required":true,"answer":["FORJADA"]}]}
                 """))
                 .andExpect(status().isCreated()).andExpect(header().string("Location", "/forms/" + formId(42)))
-                .andExpect(jsonPath("$.data.id_workspace").value(1))
-                .andExpect(jsonPath("$.data.id_gestor_remetente").value(10));
+                .andExpect(jsonPath("$.data.workspaceId").value(1))
+                .andExpect(jsonPath("$.data.senderManagerId").value(10));
         ArgumentCaptor<FormWriteRequest> request = org.mockito.ArgumentCaptor.forClass(com.astro.api.form.dto.request.FormWriteRequest.class);
         verify(service).create(request.capture(), eq(principal));
         assertEquals(com.astro.api.form.model.FormQuestionType.TEXT, request.getValue().questions().getFirst().type());
     }
 
     @Test void creationRejectsUnknownTypesImpossibleDatesAndOutOfRangeConfigurations() throws Exception {
-        for (String body : List.of("null", "{\"id_gestor\":0}", "{\"data_limite\":\"2026-02-30\"}",
-                "{\"perguntas\":[{\"tipo\":\"unknown\"}]}", "{\"perguntas\":[{}]}",
-                "{\"perguntas\":[{\"tipo\":\"foto\",\"maximo_arquivos\":11}]}")) {
+        for (String body : List.of("null", "{\"managerId\":0}", "{\"dueDate\":\"2026-02-30\"}",
+                "{\"questions\":[{\"type\":\"unknown\"}]}", "{\"questions\":[{}]}",
+                "{\"questions\":[{\"type\":\"foto\",\"maxFiles\":11}]}")) {
             mvc.perform(post("/forms").contentType("application/json").content(body)).andExpect(status().isBadRequest());
         }
         verifyNoInteractions(service);
@@ -99,7 +99,7 @@ class FormControllerTest {
     @Test void updateUsesValidatedIdentityAndMapsConcurrentConflicts() throws Exception {
         Form form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.DRAFT);
         when(service.update(eq(formId(1)), any(), eq(principal))).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
-        mvc.perform(put("/forms/" + formId(1)).contentType("application/json").content("{\"titulo\":\"Rascunho\"}"))
+        mvc.perform(put("/forms/" + formId(1)).contentType("application/json").content("{\"title\":\"Rascunho\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("RASCUNHO"));
         when(service.update(eq(formId(1)), any(), eq(principal))).thenThrow(new com.astro.api.common.exception.ConflictException("Alterado"));
         mvc.perform(put("/forms/" + formId(1)).contentType("application/json").content("{}"))
@@ -121,9 +121,9 @@ class FormControllerTest {
     @Test void publicationDoesNotAcceptAReplacementFormOrAnswersAndMapsItsStateErrors() throws Exception {
         Form form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.PENDING);
         when(service.publish(formId(1), principal)).thenReturn(new com.astro.api.form.mapper.FormMapper().toDetails(form));
-        mvc.perform(post("/forms/" + formId(1) + "/publish").contentType("application/json").content("{\"status\":\"CONCLUIDO\",\"resposta\":[\"Forjada\"]}"))
+        mvc.perform(post("/forms/" + formId(1) + "/publish").contentType("application/json").content("{\"status\":\"CONCLUIDO\",\"answer\":[\"Forjada\"]}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("PENDENTE"))
-                .andExpect(jsonPath("$.data.perguntas[0].resposta").isEmpty());
+                .andExpect(jsonPath("$.data.questions[0].answer").isEmpty());
         verify(service).publish(formId(1), principal);
         when(service.publish(formId(1), principal)).thenThrow(new com.astro.api.common.exception.ConflictException("Já publicado"));
         mvc.perform(post("/forms/" + formId(1) + "/publish")).andExpect(status().isConflict());
@@ -132,11 +132,11 @@ class FormControllerTest {
     }
 
     @Test void requestValidationResolvesPortugueseMessagesFromTheResourceBundle() throws Exception {
-        mvc.perform(post("/forms").contentType("application/json").content("{\"titulo\":\"" + "a".repeat(101) + "\"}"))
+        mvc.perform(post("/forms").contentType("application/json").content("{\"title\":\"" + "a".repeat(101) + "\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors[0]").value(org.hamcrest.Matchers.containsString(
                         "O título do formulário deve ter no máximo 100 caracteres")));
-        mvc.perform(post("/forms").contentType("application/json").content("{\"perguntas\":[{}]}"))
+        mvc.perform(post("/forms").contentType("application/json").content("{\"questions\":[{}]}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors[0]").value(org.hamcrest.Matchers.containsString("O tipo da pergunta é obrigatório")));
         verifyNoInteractions(service);

@@ -3,6 +3,10 @@
 As rotas usam `Authorization: Bearer <Firebase ID token>` e o envelope `ApiResult`.
 Somente gestores ativos, com unidade ativa e workspace válido, têm acesso.
 O workspace e o remetente são determinados pela identidade validada.
+Os campos de request e response usam os nomes Java em inglês e camelCase,
+conforme os componentes dos DTOs, sem `@JsonProperty`.
+Clientes devem enviar `title`, `managerId`, `questions`, `dueDate` e os demais
+nomes dos exemplos abaixo; os nomes antigos em português não são aliases da API.
 
 ## Listagem
 
@@ -14,7 +18,7 @@ A página começa em zero, `size` aceita 1 a 100 e a busca até 240 caracteres.
 A ordenação é por criação decrescente e, em caso de empate, identificador decrescente.
 
 `data` contém `items`, `page`, `size`, `totalElements` e `totalPages` (zero sem resultados).
-Cada item contém `id`, `titulo`, `descricao`, `quantidade_perguntas` e `status`.
+Cada item contém `id`, `title`, `description`, `questionCount` e `status`.
 Não são carregadas respostas na listagem.
 
 O gestor do workspace consulta todos os formulários do seu workspace. Outros gestores
@@ -23,14 +27,14 @@ outros remetentes ficam ocultos ao destinatário.
 
 ## Consulta de detalhes
 
-`GET /forms/{id}` retorna todos os dados e perguntas, com `id_gestor`,
-`id_gestor_remetente`, `id_workspace`, `titulo`, `descricao`, `nr`, `id_unidade`,
-`data_limite`, `status`, `criado_em`, `atualizado_em`, `respondido_em` e `perguntas`.
+`GET /forms/{id}` retorna todos os dados e perguntas, com `managerId`,
+`senderManagerId`, `workspaceId`, `title`, `description`, `nrCode`, `unitId`,
+`dueDate`, `status`, `createdAt`, `updatedAt`, `respondedAt` e `questions`.
 O ID do formulário é uma string UUID de 36 caracteres, como `550e8400-e29b-41d4-a716-446655440000`.
 Identificador inválido retorna 400; inexistente ou fora do escopo retorna 404.
 O prazo é apresentado como `YYYY-MM-DD`, usando `America/Sao_Paulo`; no MongoDB
-é armazenado como data BSON. As opções têm `id_opcao`, `texto` e `outra`.
-As perguntas de foto têm `maximo_arquivos` e `tamanho_maximo_mb`.
+é armazenado como data BSON. As opções têm `id`, `text` e `other`.
+As perguntas de foto têm `maxFiles` e `maxFileSizeMb`.
 
 ## Criação e rascunhos
 
@@ -40,25 +44,25 @@ Exemplo de corpo (não é o documento completo do MongoDB):
 
 ```json
 {
-  "titulo": "Inspeção de segurança",
-  "descricao": "Condições da unidade",
-  "id_gestor": 20,
-  "nr": 6,
-  "id_unidade": 3,
-  "data_limite": "2026-10-30",
+  "title": "Inspeção de segurança",
+  "description": "Condições da unidade",
+  "managerId": 20,
+  "nrCode": 6,
+  "unitId": 3,
+  "dueDate": "2026-10-30",
   "status": "PENDENTE",
-  "perguntas": [
-    {"tipo": "texto", "pergunta": "Descreva o local", "obrigatoria": true},
+  "questions": [
+    {"type": "texto", "question": "Descreva o local", "required": true},
     {
-      "tipo": "alternativa", "pergunta": "Quais riscos foram encontrados?",
-      "obrigatoria": true, "multipla_escolha": true,
-      "opcoes": [{"texto": "Queda", "outra": false}, {"texto": "", "outra": true}]
+      "type": "alternativa", "question": "Quais riscos foram encontrados?",
+      "required": true, "multiple": true,
+      "options": [{"text": "Queda", "other": false}, {"text": "", "other": true}]
     },
     {
-      "tipo": "foto", "pergunta": "Fotos do local", "obrigatoria": false,
-      "maximo_arquivos": 3, "tamanho_maximo_mb": 10
+      "type": "foto", "question": "Fotos do local", "required": false,
+      "maxFiles": 3, "maxFileSizeMb": 10
     },
-    {"tipo": "data", "pergunta": "Data da inspeção", "obrigatoria": true}
+    {"type": "data", "question": "Data da inspeção", "required": true}
   ]
 }
 ```
@@ -67,13 +71,13 @@ Exemplo de corpo (não é o documento completo do MongoDB):
 `{"status":"RASCUNHO"}`. Não é permitido criar como `CONCLUIDO`.
 Gestor e título podem faltar no rascunho; se gestor, unidade ou NR forem informados,
 os vínculos precisam existir e estar elegíveis. A unidade opcional é um vínculo
-contextual e não define quem responde: somente `id_gestor` é o destinatário.
+contextual e não define quem responde: somente `managerId` é o destinatário.
 
 Na publicação são obrigatórios título não vazio, gestor ativo e 1 a 100 perguntas
 com enunciados preenchidos. Descrição, NR, unidade e prazo são opcionais.
 Limites: título 100, descrição 240, enunciado 140 e texto de opção 80 caracteres.
-Cada alternativa aceita 2 a 100 opções, com no máximo uma marcada `outra`.
-O texto de `outra` é normalizado para `Outros`; seu campo de resposta pertence ao mobile.
+Cada alternativa aceita 2 a 100 opções, com no máximo uma marcada `other`.
+O texto de `other` é normalizado para `Outros`; seu campo de resposta pertence ao mobile.
 Fotos aceitam 1 a 10 arquivos e limites de 5, 10, 20, 50 ou 100 MB por arquivo.
 O padrão de foto é 1 arquivo de até 10 MB. Não há upload de fotos nessas rotas.
 Esses limites também se aplicam a rascunhos, que podem ter opções e enunciados vazios.
@@ -103,7 +107,7 @@ pode alterar os de outros remetentes no próprio workspace. O destinatário, por
 destinatário, não ganha permissão administrativa. A falta dessa permissão retorna 403.
 Formulários concluídos ou que já tenham respostas são protegidos contra edição (409).
 
-Preserve `id_pergunta` e `id_opcao` dos itens existentes. Omita os IDs nos novos itens
+Preserve o `id` de cada pergunta e opção existente. Omita os IDs nos novos itens
 e nas cópias; remova itens omitindo-os do array e reordene mudando sua posição.
 IDs desconhecidos ou repetidos são recusados. Remetente, workspace, criação e respostas
 não podem ser sobrescritos por essa operação.
@@ -166,10 +170,13 @@ identificadores e estados. `FormMapper` concentra conversões e a resposta pagin
 Os DTOs de request referenciam mensagens em português de `ValidationMessages.properties`.
 
 Os identificadores Java usam inglês, incluindo `nrCode`, `DRAFT`, `PENDING`,
-`COMPLETED`, `TEXT`, `OPTION`, `PHOTO` e `DATE`. `@JsonProperty`, `@Field`, o
-conversor de status do MongoDB e a conversão do parâmetro HTTP preservam os nomes
-do contrato existente: `nr`, `RASCUNHO`, `PENDENTE`, `CONCLUIDO`, `texto`,
-`alternativa`, `foto` e `data`. Essa adequação não exige migração adicional de dados.
+`COMPLETED`, `TEXT`, `OPTION`, `PHOTO` e `DATE`. Os DTOs usam diretamente os
+nomes Java no JSON, incluindo `nrCode`, `managerId`, `questions`, `required` e `answer`.
+Os campos físicos do MongoDB continuam mapeados por `@Field`, incluindo `nr`,
+`id_gestor`, `perguntas` e `resposta`; a remoção de `@JsonProperty` não exige migração
+dos documentos. Os valores de enum permanecem `RASCUNHO`, `PENDENTE`, `CONCLUIDO`,
+`texto`, `alternativa`, `foto` e `data`. A Home mobile mantém o contrato próprio
+existente; esta mudança se aplica aos bodies e respostas dos endpoints `/forms`.
 
 ## Validação local
 
