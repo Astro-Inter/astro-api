@@ -19,7 +19,6 @@ public interface AccountRepository extends JpaRepository<User, Long> {
     @Query(value = "SELECT ativo FROM unidade WHERE id_unidade = :unitId AND workspace_id = :workspaceId FOR SHARE", nativeQuery = true)
     Boolean lockUnitActive(@Param("unitId") Long unitId, @Param("workspaceId") Long workspaceId);
 
-    // Simple existence checks use derived JPA queries instead of handwritten SQL.
     boolean existsByCpfAndIdNot(String cpf, Long userId);
 
     boolean existsByEmailIgnoreCaseAndIdNot(String email, Long userId);
