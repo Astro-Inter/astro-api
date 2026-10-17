@@ -169,6 +169,19 @@ Os controllers cuidam do HTTP. Os services coordenam autorização, validações
 identificadores e estados. `FormMapper` concentra conversões e a resposta paginada.
 Os DTOs de request referenciam mensagens em português de `ValidationMessages.properties`.
 
+`FormAccessService` decide a política de visibilidade por perfil e produz `FormReadFilter`.
+Também produz `FormWriteCondition`, um snapshot imutável com ID, workspace, remetente
+quando exigido, versão e status esperados. O service captura essa condição antes de
+alterar o conteúdo. `FormService` define a transição de publicação para `PENDING`
+e normaliza a busca antes de consultar o repository.
+
+O repository traduz os filtros recebidos para MongoDB e executa `updateStatus` com
+o estado de destino informado pelo service. Não consulta perfis nem escolhe estados
+de publicação/visibilidade. Permanece responsável por ordenação, projeção, paginação,
+incremento da versão e gravações condicionais. Workspace, remetente quando exigido,
+versão, status anterior e ausência de respostas são conferidos atomicamente na
+gravação/exclusão, protegendo inclusive respostas recebidas após a leitura do service.
+
 Os identificadores Java usam inglês, incluindo `nrCode`, `DRAFT`, `PENDING`,
 `COMPLETED`, `TEXT`, `OPTION`, `PHOTO` e `DATE`. Os DTOs usam diretamente os
 nomes Java no JSON, incluindo `nrCode`, `managerId`, `questions`, `required` e `answer`.

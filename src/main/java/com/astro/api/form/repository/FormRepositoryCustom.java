@@ -1,18 +1,20 @@
 package com.astro.api.form.repository;
 
 import com.astro.api.form.model.Form;
-import com.astro.api.form.model.FormScope;
+import com.astro.api.form.model.FormReadFilter;
 import com.astro.api.form.model.FormStatus;
+import com.astro.api.form.model.FormWriteCondition;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
 public interface FormRepositoryCustom {
-    Listing findAll(FormScope scope, String search, FormStatus status, int page, int size);
-    Optional<Form> findById(String id, FormScope scope);
-    Optional<Form> update(Form form, FormScope scope, Long expectedVersion);
-    boolean delete(Form form, FormScope scope);
-    Optional<Form> publish(Form form, FormScope scope);
+    Listing findAll(FormReadFilter readFilter, String search, FormStatus status, int page, int size);
+    Optional<Form> findById(String formId, FormReadFilter readFilter);
+    Optional<Form> update(Form form, FormWriteCondition writeCondition);
+    boolean deleteIfUnanswered(FormWriteCondition writeCondition);
+    Optional<Form> updateStatus(FormWriteCondition writeCondition, FormStatus targetStatus, Instant updatedAt);
 
     record Listing(List<Form> forms, long total) {}
 }
