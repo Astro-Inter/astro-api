@@ -11,6 +11,7 @@ import com.astro.api.config.CorsConfig;
 import com.astro.api.user.dto.response.AccountSummaryResponse;
 import com.astro.api.user.dto.response.AccountDetailsResponse;
 import com.astro.api.user.dto.response.UserProfileResponse;
+import com.astro.api.user.dto.request.UpdateAccountDetailsRequest;
 import com.astro.api.user.service.AccountService;
 import com.astro.api.user.service.UserService;
 import com.astro.api.user.model.WorkModel;
@@ -77,6 +78,15 @@ class AccountSecurityTest {
                         .andExpect(status().isForbidden());
             }
         }
+        mvc.perform(put("/user/me/account-details").contentType("application/json").content(validUpdate()))
+                .andExpect(status().isForbidden());
+        mvc.perform(put("/user/me/account-details").header("Authorization", "Bearer invalid")
+                        .contentType("application/json").content(validUpdate())).andExpect(status().isForbidden());
+        for (Role role : new Role[]{Role.ADMIN, Role.COLABORADOR}) {
+            authenticate(role);
+            mvc.perform(put("/user/me/account-details").header("Authorization", "Bearer valid")
+                            .contentType("application/json").content(validUpdate())).andExpect(status().isForbidden());
+        }
         verifyNoInteractions(accounts);
     }
 
@@ -120,6 +130,85 @@ class AccountSecurityTest {
                 .andExpect(jsonPath("$.data.nrs").isArray()).andExpect(jsonPath("$.data.nome").value("Maria Rosa"))
                 .andExpect(jsonPath("$.data.cargo").value("Engenheira"));
         verifyNoInteractions(accounts);
+    }
+
+    String validUpdate() {
+        return "{\"nome\":\"Maria Rosa\",\"cpf\":\"52998224725\",\"email\":\"stored@example.com\",\"roleId\":20,\"unitId\":10,\"modalidade\":\"REMOTO\"}";
+    }
+
+    @Test void putUsesTheTokenAndReturnsUpdatedDetailsForBothProfiles() throws Exception {
+        for (Role role : new Role[]{Role.GESTOR, Role.GESTOR_WORKSPACE}) {
+            authenticate(role);
+            var principal = new AuthenticatedUser("own-uid", "token@example.com", role);
+            var body = new UpdateAccountDetailsRequest("Maria Rosa", "52998224725", "stored@example.com", 20L, 10L, WorkModel.REMOTO);
+            when(accounts.update(body, principal)).thenReturn(new AccountDetailsResponse("Maria Rosa", "52998224725",
+                    "stored@example.com", 20L, "Engenheira", 10L, "Osasco", WorkModel.REMOTO, null));
+            mvc.perform(put("/user/me/account-details?userId=999").header("Authorization", "Bearer valid")
+                            .contentType("application/json").content(validUpdate()))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.data", aMapWithSize(9)))
+                    .andExpect(jsonPath("$.data.cpf").value("52998224725"));
+            verify(accounts).update(body, principal);
+        }
+    }
+
+    @Test void putRejectsEachMissingOrNullFieldBeforeCallingTheService() throws Exception {
+        authenticate(Role.GESTOR_WORKSPACE);
+        var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
+        for (String field : new String[]{"nome", "cpf", "email", "roleId", "unitId", "modalidade"}) {
+            for (boolean omitted : new boolean[]{true, false}) {
+                var body = (tools.jackson.databind.node.ObjectNode) mapper.readTree(validUpdate());
+                if (omitted) body.remove(field); else body.putNull(field);
+                mvc.perform(put("/user/me/account-details").header("Authorization", "Bearer valid")
+                                .contentType("application/json").content(mapper.writeValueAsString(body)))
+                        .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false))
+                        .andExpect(jsonPath("$.errors").isNotEmpty());
+            }
+        }
+        verifyNoInteractions(accounts);
+    }
+
+    @Test void putRejectsInvalidFormatsLimitsAndForbiddenFields() throws Exception {
+        authenticate(Role.GESTOR_WORKSPACE);
+        var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
+        var invalid = java.util.List.of(
+                validUpdate().replace("Maria Rosa", " "), validUpdate().replace("Maria Rosa", "M"),
+                validUpdate().replace("Maria Rosa", "M".repeat(256)),
+                validUpdate().replace("52998224725", "11111111111"), validUpdate().replace("52998224725", "abc"),
+                validUpdate().replace("52998224725", ""), validUpdate().replace("stored@example.com", "invalid"),
+                validUpdate().replace("stored@example.com", "x".repeat(250) + "@astro.com"),
+                validUpdate().replace("\"roleId\":20", "\"roleId\":0"),
+                validUpdate().replace("\"unitId\":10", "\"unitId\":-1"),
+                validUpdate().replace("REMOTO", "INVALID"));
+        for (String body : invalid) {
+            mvc.perform(put("/user/me/account-details").header("Authorization", "Bearer valid")
+                            .contentType("application/json").content(body))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false));
+        }
+        for (String field : new String[]{"userId", "firebaseUid", "workspaceId", "status", "tipo", "senha", "password", "passwordHash", "file", "profilePhotoUrl", "nrs"}) {
+            var body = (tools.jackson.databind.node.ObjectNode) mapper.readTree(validUpdate());
+            body.put(field, "not-allowed");
+            mvc.perform(put("/user/me/account-details").header("Authorization", "Bearer valid")
+                            .contentType("application/json").content(mapper.writeValueAsString(body)))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false));
+        }
+        verifyNoInteractions(accounts);
+    }
+
+    @Test void putUsesStandardErrorEnvelopesForConflictInvalidLinkAndForbiddenChanges() throws Exception {
+        authenticate(Role.GESTOR);
+        var failures = java.util.List.of(
+                new com.astro.api.common.exception.ConflictException("Já existe um usuário com este CPF"),
+                new com.astro.api.common.exception.BusinessException("O cargo deve estar ativo"),
+                new org.springframework.security.access.AccessDeniedException("Sem permissão"));
+        int[] expectedStatuses = {409, 400, 403};
+        for (int index = 0; index < failures.size(); index++) {
+            doThrow(failures.get(index)).when(accounts).update(any(), any());
+            mvc.perform(put("/user/me/account-details").header("Authorization", "Bearer valid")
+                            .contentType("application/json").content(validUpdate()))
+                    .andExpect(status().is(expectedStatuses[index])).andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.errors").isNotEmpty()).andExpect(jsonPath("$.path").value("/user/me/account-details"));
+        }
     }
 
     @Test void exposesOnlyThreeSummaryFieldsForBothManagersAndIgnoresTargetIds() throws Exception {

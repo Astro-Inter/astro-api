@@ -3,6 +3,9 @@ package com.astro.api.user.mapper;
 import com.astro.api.user.dto.response.AccountSummaryResponse;
 import com.astro.api.user.dto.response.AccountDetailsResponse;
 import com.astro.api.user.model.User;
+import com.astro.api.user.dto.request.UpdateAccountDetailsRequest;
+import com.astro.api.role.model.Role;
+import com.astro.api.unit.model.Unit;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -18,5 +21,14 @@ public class AccountMapper {
                 user.getUnit() == null ? null : user.getUnit().id,
                 user.getUnit() == null ? null : user.getUnit().name,
                 user.getWorkModel(), profilePhotoUrl);
+    }
+
+    public void applyUpdate(User user, UpdateAccountDetailsRequest body, Role role, Unit unit) {
+        user.setName(body.name());
+        user.setCpf(body.cpf());
+        user.setEmail(body.email());
+        user.setRole(role);
+        user.setUnit(unit);
+        user.setWorkModel(body.workModel());
     }
 }

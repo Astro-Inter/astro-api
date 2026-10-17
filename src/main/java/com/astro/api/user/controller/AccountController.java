@@ -4,16 +4,20 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.response.ApiResult;
 import com.astro.api.user.dto.response.AccountSummaryResponse;
 import com.astro.api.user.dto.response.AccountDetailsResponse;
+import com.astro.api.user.dto.request.UpdateAccountDetailsRequest;
 import com.astro.api.user.service.AccountService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -54,5 +58,22 @@ public class AccountController {
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Detalhes da conta retornados com sucesso",
                 accounts.findDetails(principal), request.getRequestURI()));
+    }
+
+    @PutMapping("/user/me/account-details")
+    @Operation(summary = "Substitui os seis campos editáveis da própria conta", description = "Exige nome, cpf, email, roleId, unitId e modalidade, sem nulos ou campos extras. GESTOR mantém cargo/unidade; GESTOR_WORKSPACE pode escolher vínculos ativos no próprio workspace. Preserva vínculos inativos atuais. Não recebe senha ou foto. E-mail alterado é sincronizado com Firebase e marcado como não verificado; confirmação deve ocorrer no fluxo Firebase do cliente.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Detalhes atualizados no envelope ApiResult, após commit e sincronização de e-mail"),
+            @ApiResponse(responseCode = "400", description = "Campos omitidos, nulos, desconhecidos, formatos inválidos ou novo vínculo inativo (ApiResult de erro)"),
+            @ApiResponse(responseCode = "403", description = "Token ausente/inválido, perfil sem acesso ou mudança de vínculo sem permissão"),
+            @ApiResponse(responseCode = "404", description = "Usuário, cargo ou unidade não encontrados no workspace (ApiResult de erro)"),
+            @ApiResponse(responseCode = "409", description = "CPF/e-mail duplicado ou identidade Firebase divergente (ApiResult de erro)"),
+            @ApiResponse(responseCode = "500", description = "Falha interna/Firebase; sem sucesso parcial, com compensação ou contenção (ApiResult de erro)"),
+            @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível (ApiResult de erro)")
+    })
+    public ResponseEntity<ApiResult<AccountDetailsResponse>> update(@Valid @RequestBody UpdateAccountDetailsRequest body,
+            @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
+        return ResponseEntity.ok(ApiResult.success("Conta atualizada com sucesso",
+                accounts.update(body, principal), request.getRequestURI()));
     }
 }

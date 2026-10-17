@@ -10,6 +10,13 @@ import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.model.WorkModel;
 import com.astro.api.user.repository.UserRepository;
+import com.astro.api.user.repository.AccountRepository;
+import com.astro.api.role.repository.RoleRepository;
+import com.astro.api.unit.repository.UnitRepository;
+import com.astro.api.auth.service.FirebaseIdentityService;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
+import org.junit.jupiter.api.BeforeEach;
 import com.astro.api.workspace.model.Workspace;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
@@ -22,7 +29,17 @@ import static org.mockito.Mockito.*;
 class AccountServiceTest {
     final UserRepository users = mock(UserRepository.class);
     final UserAvatarService avatars = mock(UserAvatarService.class);
-    final AccountService service = new AccountService(users, avatars, new AccountMapper());
+    final AccountRepository accounts = mock(AccountRepository.class);
+    final RoleRepository roles = mock(RoleRepository.class);
+    final UnitRepository units = mock(UnitRepository.class);
+    final FirebaseIdentityService identities = mock(FirebaseIdentityService.class);
+    final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
+    final AccountService service = new AccountService(users, avatars, new AccountMapper(), accounts, roles, units,
+            identities, transactions);
+
+    @BeforeEach void transactions() {
+        when(transactions.getTransaction(any())).thenAnswer(call -> new SimpleTransactionStatus());
+    }
 
     static User account(Role role) {
         Workspace workspace = new Workspace(); workspace.id = 1L;
