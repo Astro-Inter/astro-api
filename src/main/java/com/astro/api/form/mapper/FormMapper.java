@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 public class FormMapper {
     public static final ZoneId FORM_ZONE = ZoneId.of("America/Sao_Paulo");
 
-    public void applyContent(FormWriteRequest formRequest, Form form) {
+    public void applyContent(FormCreateOrUpdateRequest formRequest, Form form) {
         List<Form.FormQuestion> previous = form.getQuestions() == null ? List.<Form.FormQuestion>of() : form.getQuestions();
         form.setQuestions(toQuestions(formRequest.questions() == null ? List.of() : formRequest.questions(), previous));
         form.setTitle(clean(formRequest.title()));
@@ -31,12 +31,12 @@ public class FormMapper {
         form.setDueDate(formRequest.dueDate() == null ? null : formRequest.dueDate().atStartOfDay(FORM_ZONE).toInstant());
     }
 
-    private List<Form.FormQuestion> toQuestions(List<FormQuestionRequest> requests,
+    private List<Form.FormQuestion> toQuestions(List<FormQuestionDefinitionRequest> requests,
                                                 List<Form.FormQuestion> previous) {
         Map<Long, Form.FormQuestion> existing = previous.stream().collect(Collectors.toMap(Form.FormQuestion::getId, value -> value));
         long nextId = previous.stream().mapToLong(Form.FormQuestion::getId).max().orElse(0) + 1;
         List<Form.FormQuestion> result = new ArrayList<>();
-        for (FormQuestionRequest request : requests) {
+        for (FormQuestionDefinitionRequest request : requests) {
             Form.FormQuestion question = new Form.FormQuestion();
             question.setId(request.id() == null ? nextId++ : request.id());
             question.setType(request.type().value());
@@ -69,13 +69,13 @@ public class FormMapper {
 
     private String clean(String value) { return value == null ? "" : value.strip(); }
 
-    public FormWriteRequest toWriteRequest(Form form) {
-        List<FormQuestionRequest> questions = form.getQuestions() == null ? List.<FormQuestionRequest>of() : form.getQuestions().stream()
-                .map(question -> new FormQuestionRequest(question.getId(), FormQuestionType.fromValue(question.getType()), question.getQuestion(),
+    public FormCreateOrUpdateRequest toCreateOrUpdateRequest(Form form) {
+        List<FormQuestionDefinitionRequest> questions = form.getQuestions() == null ? List.<FormQuestionDefinitionRequest>of() : form.getQuestions().stream()
+                .map(question -> new FormQuestionDefinitionRequest(question.getId(), FormQuestionType.fromValue(question.getType()), question.getQuestion(),
                         question.getRequired(), question.getMultiple(), question.getOptions() == null ? List.of()
                         : question.getOptions().stream().map(option -> new FormOptionRequest(option.getId(), option.getText(), option.getOther())).toList(),
                         question.getMaxFiles(), question.getMaxFileSizeMb())).toList();
-        return new FormWriteRequest(form.getTitle(), form.getDescription(), form.getManagerId(), form.getNrCode(), form.getUnitId(),
+        return new FormCreateOrUpdateRequest(form.getTitle(), form.getDescription(), form.getManagerId(), form.getNrCode(), form.getUnitId(),
                 form.getDueDate() == null ? null : form.getDueDate().atZone(FORM_ZONE).toLocalDate(), form.getStatus(), questions);
     }
 

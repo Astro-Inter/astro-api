@@ -8,7 +8,7 @@ import jakarta.validation.constraints.*;
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record FormQuestionRequest(
+public record FormQuestionDefinitionRequest(
         @Positive(message = "{form.question.id.positive}") Long id,
         @NotNull(message = "{form.question.type.notNull}") FormQuestionType type,
         @Size(max = 140, message = "{form.question.text.size}") String question,

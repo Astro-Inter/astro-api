@@ -2,8 +2,8 @@ package com.astro.api.form.service;
 
 import com.astro.api.form.dto.request.FormOptionRequest;
 import com.astro.api.common.exception.BusinessException;
-import com.astro.api.form.dto.request.FormWriteRequest;
-import com.astro.api.form.dto.request.FormQuestionRequest;
+import com.astro.api.form.dto.request.FormCreateOrUpdateRequest;
+import com.astro.api.form.dto.request.FormQuestionDefinitionRequest;
 import com.astro.api.form.model.Form;
 import com.astro.api.form.model.FormQuestionType;
 import com.astro.api.form.strategy.*;
@@ -31,14 +31,14 @@ public class FormValidationService {
         }
     }
 
-    public void validate(FormWriteRequest formRequest, FormValidationMode mode) {
+    public void validate(FormCreateOrUpdateRequest formRequest, FormValidationMode mode) {
         require(formRequest != null, "Informe os dados do formulário");
         require(formRequest.title() == null || formRequest.title().length() <= 100, "Título deve ter até 100 caracteres");
         require(formRequest.description() == null || formRequest.description().length() <= 240, "Descrição deve ter até 240 caracteres");
         require(formRequest.managerId() == null || formRequest.managerId() > 0, "Gestor deve ter identificador positivo");
         require(formRequest.unitId() == null || formRequest.unitId() > 0, "Unidade deve ter identificador positivo");
         require(formRequest.nrCode() == null || formRequest.nrCode() > 0, "NR deve ter código positivo");
-        List<FormQuestionRequest> questions = formRequest.questions() == null ? List.<FormQuestionRequest>of() : formRequest.questions();
+        List<FormQuestionDefinitionRequest> questions = formRequest.questions() == null ? List.<FormQuestionDefinitionRequest>of() : formRequest.questions();
         require(questions.size() <= 100, "O formulário aceita até 100 perguntas");
         if (mode == FormValidationMode.PUBLISH) {
             require(formRequest.title() != null && !formRequest.title().isBlank(), "Informe o título do formulário");
@@ -46,7 +46,7 @@ public class FormValidationService {
             require(!questions.isEmpty(), "Adicione pelo menos uma pergunta");
         }
         Set<Long> ids = new HashSet<Long>();
-        for (FormQuestionRequest question : questions) {
+        for (FormQuestionDefinitionRequest question : questions) {
             require(question != null && question.type() != null, "Informe um tipo de pergunta válido");
             require(question.id() == null || (question.id() > 0 && ids.add(question.id())),
                     "Os identificadores das perguntas devem ser positivos e únicos");
@@ -61,10 +61,10 @@ public class FormValidationService {
         if (!valid) throw new BusinessException(message);
     }
 
-    public void validateIdentifiers(FormWriteRequest formRequest, List<Form.FormQuestion> existingQuestions) {
+    public void validateIdentifiers(FormCreateOrUpdateRequest formRequest, List<Form.FormQuestion> existingQuestions) {
         Map<Long, Form.FormQuestion> questionsById = existingQuestions.stream()
                 .collect(Collectors.toMap(Form.FormQuestion::getId, question -> question));
-        for (FormQuestionRequest question : formRequest.questions() == null ? List.<FormQuestionRequest>of() : formRequest.questions()) {
+        for (FormQuestionDefinitionRequest question : formRequest.questions() == null ? List.<FormQuestionDefinitionRequest>of() : formRequest.questions()) {
             require(question.id() == null || questionsById.containsKey(question.id()),
                     "Identificador de pergunta desconhecido; omita o ID de novas perguntas");
             Form.FormQuestion previousQuestion = question.id() == null ? null : questionsById.get(question.id());

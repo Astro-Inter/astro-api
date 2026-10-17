@@ -1,6 +1,6 @@
 package com.astro.api.form.strategy;
 
-import com.astro.api.form.dto.request.FormQuestionRequest;
+import com.astro.api.form.dto.request.FormQuestionDefinitionRequest;
 import com.astro.api.form.model.FormQuestionType;
 import org.springframework.stereotype.Component;
 
@@ -9,7 +9,7 @@ import java.util.Set;
 @Component
 public class PhotoQuestionStrategy implements FormQuestionStrategy {
     public FormQuestionType supportedType() { return FormQuestionType.PHOTO; }
-    public void validate(FormQuestionRequest question, FormValidationMode mode) {
+    public void validate(FormQuestionDefinitionRequest question, FormValidationMode mode) {
         QuestionRules.noAlternatives(question);
         QuestionRules.require(question.maxFiles() == null || (question.maxFiles() >= 1 && question.maxFiles() <= 10),
                 "O limite de fotos deve ser de 1 a 10 arquivos");

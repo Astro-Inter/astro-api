@@ -2,7 +2,7 @@ package com.astro.api.form.strategy;
 
 import java.util.Set;
 import com.astro.api.form.dto.request.FormOptionRequest;
-import com.astro.api.form.dto.request.FormQuestionRequest;
+import com.astro.api.form.dto.request.FormQuestionDefinitionRequest;
 import com.astro.api.form.model.FormQuestionType;
 import org.springframework.stereotype.Component;
 
@@ -12,7 +12,7 @@ import java.util.List;
 @Component
 public class OptionQuestionStrategy implements FormQuestionStrategy {
     public FormQuestionType supportedType() { return FormQuestionType.OPTION; }
-    public void validate(FormQuestionRequest question, FormValidationMode mode) {
+    public void validate(FormQuestionDefinitionRequest question, FormValidationMode mode) {
         QuestionRules.noFileLimits(question);
         List<FormOptionRequest> options = question.options() == null ? List.<com.astro.api.form.dto.request.FormOptionRequest>of() : question.options();
         QuestionRules.require(options.size() <= 100 && (mode == FormValidationMode.DRAFT || options.size() >= 2),

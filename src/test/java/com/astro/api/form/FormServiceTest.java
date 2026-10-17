@@ -125,11 +125,11 @@ class FormServiceTest {
             assertEquals(4, java.util.UUID.fromString(inserted.getId()).version());
             return inserted;
         });
-        FormWriteRequest draft = new FormWriteRequest(null, null, null, null, null, null, FormStatus.DRAFT, null);
+        FormCreateOrUpdateRequest draft = new FormCreateOrUpdateRequest(null, null, null, null, null, null, FormStatus.DRAFT, null);
         FormDetailsResponse result = service.create(draft, principal);
         assertEquals(FormStatus.DRAFT, result.status()); assertNull(result.managerId()); assertTrue(result.questions().isEmpty());
         clearInvocations(repository);
-        assertThrows(BusinessException.class, () -> service.create(new FormWriteRequest(null, null, null, null, null, null, FormStatus.PENDING, null), principal));
+        assertThrows(BusinessException.class, () -> service.create(new FormCreateOrUpdateRequest(null, null, null, null, null, null, FormStatus.PENDING, null), principal));
         assertThrows(BusinessException.class, () -> service.create(FormTestFixtures.content(FormStatus.COMPLETED), principal));
         verifyNoInteractions(repository);
     }
@@ -148,7 +148,7 @@ class FormServiceTest {
     }
 
     @Test void validatesOptionalUnitAndNrAgainstTheirAuthoritativeCatalogs() {
-        FormWriteRequest body = new FormWriteRequest("Título", null, 20L, 6, 3L, null, FormStatus.PENDING,
+        FormCreateOrUpdateRequest body = new FormCreateOrUpdateRequest("Título", null, 20L, 6, 3L, null, FormStatus.PENDING,
                 List.of(FormTestFixtures.question(com.astro.api.form.model.FormQuestionType.TEXT)));
         Unit unit = manager(20, 2, UserType.GESTOR).getUnit();
         when(units.findById(3L)).thenReturn(Optional.of(unit));
@@ -174,10 +174,10 @@ class FormServiceTest {
 
     @Test void senderCanReorderRemoveAndDuplicateQuestionsWhilePreservingExistingIdentifiers() {
         Form form = existing(FormStatus.PENDING, 10);
-        FormQuestionRequest kept = new FormQuestionRequest(4L, com.astro.api.form.model.FormQuestionType.DATE, "Data alterada", true, null, null, null, null);
-        FormQuestionRequest choice = new FormQuestionRequest(2L, com.astro.api.form.model.FormQuestionType.OPTION, "Escolha", false, false,
+        FormQuestionDefinitionRequest kept = new FormQuestionDefinitionRequest(4L, com.astro.api.form.model.FormQuestionType.DATE, "Data alterada", true, null, null, null, null);
+        FormQuestionDefinitionRequest choice = new FormQuestionDefinitionRequest(2L, com.astro.api.form.model.FormQuestionType.OPTION, "Escolha", false, false,
                 List.of(new FormOptionRequest(2L, "", true), new FormOptionRequest(1L, "Sim", false)), null, null);
-        FormWriteRequest body = new FormWriteRequest("Novo título", null, 20L, null, null, null, null,
+        FormCreateOrUpdateRequest body = new FormCreateOrUpdateRequest("Novo título", null, 20L, null, null, null, null,
                 List.of(kept, choice, FormTestFixtures.question(com.astro.api.form.model.FormQuestionType.DATE)));
         when(repository.update(any(), argThat(condition -> Long.valueOf(0L).equals(condition.expectedVersion())))).thenAnswer(call -> Optional.of(call.getArgument(0)));
         FormDetailsResponse result = service.update(formId(1), body, principal);
@@ -215,12 +215,12 @@ class FormServiceTest {
 
     @Test void rejectsUnknownQuestionAndOptionIdsRatherThanTrustingClientProvidedIds() {
         Form form = existing(FormStatus.PENDING, 10);
-        FormQuestionRequest unknownQuestion = new FormQuestionRequest(99L, com.astro.api.form.model.FormQuestionType.TEXT, "Texto", true, null, null, null, null);
-        FormWriteRequest body = new FormWriteRequest("Título", null, 20L, null, null, null, null, List.of(unknownQuestion));
+        FormQuestionDefinitionRequest unknownQuestion = new FormQuestionDefinitionRequest(99L, com.astro.api.form.model.FormQuestionType.TEXT, "Texto", true, null, null, null, null);
+        FormCreateOrUpdateRequest body = new FormCreateOrUpdateRequest("Título", null, 20L, null, null, null, null, List.of(unknownQuestion));
         assertThrows(BusinessException.class, () -> service.update(formId(1), body, principal));
-        FormQuestionRequest unknownOption = new FormQuestionRequest(2L, com.astro.api.form.model.FormQuestionType.OPTION, "Texto", true, false,
+        FormQuestionDefinitionRequest unknownOption = new FormQuestionDefinitionRequest(2L, com.astro.api.form.model.FormQuestionType.OPTION, "Texto", true, false,
                 List.of(new FormOptionRequest(99L, "Sim", false), new FormOptionRequest(null, "Não", false)), null, null);
-        FormWriteRequest alternativeBody = new FormWriteRequest("Título", null, 20L, null, null, null, null, List.of(unknownOption));
+        FormCreateOrUpdateRequest alternativeBody = new FormCreateOrUpdateRequest("Título", null, 20L, null, null, null, null, List.of(unknownOption));
         assertThrows(BusinessException.class, () -> service.update(formId(1), alternativeBody, principal));
         verify(repository, never()).update(any(), any());
     }

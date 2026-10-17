@@ -14,8 +14,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class FormValidationTest {
     final FormValidationService validator = FormTestFixtures.validator();
 
-    FormWriteRequest body(FormQuestionRequest question) {
-        return new FormWriteRequest("Título", null, 20L, null, null, null, FormStatus.PENDING, List.of(question));
+    FormCreateOrUpdateRequest body(FormQuestionDefinitionRequest question) {
+        return new FormCreateOrUpdateRequest("Título", null, 20L, null, null, null, FormStatus.PENDING, List.of(question));
     }
 
     @Test void requiresACompleteAndUnambiguousStrategyRegistry() {
@@ -24,34 +24,34 @@ class FormValidationTest {
     }
 
     @Test void permitsIncompleteDraftsAndRequiresQuestionTextForPublication() {
-        FormQuestionRequest question = new FormQuestionRequest(null, FormQuestionType.TEXT, " ", false, null, null, null, null);
+        FormQuestionDefinitionRequest question = new FormQuestionDefinitionRequest(null, FormQuestionType.TEXT, " ", false, null, null, null, null);
         assertDoesNotThrow(() -> validator.validate(body(question), FormValidationMode.DRAFT));
         assertThrows(BusinessException.class, () -> validator.validate(body(question), FormValidationMode.PUBLISH));
-        FormQuestionRequest tooLong = new FormQuestionRequest(null, FormQuestionType.TEXT, "a".repeat(141), false, null, null, null, null);
+        FormQuestionDefinitionRequest tooLong = new FormQuestionDefinitionRequest(null, FormQuestionType.TEXT, "a".repeat(141), false, null, null, null, null);
         assertThrows(BusinessException.class, () -> validator.validate(body(tooLong), FormValidationMode.DRAFT));
     }
 
     @Test void optionStrategyValidatesOtherChoicesBlankTextAndDuplicateIdentifiers() {
         FormOptionRequest option = new FormOptionRequest(1L, "Sim", false);
         FormOptionRequest other = new FormOptionRequest(2L, "", true);
-        FormQuestionRequest valid = new FormQuestionRequest(null, FormQuestionType.OPTION, "Título", true, true, List.of(option, other), null, null);
+        FormQuestionDefinitionRequest valid = new FormQuestionDefinitionRequest(null, FormQuestionType.OPTION, "Título", true, true, List.of(option, other), null, null);
         assertDoesNotThrow(() -> validator.validate(body(valid), FormValidationMode.PUBLISH));
         for (List<FormOptionRequest> options : List.of(List.of(option), List.of(option, option), List.of(other, new FormOptionRequest(3L, "", true)),
                 List.of(option, new FormOptionRequest(3L, " ", false)))) {
-            FormQuestionRequest invalid = new FormQuestionRequest(null, FormQuestionType.OPTION, "Título", false, false, options, null, null);
+            FormQuestionDefinitionRequest invalid = new FormQuestionDefinitionRequest(null, FormQuestionType.OPTION, "Título", false, false, options, null, null);
             assertThrows(BusinessException.class, () -> validator.validate(body(invalid), FormValidationMode.PUBLISH));
         }
     }
 
     @Test void photoStrategyChecksTheActualChoicesAndRejectsOptions() {
-        for (FormQuestionRequest question : List.of(
-                new FormQuestionRequest(null, FormQuestionType.PHOTO, "Foto", false, null, null, 11, 10),
-                new FormQuestionRequest(null, FormQuestionType.PHOTO, "Foto", false, null, null, 1, 7),
-                new FormQuestionRequest(null, FormQuestionType.PHOTO, "Foto", false, true, null, 1, 10))) {
+        for (FormQuestionDefinitionRequest question : List.of(
+                new FormQuestionDefinitionRequest(null, FormQuestionType.PHOTO, "Foto", false, null, null, 11, 10),
+                new FormQuestionDefinitionRequest(null, FormQuestionType.PHOTO, "Foto", false, null, null, 1, 7),
+                new FormQuestionDefinitionRequest(null, FormQuestionType.PHOTO, "Foto", false, true, null, 1, 10))) {
             assertThrows(BusinessException.class, () -> validator.validate(body(question), FormValidationMode.DRAFT));
         }
         for (int size : List.of(5, 10, 20, 50, 100)) {
-            FormQuestionRequest question = new FormQuestionRequest(null, FormQuestionType.PHOTO, "Foto", false, null, null, 10, size);
+            FormQuestionDefinitionRequest question = new FormQuestionDefinitionRequest(null, FormQuestionType.PHOTO, "Foto", false, null, null, 10, size);
             assertDoesNotThrow(() -> validator.validate(body(question), FormValidationMode.PUBLISH));
         }
     }
@@ -59,17 +59,17 @@ class FormValidationTest {
     @Test void textAndDateRejectConfigurationFromOtherQuestionTypes() {
         for (FormQuestionType type : List.of(FormQuestionType.TEXT, FormQuestionType.DATE)) {
             assertThrows(BusinessException.class, () -> validator.validate(body(
-                    new FormQuestionRequest(null, type, "Título", false, null, null, 1, 10)), FormValidationMode.PUBLISH));
+                    new FormQuestionDefinitionRequest(null, type, "Título", false, null, null, 1, 10)), FormValidationMode.PUBLISH));
             assertThrows(BusinessException.class, () -> validator.validate(body(
-                    new FormQuestionRequest(null, type, "Título", false, true, null, null, null)), FormValidationMode.PUBLISH));
+                    new FormQuestionDefinitionRequest(null, type, "Título", false, true, null, null, null)), FormValidationMode.PUBLISH));
         }
     }
 
     @Test void duplicateQuestionIdsAndExcessiveCollectionsAreRejectedEvenInDrafts() {
-        FormQuestionRequest question = new FormQuestionRequest(1L, FormQuestionType.TEXT, "Título", false, null, null, null, null);
-        assertThrows(BusinessException.class, () -> validator.validate(new FormWriteRequest(null, null, null, null, null,
+        FormQuestionDefinitionRequest question = new FormQuestionDefinitionRequest(1L, FormQuestionType.TEXT, "Título", false, null, null, null, null);
+        assertThrows(BusinessException.class, () -> validator.validate(new FormCreateOrUpdateRequest(null, null, null, null, null,
                 null, FormStatus.DRAFT, List.of(question, question)), FormValidationMode.DRAFT));
-        assertThrows(BusinessException.class, () -> validator.validate(new FormWriteRequest(null, null, null, null, null,
+        assertThrows(BusinessException.class, () -> validator.validate(new FormCreateOrUpdateRequest(null, null, null, null, null,
                 null, FormStatus.DRAFT, java.util.Collections.nCopies(101, FormTestFixtures.question(FormQuestionType.TEXT))), FormValidationMode.DRAFT));
     }
 }
