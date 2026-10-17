@@ -22,9 +22,9 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/forms")
 @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
 public class FormController {
-    private final FormService service;
+    private final FormService formService;
 
-    public FormController(FormService service) { this.service = service; }
+    public FormController(FormService formService) { this.formService = formService; }
 
     @InitBinder
     public void configureStatusBinding(WebDataBinder binder) {
@@ -41,14 +41,14 @@ public class FormController {
     public ResponseEntity<ApiResult<FormDetailsResponse>> publish(@PathVariable("id") String id,
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Formulário publicado com sucesso",
-                service.publish(id, principal), request.getRequestURI()));
+                formService.publish(id, principal), request.getRequestURI()));
     }
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Exclui um formulário sem respostas, respeitando remetente e workspace")
     public ResponseEntity<Void> delete(@PathVariable("id") String id,
             @AuthenticationPrincipal AuthenticatedUser principal) {
-        service.delete(id, principal);
+        formService.delete(id, principal);
         return ResponseEntity.noContent().build();
     }
 
@@ -58,14 +58,14 @@ public class FormController {
             @Valid @RequestBody FormWriteRequest body, @AuthenticationPrincipal AuthenticatedUser principal,
             HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Formulário atualizado com sucesso",
-                service.update(id, body, principal), request.getRequestURI()));
+                formService.update(id, body, principal), request.getRequestURI()));
     }
 
     @PostMapping
     @Operation(summary = "Cria um formulário pendente ou um rascunho com respostas vazias")
     public ResponseEntity<ApiResult<FormDetailsResponse>> create(@Valid @RequestBody FormWriteRequest body,
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
-        FormDetailsResponse form = service.create(body, principal);
+        FormDetailsResponse form = formService.create(body, principal);
         return ResponseEntity.created(URI.create("/forms/" + form.id())).body(ApiResult.success(
                 "Formulário criado com sucesso", form, request.getRequestURI()));
     }
@@ -76,7 +76,7 @@ public class FormController {
             @PathVariable("id") String id, @AuthenticationPrincipal AuthenticatedUser principal,
             HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Formulário retornado com sucesso",
-                service.findById(id, principal), request.getRequestURI()));
+                formService.findById(id, principal), request.getRequestURI()));
     }
 
     @GetMapping
@@ -89,6 +89,6 @@ public class FormController {
             @RequestParam(name = "size", defaultValue = "20") int size,
             HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Formulários retornados com sucesso",
-                service.findAll(principal, search, status, page, size), request.getRequestURI()));
+                formService.findAll(principal, search, status, page, size), request.getRequestURI()));
     }
 }

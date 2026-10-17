@@ -24,87 +24,90 @@ import java.time.temporal.ChronoUnit;
 @Service
 public class FormService {
     private final FormRepository formRepository;
-    private final FormAccessService access;
-    private final FormMapper mapper;
-    private final FormValidationService validation;
-    private final FormReferenceService references;
+    private final FormAccessService formAccessService;
+    private final FormMapper formMapper;
+    private final FormValidationService formValidationService;
+    private final FormReferenceService formReferenceService;
 
-    public FormService(FormRepository formRepository, FormAccessService access, FormMapper mapper,
-                       FormValidationService validation, FormReferenceService references) {
+    public FormService(FormRepository formRepository,
+                       FormAccessService formAccessService,
+                       FormMapper formMapper,
+                       FormValidationService formValidationService,
+                       FormReferenceService formReferenceService) {
         this.formRepository = formRepository;
-        this.access = access;
-        this.mapper = mapper;
-        this.validation = validation;
-        this.references = references;
+        this.formAccessService = formAccessService;
+        this.formMapper = formMapper;
+        this.formValidationService = formValidationService;
+        this.formReferenceService = formReferenceService;
     }
 
-    public FormDetailsResponse create(FormWriteRequest body, AuthenticatedUser principal) {
-        FormScope scope = access.requireManager(principal);
-        if (body == null || (body.status() != null && body.status() != FormStatus.DRAFT && body.status() != FormStatus.PENDING)) {
+    public FormDetailsResponse create(FormWriteRequest formRequest, AuthenticatedUser authenticatedUser) {
+        FormScope formScope = formAccessService.requireManager(authenticatedUser);
+        if (formRequest == null || (formRequest.status() != null && formRequest.status() != FormStatus.DRAFT && formRequest.status() != FormStatus.PENDING)) {
             throw new BusinessException("Crie o formulário como RASCUNHO ou PENDENTE");
         }
-        FormStatus status = body.status() == null ? FormStatus.PENDING : body.status();
-        validation.validate(body, status == FormStatus.DRAFT ? FormValidationMode.DRAFT : FormValidationMode.PUBLISH);
-        validation.validateIdentifiers(body, List.of());
-        references.validate(body, scope);
+        FormStatus status = formRequest.status() == null ? FormStatus.PENDING : formRequest.status();
+        formValidationService.validate(formRequest, status == FormStatus.DRAFT ? FormValidationMode.DRAFT : FormValidationMode.PUBLISH);
+        formValidationService.validateIdentifiers(formRequest, List.of());
+        formReferenceService.validate(formRequest, formScope);
         Form form = new Form();
-        mapper.applyContent(body, form);
+        formMapper.applyContent(formRequest, form);
         form.setId(UUID.randomUUID().toString());
-        form.setWorkspaceId(scope.workspaceId());
-        form.setSenderManagerId(scope.managerId());
+        form.setWorkspaceId(formScope.workspaceId());
+        form.setSenderManagerId(formScope.managerId());
         form.setStatus(status);
         form.setCreatedAt(now());
         form.setUpdatedAt(form.getCreatedAt());
         form.setVersion(0L);
-        return mapper.toDetails(formRepository.insert(form));
+        return formMapper.toDetails(formRepository.insert(form));
     }
 
-    public FormDetailsResponse update(String id, FormWriteRequest body, AuthenticatedUser principal) {
-        FormScope scope = access.requireManager(principal);
-        Form form = requireForm(id, scope);
-        access.requireManagement(form, scope);
+    public FormDetailsResponse update(String formId, FormWriteRequest formRequest, AuthenticatedUser authenticatedUser) {
+        FormScope formScope = formAccessService.requireManager(authenticatedUser);
+        Form form = requireForm(formId, formScope);
+        formAccessService.requireManagement(form, formScope);
         requireMutable(form);
-        if (body == null || (body.status() != null && body.status() != form.getStatus())) {
+        if (formRequest == null || (formRequest.status() != null && formRequest.status() != form.getStatus())) {
             throw new BusinessException("A edição preserva o status; use a publicação para enviar um rascunho");
         }
-        validation.validate(body, form.getStatus() == FormStatus.DRAFT ? FormValidationMode.DRAFT : FormValidationMode.PUBLISH);
-        validation.validateIdentifiers(body, form.getQuestions() == null ? List.of() : form.getQuestions());
-        references.validate(body, scope);
+        formValidationService.validate(formRequest, form.getStatus() == FormStatus.DRAFT ? FormValidationMode.DRAFT : FormValidationMode.PUBLISH);
+        formValidationService.validateIdentifiers(formRequest, form.getQuestions() == null ? List.of() : form.getQuestions());
+        formReferenceService.validate(formRequest, formScope);
         Long expectedVersion = form.getVersion();
-        mapper.applyContent(body, form);
+        formMapper.applyContent(formRequest, form);
         form.setUpdatedAt(now());
-        return mapper.toDetails(formRepository.update(form, scope, expectedVersion)
+        return formMapper.toDetails(formRepository.update(form, formScope, expectedVersion)
                 .orElseThrow(() -> new ConflictException("O formulário foi alterado; consulte novamente antes de salvar")));
     }
 
-    public void delete(String id, AuthenticatedUser principal) {
-        FormScope scope = access.requireManager(principal);
-        Form form = requireForm(id, scope);
-        access.requireManagement(form, scope);
+    public void delete(String formId, AuthenticatedUser authenticatedUser) {
+        FormScope formScope = formAccessService.requireManager(authenticatedUser);
+        Form form = requireForm(formId, formScope);
+        formAccessService.requireManagement(form, formScope);
         requireMutable(form);
-        if (!formRepository.delete(form, scope)) {
+        if (!formRepository.delete(form, formScope)) {
             throw new ConflictException("O formulário foi alterado; consulte novamente antes de excluir");
         }
     }
 
-    public FormDetailsResponse publish(String id, AuthenticatedUser principal) {
-        FormScope scope = access.requireManager(principal);
-        Form form = requireForm(id, scope);
-        access.requireManagement(form, scope);
+    public FormDetailsResponse publish(String formId, AuthenticatedUser authenticatedUser) {
+        FormScope formScope = formAccessService.requireManager(authenticatedUser);
+        Form form = requireForm(formId, formScope);
+        formAccessService.requireManagement(form, formScope);
         requireMutable(form);
         if (form.getStatus() != FormStatus.DRAFT) {
             throw new ConflictException("Somente rascunhos podem ser publicados");
         }
-        FormWriteRequest content;
+        FormWriteRequest savedDraftRequest;
         try {
-            content = mapper.toWriteRequest(form);
+            savedDraftRequest = formMapper.toWriteRequest(form);
         } catch (IllegalArgumentException exception) {
             throw new BusinessException("Tipo de pergunta inválido no rascunho");
         }
-        validation.validate(content, FormValidationMode.PUBLISH);
-        references.validate(content, scope);
+        formValidationService.validate(savedDraftRequest, FormValidationMode.PUBLISH);
+        formReferenceService.validate(savedDraftRequest, formScope);
         form.setUpdatedAt(now());
-        return mapper.toDetails(formRepository.publish(form, scope)
+        return formMapper.toDetails(formRepository.publish(form, formScope)
                 .orElseThrow(() -> new ConflictException("O formulário foi alterado; consulte novamente antes de publicar")));
     }
 
@@ -116,33 +119,33 @@ public class FormService {
         }
     }
 
-    public FormPageResponse findAll(AuthenticatedUser principal, String search, FormStatus status, int page, int size) {
-        FormScope scope = access.requireManager(principal);
+    public FormPageResponse findAll(AuthenticatedUser authenticatedUser, String search, FormStatus status, int page, int size) {
+        FormScope formScope = formAccessService.requireManager(authenticatedUser);
         if (page < 0 || size < 1 || size > 100 || (search != null && search.length() > 240)) {
             throw new BusinessException("Use page >= 0, size entre 1 e 100 e busca de até 240 caracteres");
         }
-        FormRepositoryCustom.Listing listing = formRepository.findAll(scope, search, status, page, size);
-        return mapper.toPage(listing.forms(), page, size, listing.total());
+        FormRepositoryCustom.Listing formListing = formRepository.findAll(formScope, search, status, page, size);
+        return formMapper.toPage(formListing.forms(), page, size, formListing.total());
     }
 
     public List<Form> findTop3PendingForManager(Long managerId) {
         return formRepository.findTop3PendingByManagerId(managerId);
     }
 
-    public FormDetailsResponse findById(String id, AuthenticatedUser principal) {
-        return mapper.toDetails(requireForm(id, access.requireManager(principal)));
+    public FormDetailsResponse findById(String formId, AuthenticatedUser authenticatedUser) {
+        return formMapper.toDetails(requireForm(formId, formAccessService.requireManager(authenticatedUser)));
     }
 
-    private Form requireForm(String id, FormScope scope) {
-        if (id == null || id.length() != 36) {
+    private Form requireForm(String formId, FormScope formScope) {
+        if (formId == null || formId.length() != 36) {
             throw new BusinessException("O identificador do formulário deve ser um UUID válido");
         }
         try {
-            id = UUID.fromString(id).toString();
+            formId = UUID.fromString(formId).toString();
         } catch (IllegalArgumentException exception) {
             throw new BusinessException("O identificador do formulário deve ser um UUID válido");
         }
-        return formRepository.findById(id, scope)
+        return formRepository.findById(formId, formScope)
                 .orElseThrow(() -> new ResourceNotFoundException("Formulário não encontrado"));
     }
 

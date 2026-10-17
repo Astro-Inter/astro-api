@@ -18,31 +18,31 @@ import java.util.stream.Collectors;
 
 @Service
 public class FormValidationService {
-    private final Map<FormQuestionType, FormQuestionStrategy> strategies = new EnumMap<>(FormQuestionType.class);
+    private final Map<FormQuestionType, FormQuestionStrategy> questionStrategiesByType = new EnumMap<>(FormQuestionType.class);
 
-    public FormValidationService(List<FormQuestionStrategy> implementations) {
-        for (FormQuestionStrategy strategy : implementations) {
-            if (strategies.putIfAbsent(strategy.supportedType(), strategy) != null) {
-                throw new IllegalStateException("Estratégia duplicada para " + strategy.supportedType());
+    public FormValidationService(List<FormQuestionStrategy> questionStrategies) {
+        for (FormQuestionStrategy questionStrategy : questionStrategies) {
+            if (questionStrategiesByType.putIfAbsent(questionStrategy.supportedType(), questionStrategy) != null) {
+                throw new IllegalStateException("Estratégia duplicada para " + questionStrategy.supportedType());
             }
         }
-        if (strategies.size() != FormQuestionType.values().length) {
+        if (questionStrategiesByType.size() != FormQuestionType.values().length) {
             throw new IllegalStateException("Todos os tipos de pergunta precisam de uma estratégia");
         }
     }
 
-    public void validate(FormWriteRequest body, FormValidationMode mode) {
-        require(body != null, "Informe os dados do formulário");
-        require(body.title() == null || body.title().length() <= 100, "Título deve ter até 100 caracteres");
-        require(body.description() == null || body.description().length() <= 240, "Descrição deve ter até 240 caracteres");
-        require(body.managerId() == null || body.managerId() > 0, "Gestor deve ter identificador positivo");
-        require(body.unitId() == null || body.unitId() > 0, "Unidade deve ter identificador positivo");
-        require(body.nrCode() == null || body.nrCode() > 0, "NR deve ter código positivo");
-        List<FormQuestionRequest> questions = body.questions() == null ? List.<FormQuestionRequest>of() : body.questions();
+    public void validate(FormWriteRequest formRequest, FormValidationMode mode) {
+        require(formRequest != null, "Informe os dados do formulário");
+        require(formRequest.title() == null || formRequest.title().length() <= 100, "Título deve ter até 100 caracteres");
+        require(formRequest.description() == null || formRequest.description().length() <= 240, "Descrição deve ter até 240 caracteres");
+        require(formRequest.managerId() == null || formRequest.managerId() > 0, "Gestor deve ter identificador positivo");
+        require(formRequest.unitId() == null || formRequest.unitId() > 0, "Unidade deve ter identificador positivo");
+        require(formRequest.nrCode() == null || formRequest.nrCode() > 0, "NR deve ter código positivo");
+        List<FormQuestionRequest> questions = formRequest.questions() == null ? List.<FormQuestionRequest>of() : formRequest.questions();
         require(questions.size() <= 100, "O formulário aceita até 100 perguntas");
         if (mode == FormValidationMode.PUBLISH) {
-            require(body.title() != null && !body.title().isBlank(), "Informe o título do formulário");
-            require(body.managerId() != null, "Selecione o gestor destinatário");
+            require(formRequest.title() != null && !formRequest.title().isBlank(), "Informe o título do formulário");
+            require(formRequest.managerId() != null, "Selecione o gestor destinatário");
             require(!questions.isEmpty(), "Adicione pelo menos uma pergunta");
         }
         Set<Long> ids = new HashSet<Long>();
@@ -53,7 +53,7 @@ public class FormValidationService {
             require(question.question() == null || question.question().length() <= 140, "Pergunta deve ter até 140 caracteres");
             require(mode == FormValidationMode.DRAFT || (question.question() != null && !question.question().isBlank()),
                     "Preencha o enunciado de todas as perguntas antes da publicação");
-            strategies.get(question.type()).validate(question, mode);
+            questionStrategiesByType.get(question.type()).validate(question, mode);
         }
     }
 
@@ -61,10 +61,10 @@ public class FormValidationService {
         if (!valid) throw new BusinessException(message);
     }
 
-    public void validateIdentifiers(FormWriteRequest request, List<Form.FormQuestion> existingQuestions) {
+    public void validateIdentifiers(FormWriteRequest formRequest, List<Form.FormQuestion> existingQuestions) {
         Map<Long, Form.FormQuestion> questionsById = existingQuestions.stream()
                 .collect(Collectors.toMap(Form.FormQuestion::getId, question -> question));
-        for (FormQuestionRequest question : request.questions() == null ? List.<FormQuestionRequest>of() : request.questions()) {
+        for (FormQuestionRequest question : formRequest.questions() == null ? List.<FormQuestionRequest>of() : formRequest.questions()) {
             require(question.id() == null || questionsById.containsKey(question.id()),
                     "Identificador de pergunta desconhecido; omita o ID de novas perguntas");
             Form.FormQuestion previousQuestion = question.id() == null ? null : questionsById.get(question.id());

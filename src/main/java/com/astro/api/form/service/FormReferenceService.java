@@ -17,33 +17,36 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FormReferenceService {
-    private final UserRepository users;
-    private final UnitRepository units;
-    private final NrCatalogRepository nrs;
+    private final UserRepository userRepository;
+    private final UnitRepository unitRepository;
+    private final NrCatalogRepository nrCatalogRepository;
 
-    public FormReferenceService(UserRepository users, UnitRepository units, NrCatalogRepository nrs) {
-        this.users = users; this.units = units; this.nrs = nrs;
+    public FormReferenceService(UserRepository userRepository, UnitRepository unitRepository,
+                                NrCatalogRepository nrCatalogRepository) {
+        this.userRepository = userRepository;
+        this.unitRepository = unitRepository;
+        this.nrCatalogRepository = nrCatalogRepository;
     }
 
     @Transactional(readOnly = true)
-    public void validate(FormWriteRequest body, FormScope scope) {
-        if (body.managerId() != null) {
-            User manager = users.findById(body.managerId()).filter(user -> user.getUnit() != null
-                    && user.getUnit().workspace != null && scope.workspaceId().equals(user.getUnit().workspace.id)
+    public void validate(FormWriteRequest formRequest, FormScope formScope) {
+        if (formRequest.managerId() != null) {
+            User manager = userRepository.findById(formRequest.managerId()).filter(user -> user.getUnit() != null
+                    && user.getUnit().workspace != null && formScope.workspaceId().equals(user.getUnit().workspace.id)
                     && (user.getType() == UserType.GESTOR || user.getType() == UserType.GESTOR_WORKSPACE))
                     .orElseThrow(() -> new ResourceNotFoundException("Gestor destinatário não encontrado no workspace"));
             if (manager.getStatus() != UserStatus.ATIVO || !manager.getUnit().isActive) {
                 throw new BusinessException("O gestor destinatário e sua unidade devem estar ativos");
             }
         }
-        if (body.unitId() != null) {
-            Unit unit = units.findById(body.unitId()).filter(value -> value.workspace != null
-                    && scope.workspaceId().equals(value.workspace.id))
+        if (formRequest.unitId() != null) {
+            Unit unit = unitRepository.findById(formRequest.unitId()).filter(value -> value.workspace != null
+                    && formScope.workspaceId().equals(value.workspace.id))
                     .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada no workspace"));
             if (!unit.isActive) throw new BusinessException("A unidade vinculada deve estar ativa");
         }
-        if (body.nrCode() != null) {
-            NrCatalog nrCatalogEntry = nrs.findById(body.nrCode()).orElseThrow(() -> new ResourceNotFoundException("NR não encontrada"));
+        if (formRequest.nrCode() != null) {
+            NrCatalog nrCatalogEntry = nrCatalogRepository.findById(formRequest.nrCode()).orElseThrow(() -> new ResourceNotFoundException("NR não encontrada"));
             if (nrCatalogEntry.isRevoked()) throw new BusinessException("A NR vinculada não pode estar revogada");
         }
     }
