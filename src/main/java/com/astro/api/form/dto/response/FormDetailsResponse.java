@@ -1,7 +1,6 @@
 package com.astro.api.form.dto.response;
 
 import com.astro.api.form.model.FormStatus;
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -9,33 +8,35 @@ import java.util.List;
 
 public record FormDetailsResponse(
         String id,
-        @JsonProperty("id_workspace") Long workspaceId,
-        @JsonProperty("id_gestor_remetente") Long senderManagerId,
-        @JsonProperty("id_gestor") Long managerId,
-        @JsonProperty("titulo") String title,
-        @JsonProperty("descricao") String description,
-        @JsonProperty("nr") Integer nrCode,
-        @JsonProperty("id_unidade") Long unitId,
-        @JsonProperty("data_limite") LocalDate dueDate,
+        Long workspaceId,
+        Long senderManagerId,
+        Long managerId,
+        String title,
+        String description,
+        Integer nrCode,
+        Long unitId,
+        LocalDate dueDate,
         FormStatus status,
-        @JsonProperty("criado_em") Instant createdAt,
-        @JsonProperty("atualizado_em") Instant updatedAt,
-        @JsonProperty("respondido_em") Instant respondedAt,
-        @JsonProperty("perguntas") List<QuestionResponse> questions
+        Instant createdAt,
+        Instant updatedAt,
+        Instant respondedAt,
+        List<QuestionResponse> questions
 ) {
     public record QuestionResponse(
-            @JsonProperty("id_pergunta") Long id,
-            @JsonProperty("tipo") String type,
-            @JsonProperty("pergunta") String question,
-            @JsonProperty("obrigatoria") boolean required,
-            @JsonProperty("multipla_escolha") Boolean multiple,
-            @JsonProperty("opcoes") List<OptionResponse> options,
-            @JsonProperty("maximo_arquivos") Integer maxFiles,
-            @JsonProperty("tamanho_maximo_mb") Integer maxFileSizeMb,
-            @JsonProperty("resposta") List<Object> answer
+            Long id,
+            String type,
+            String question,
+            boolean required,
+            Boolean multiple,
+            List<OptionResponse> options,
+            Integer maxFiles,
+            Integer maxFileSizeMb,
+            List<Object> answer
     ) {}
 
-    public record OptionResponse(@JsonProperty("id_opcao") Long id,
-                                 @JsonProperty("texto") String text,
-                                 @JsonProperty("outra") boolean other) {}
+    public record OptionResponse(
+            Long id,
+            String text,
+            boolean other
+    ) {}
 }

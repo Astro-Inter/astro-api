@@ -220,7 +220,7 @@ class FormRepositoryMongoTest {
             authenticate("sender", com.astro.api.auth.security.Role.GESTOR);
             MvcResult creation = mvc.perform(post("/forms").contentType("application/json").content("{\"status\":\"RASCUNHO\"}"))
                     .andExpect(status().isCreated()).andReturn();
-            String createdAt = json.readTree(creation.getResponse().getContentAsString()).get("data").get("criado_em").asString();
+            String createdAt = json.readTree(creation.getResponse().getContentAsString()).get("data").get("createdAt").asString();
             String id = mongo.findAll(Form.class).getFirst().getId();
             String url = "/forms/" + id;
             assertEquals(4, UUID.fromString(id).version());
@@ -229,11 +229,11 @@ class FormRepositoryMongoTest {
                     .andExpect(status().isBadRequest());
             mvc.perform(delete("/forms/invalid")).andExpect(status().isBadRequest());
             mvc.perform(post("/forms/invalid/publish")).andExpect(status().isBadRequest());
-            mvc.perform(get(url)).andExpect(status().isOk()).andExpect(jsonPath("$.data.criado_em").value(createdAt));
+            mvc.perform(get(url)).andExpect(status().isOk()).andExpect(jsonPath("$.data.createdAt").value(createdAt));
             mvc.perform(post(url + "/publish")).andExpect(status().isBadRequest());
             mvc.perform(put(url).contentType("application/json").content(json.writeValueAsString(FormTestFixtures.content(FormStatus.DRAFT))))
-                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.perguntas.length()").value(4))
-                    .andExpect(jsonPath("$.data.criado_em").value(createdAt));
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.questions.length()").value(4))
+                    .andExpect(jsonPath("$.data.createdAt").value(createdAt));
             authenticate("recipient", com.astro.api.auth.security.Role.GESTOR);
             mvc.perform(get(url)).andExpect(status().isNotFound());
             authenticate("sender", com.astro.api.auth.security.Role.GESTOR);
@@ -251,7 +251,7 @@ class FormRepositoryMongoTest {
             mvc.perform(delete(url)).andExpect(status().isNotFound());
             authenticate("owner", com.astro.api.auth.security.Role.GESTOR_WORKSPACE);
             mvc.perform(put(url).contentType("application/json").content(json.writeValueAsString(FormTestFixtures.content(FormStatus.PENDING))))
-                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.id_gestor_remetente").value(10));
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.senderManagerId").value(10));
             // Simulate the future mobile completion without adding response endpoints to this scope.
             mongo.getCollection("forms").updateOne(new org.bson.Document("_id", id), new org.bson.Document("$set",
                     new org.bson.Document("status", "CONCLUIDO").append("perguntas.0.resposta", List.of("Resposta única"))));
@@ -259,7 +259,7 @@ class FormRepositoryMongoTest {
             mvc.perform(put(url).contentType("application/json").content("{}"))
                     .andExpect(status().isConflict());
             mvc.perform(get(url)).andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.perguntas[0].resposta[0]").value("Resposta única"));
+                    .andExpect(jsonPath("$.data.questions[0].answer[0]").value("Resposta única"));
             mvc.perform(post("/forms").contentType("application/json").content("{\"status\":\"RASCUNHO\"}"))
                     .andExpect(status().isCreated());
             String removable = mongo.findAll(Form.class).stream().map(Form::getId).filter(value -> !value.equals(id)).findFirst().orElseThrow();
