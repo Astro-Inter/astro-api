@@ -9,7 +9,7 @@ import com.astro.api.form.service.FormService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import com.astro.api.form.dto.request.FormWriteRequest;
+import com.astro.api.form.dto.request.FormCreateOrUpdateRequest;
 import java.net.URI;
 import java.beans.PropertyEditorSupport;
 import org.springframework.web.bind.WebDataBinder;
@@ -55,7 +55,7 @@ public class FormController {
     @PutMapping("/{id}")
     @Operation(summary = "Substitui dados e perguntas de um formulário próprio ou gerenciado pelo workspace")
     public ResponseEntity<ApiResult<FormDetailsResponse>> update(@PathVariable("id") String id,
-            @Valid @RequestBody FormWriteRequest body, @AuthenticationPrincipal AuthenticatedUser principal,
+            @Valid @RequestBody FormCreateOrUpdateRequest body, @AuthenticationPrincipal AuthenticatedUser principal,
             HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Formulário atualizado com sucesso",
                 formService.update(id, body, principal), request.getRequestURI()));
@@ -63,7 +63,7 @@ public class FormController {
 
     @PostMapping
     @Operation(summary = "Cria um formulário pendente ou um rascunho com respostas vazias")
-    public ResponseEntity<ApiResult<FormDetailsResponse>> create(@Valid @RequestBody FormWriteRequest body,
+    public ResponseEntity<ApiResult<FormDetailsResponse>> create(@Valid @RequestBody FormCreateOrUpdateRequest body,
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         FormDetailsResponse form = formService.create(body, principal);
         return ResponseEntity.created(URI.create("/forms/" + form.id())).body(ApiResult.success(

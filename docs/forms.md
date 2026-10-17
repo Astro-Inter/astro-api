@@ -203,3 +203,10 @@ O CI fornece uma instância MongoDB para esses testes.
 A integração cobre persistência BSON, escopo de consultas, geração concorrente de UUIDs,
 gravações condicionais e um fluxo HTTP completo de criação do rascunho até publicação.
 Os endpoints de resposta e upload do mobile continuam fora deste módulo de entrega.
+
+## DTOs de criação e edição
+
+- `FormCreateOrUpdateRequest` recebe o formulário completo nos endpoints `POST /forms` e `PUT /forms/{id}`: dados gerais e lista de perguntas.
+- `FormQuestionDefinitionRequest` define cada pergunta dessa lista: tipo, enunciado, obrigatoriedade, opções e limites de fotos.
+
+Um formulário com cinco perguntas usa um `FormCreateOrUpdateRequest` com cinco itens `FormQuestionDefinitionRequest` em `questions`. Os nomes distinguem as operações no formulário da definição de suas perguntas.

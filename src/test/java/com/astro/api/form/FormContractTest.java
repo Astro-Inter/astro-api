@@ -1,8 +1,8 @@
 package com.astro.api.form;
 
 import com.astro.api.form.dto.request.FormOptionRequest;
-import com.astro.api.form.dto.request.FormQuestionRequest;
-import com.astro.api.form.dto.request.FormWriteRequest;
+import com.astro.api.form.dto.request.FormQuestionDefinitionRequest;
+import com.astro.api.form.dto.request.FormCreateOrUpdateRequest;
 import com.astro.api.form.mapper.FormMapper;
 import com.astro.api.form.model.Form;
 import com.astro.api.form.model.FormQuestionType;
@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class FormContractTest {
     @Test void requestsAndResponsesUseCamelCaseIncludingNestedQuestionsAndOptions() {
         JsonMapper mapper = JsonMapper.builder().build();
-        FormWriteRequest request = mapper.readValue("""
+        FormCreateOrUpdateRequest request = mapper.readValue("""
                 {"title":"Inspeção","description":"Condições da unidade","managerId":20,
                  "nrCode":6,"unitId":3,"dueDate":"2026-10-30","status":"PENDENTE",
                  "questions":[
@@ -37,7 +37,7 @@ class FormContractTest {
                     "options":[{"text":"Queda","other":false},{"text":"","other":true}]},
                    {"type":"foto","question":"Fotos do local","required":false,
                     "maxFiles":3,"maxFileSizeMb":20}]}
-                """, FormWriteRequest.class);
+                """, FormCreateOrUpdateRequest.class);
         assertEquals("Inspeção", request.title());
         assertEquals("Condições da unidade", request.description());
         assertEquals(20L, request.managerId());
@@ -89,7 +89,7 @@ class FormContractTest {
             messages.load(new InputStreamReader(source, StandardCharsets.UTF_8));
         }
         try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
-            for (Class<?> type : new Class<?>[]{FormWriteRequest.class, FormQuestionRequest.class, FormOptionRequest.class}) {
+            for (Class<?> type : new Class<?>[]{FormCreateOrUpdateRequest.class, FormQuestionDefinitionRequest.class, FormOptionRequest.class}) {
                 for (PropertyDescriptor property : factory.getValidator().getConstraintsForClass(type).getConstrainedProperties()) {
                     assertMessages(property, messages);
                 }
