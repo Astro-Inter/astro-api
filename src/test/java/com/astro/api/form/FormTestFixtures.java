@@ -45,8 +45,8 @@ final class FormTestFixtures {
                         new FormOptionRequest(null, "", true)) : null, null, null);
     }
 
-    static FormCreateOrUpdateRequest content(FormStatus status) {
-        return new FormCreateOrUpdateRequest(" Inspeção ", " Descrição ", 20L, null, null,
+    static FormRequest content(FormStatus status) {
+        return new FormRequest(" Inspeção ", " Descrição ", 20L, null, null,
                 LocalDate.of(2026, 10, 30), status,
                 List.of(question(FormQuestionType.TEXT), question(FormQuestionType.OPTION),
                         question(FormQuestionType.PHOTO), question(FormQuestionType.DATE)));

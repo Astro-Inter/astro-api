@@ -1,6 +1,6 @@
 package com.astro.api.form;
 
-import com.astro.api.form.dto.request.FormCreateOrUpdateRequest;
+import com.astro.api.form.dto.request.FormRequest;
 import org.mockito.ArgumentCaptor;
 import com.astro.api.form.model.Form;
 import com.astro.api.auth.security.*;
@@ -82,7 +82,7 @@ class FormControllerTest {
                 .andExpect(status().isCreated()).andExpect(header().string("Location", "/forms/" + formId(42)))
                 .andExpect(jsonPath("$.data.workspaceId").value(1))
                 .andExpect(jsonPath("$.data.senderManagerId").value(10));
-        ArgumentCaptor<FormCreateOrUpdateRequest> request = org.mockito.ArgumentCaptor.forClass(com.astro.api.form.dto.request.FormCreateOrUpdateRequest.class);
+        ArgumentCaptor<FormRequest> request = org.mockito.ArgumentCaptor.forClass(com.astro.api.form.dto.request.FormRequest.class);
         verify(service).create(request.capture(), eq(principal));
         assertEquals(com.astro.api.form.model.FormQuestionType.TEXT, request.getValue().questions().getFirst().type());
     }

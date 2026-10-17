@@ -9,7 +9,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record FormCreateOrUpdateRequest(
+public record FormRequest(
         @Size(max = 100, message = "{form.title.size}") String title,
         @Size(max = 240, message = "{form.description.size}") String description,
         @Positive(message = "{form.managerId.positive}") Long managerId,

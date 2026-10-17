@@ -206,7 +206,7 @@ Os endpoints de resposta e upload do mobile continuam fora deste módulo de entr
 
 ## DTOs de criação e edição
 
-- `FormCreateOrUpdateRequest` recebe o formulário completo nos endpoints `POST /forms` e `PUT /forms/{id}`: dados gerais e lista de perguntas.
+- `FormRequest` recebe o formulário completo nos endpoints `POST /forms` e `PUT /forms/{id}`: dados gerais e lista de perguntas.
 - `FormQuestionDefinitionRequest` define cada pergunta dessa lista: tipo, enunciado, obrigatoriedade, opções e limites de fotos.
 
-Um formulário com cinco perguntas usa um `FormCreateOrUpdateRequest` com cinco itens `FormQuestionDefinitionRequest` em `questions`. Os nomes distinguem as operações no formulário da definição de suas perguntas.
+Um formulário com cinco perguntas usa um `FormRequest` com cinco itens `FormQuestionDefinitionRequest` em `questions`. Os nomes distinguem as operações no formulário da definição de suas perguntas.

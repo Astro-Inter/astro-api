@@ -2,7 +2,7 @@ package com.astro.api.form.service;
 
 import com.astro.api.form.dto.request.FormOptionRequest;
 import com.astro.api.common.exception.BusinessException;
-import com.astro.api.form.dto.request.FormCreateOrUpdateRequest;
+import com.astro.api.form.dto.request.FormRequest;
 import com.astro.api.form.dto.request.FormQuestionDefinitionRequest;
 import com.astro.api.form.model.Form;
 import com.astro.api.form.model.FormQuestionType;
@@ -31,7 +31,7 @@ public class FormValidationService {
         }
     }
 
-    public void validate(FormCreateOrUpdateRequest formRequest, FormValidationMode mode) {
+    public void validate(FormRequest formRequest, FormValidationMode mode) {
         require(formRequest != null, "Informe os dados do formulário");
         require(formRequest.title() == null || formRequest.title().length() <= 100, "Título deve ter até 100 caracteres");
         require(formRequest.description() == null || formRequest.description().length() <= 240, "Descrição deve ter até 240 caracteres");
@@ -61,7 +61,7 @@ public class FormValidationService {
         if (!valid) throw new BusinessException(message);
     }
 
-    public void validateIdentifiers(FormCreateOrUpdateRequest formRequest, List<Form.FormQuestion> existingQuestions) {
+    public void validateIdentifiers(FormRequest formRequest, List<Form.FormQuestion> existingQuestions) {
         Map<Long, Form.FormQuestion> questionsById = existingQuestions.stream()
                 .collect(Collectors.toMap(Form.FormQuestion::getId, question -> question));
         for (FormQuestionDefinitionRequest question : formRequest.questions() == null ? List.<FormQuestionDefinitionRequest>of() : formRequest.questions()) {
