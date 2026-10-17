@@ -9,7 +9,7 @@ import com.astro.api.form.dto.response.FormPageResponse;
 import com.astro.api.form.dto.response.FormDetailsResponse;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.exception.ConflictException;
-import com.astro.api.form.dto.request.FormCreateOrUpdateRequest;
+import com.astro.api.form.dto.request.FormRequest;
 import com.astro.api.form.strategy.FormValidationMode;
 import com.astro.api.form.mapper.FormMapper;
 import com.astro.api.form.model.FormStatus;
@@ -42,7 +42,7 @@ public class FormService {
         this.formReferenceService = formReferenceService;
     }
 
-    public FormDetailsResponse create(FormCreateOrUpdateRequest formRequest, AuthenticatedUser authenticatedUser) {
+    public FormDetailsResponse create(FormRequest formRequest, AuthenticatedUser authenticatedUser) {
         FormScope formScope = formAccessService.requireManager(authenticatedUser);
         if (formRequest == null || (formRequest.status() != null && formRequest.status() != FormStatus.DRAFT && formRequest.status() != FormStatus.PENDING)) {
             throw new BusinessException("Crie o formulário como RASCUNHO ou PENDENTE");
@@ -63,7 +63,7 @@ public class FormService {
         return formMapper.toDetails(formRepository.insert(form));
     }
 
-    public FormDetailsResponse update(String formId, FormCreateOrUpdateRequest formRequest, AuthenticatedUser authenticatedUser) {
+    public FormDetailsResponse update(String formId, FormRequest formRequest, AuthenticatedUser authenticatedUser) {
         FormScope formScope = formAccessService.requireManager(authenticatedUser);
         Form form = requireForm(formId, formScope);
         formAccessService.requireManagement(form, formScope);
@@ -99,9 +99,9 @@ public class FormService {
         if (form.getStatus() != FormStatus.DRAFT) {
             throw new ConflictException("Somente rascunhos podem ser publicados");
         }
-        FormCreateOrUpdateRequest savedDraftRequest;
+        FormRequest savedDraftRequest;
         try {
-            savedDraftRequest = formMapper.toCreateOrUpdateRequest(form);
+            savedDraftRequest = formMapper.toFormRequest(form);
         } catch (IllegalArgumentException exception) {
             throw new BusinessException("Tipo de pergunta inválido no rascunho");
         }

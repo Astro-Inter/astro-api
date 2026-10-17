@@ -14,8 +14,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class FormValidationTest {
     final FormValidationService validator = FormTestFixtures.validator();
 
-    FormCreateOrUpdateRequest body(FormQuestionDefinitionRequest question) {
-        return new FormCreateOrUpdateRequest("Título", null, 20L, null, null, null, FormStatus.PENDING, List.of(question));
+    FormRequest body(FormQuestionDefinitionRequest question) {
+        return new FormRequest("Título", null, 20L, null, null, null, FormStatus.PENDING, List.of(question));
     }
 
     @Test void requiresACompleteAndUnambiguousStrategyRegistry() {
@@ -67,9 +67,9 @@ class FormValidationTest {
 
     @Test void duplicateQuestionIdsAndExcessiveCollectionsAreRejectedEvenInDrafts() {
         FormQuestionDefinitionRequest question = new FormQuestionDefinitionRequest(1L, FormQuestionType.TEXT, "Título", false, null, null, null, null);
-        assertThrows(BusinessException.class, () -> validator.validate(new FormCreateOrUpdateRequest(null, null, null, null, null,
+        assertThrows(BusinessException.class, () -> validator.validate(new FormRequest(null, null, null, null, null,
                 null, FormStatus.DRAFT, List.of(question, question)), FormValidationMode.DRAFT));
-        assertThrows(BusinessException.class, () -> validator.validate(new FormCreateOrUpdateRequest(null, null, null, null, null,
+        assertThrows(BusinessException.class, () -> validator.validate(new FormRequest(null, null, null, null, null,
                 null, FormStatus.DRAFT, java.util.Collections.nCopies(101, FormTestFixtures.question(FormQuestionType.TEXT))), FormValidationMode.DRAFT));
     }
 }

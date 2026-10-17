@@ -6,7 +6,7 @@ import com.astro.api.user.model.User;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.conformity.repository.NrCatalogRepository;
-import com.astro.api.form.dto.request.FormCreateOrUpdateRequest;
+import com.astro.api.form.dto.request.FormRequest;
 import com.astro.api.form.model.FormScope;
 import com.astro.api.unit.repository.UnitRepository;
 import com.astro.api.user.model.UserStatus;
@@ -29,7 +29,7 @@ public class FormReferenceService {
     }
 
     @Transactional(readOnly = true)
-    public void validate(FormCreateOrUpdateRequest formRequest, FormScope formScope) {
+    public void validate(FormRequest formRequest, FormScope formScope) {
         if (formRequest.managerId() != null) {
             User manager = userRepository.findById(formRequest.managerId()).filter(user -> user.getUnit() != null
                     && user.getUnit().workspace != null && formScope.workspaceId().equals(user.getUnit().workspace.id)
