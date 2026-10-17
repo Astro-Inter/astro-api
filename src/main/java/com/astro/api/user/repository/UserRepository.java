@@ -3,6 +3,7 @@ package com.astro.api.user.repository;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.workspace.model.Workspace;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -23,6 +24,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByCpfIn(Collection<String> cpfs);
 
     List<User> findByUnit_WorkspaceAndStatus(Workspace workspace, UserStatus status);
+
+    @EntityGraph(attributePaths = {"role", "role.workspace", "unit", "unit.workspace", "unit.address"})
+    @Query("select u from User u where u.id in :ids and u.unit.workspace = :workspace")
+    List<User> findEventParticipantsInWorkspace(@Param("ids") Collection<Long> ids,
+                                               @Param("workspace") Workspace workspace);
 
     @Query(value = "SELECT fn_retornar_tipo_conta(:email)", nativeQuery = true)
     String findAccountTypeByEmail(@Param("email") String email);
