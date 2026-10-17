@@ -27,113 +27,142 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 public class AccountService {
     private static final Logger LOGGER = LoggerFactory.getLogger(AccountService.class);
-    private final UserRepository users;
-    private final UserAvatarService avatars;
-    private final AccountMapper mapper;
-    private final AccountRepository accounts;
-    private final RoleRepository roles;
-    private final UnitRepository units;
-    private final FirebaseIdentityService identities;
-    private final TransactionTemplate transactions;
+    private final UserRepository userRepository;
+    private final UserAvatarService userAvatarService;
+    private final AccountMapper accountMapper;
+    private final AccountRepository accountRepository;
+    private final RoleRepository roleRepository;
+    private final UnitRepository unitRepository;
+    private final FirebaseIdentityService firebaseIdentityService;
+    private final TransactionTemplate transactionTemplate;
 
-    public AccountService(UserRepository users, UserAvatarService avatars, AccountMapper mapper,
-                          AccountRepository accounts, RoleRepository roles, UnitRepository units,
-                          FirebaseIdentityService identities, PlatformTransactionManager transactionManager) {
-        this.users = users;
-        this.avatars = avatars;
-        this.mapper = mapper;
-        this.accounts = accounts;
-        this.roles = roles;
-        this.units = units;
-        this.identities = identities;
-        this.transactions = new TransactionTemplate(transactionManager);
-        this.transactions.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    public AccountService(UserRepository userRepository, UserAvatarService userAvatarService, AccountMapper accountMapper,
+                          AccountRepository accountRepository, RoleRepository roleRepository, UnitRepository unitRepository,
+                          FirebaseIdentityService firebaseIdentityService, PlatformTransactionManager transactionManager) {
+        this.userRepository = userRepository;
+        this.userAvatarService = userAvatarService;
+        this.accountMapper = accountMapper;
+        this.accountRepository = accountRepository;
+        this.roleRepository = roleRepository;
+        this.unitRepository = unitRepository;
+        this.firebaseIdentityService = firebaseIdentityService;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     @Transactional(readOnly = true)
     public AccountSummaryResponse findSummary(AuthenticatedUser principal) {
         User user = requireAccount(principal);
-        return mapper.toSummary(user, avatars.findUrl(user.getId()));
+        return accountMapper.toSummary(user, userAvatarService.findUrl(user.getId()));
     }
 
     @Transactional(readOnly = true)
     public AccountDetailsResponse findDetails(AuthenticatedUser principal) {
         User user = requireAccount(principal);
-        return mapper.toDetails(user, avatars.findUrl(user.getId()));
+        return accountMapper.toDetails(user, userAvatarService.findUrl(user.getId()));
     }
 
     public AccountDetailsResponse update(UpdateAccountDetailsRequest body, AuthenticatedUser principal) {
         requirePrincipal(principal);
-        EmailChange[] emailChange = new EmailChange[1];
+        AtomicReference<EmailChange> emailChange = new AtomicReference<>();
         try {
             // The template includes commit: a failed commit must compensate Firebase too.
-            return transactions.execute(transaction -> {
-                User user = accounts.findForUpdateByFirebaseUid(principal.firebaseUid())
-                        .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
-                validateAccount(user, principal);
-                Long workspaceId = user.getUnit().workspace.id;
-                boolean roleChanged = user.getRole() == null || !Objects.equals(body.roleId(), user.getRole().getId());
-                boolean unitChanged = !Objects.equals(body.unitId(), user.getUnit().id);
-                if (principal.role() == Role.GESTOR && (roleChanged || unitChanged)) {
-                    throw new AccessDeniedException("A alteração do próprio cargo ou unidade exige um gestor de workspace");
-                }
-                com.astro.api.role.model.Role role = roles.findById(body.roleId())
-                        .filter(value -> value.getWorkspace() != null && workspaceId.equals(value.getWorkspace().id))
-                        .orElseThrow(() -> new ResourceNotFoundException("Cargo não encontrado no workspace"));
-                Unit unit = units.findById(body.unitId())
-                        .filter(value -> value.workspace != null && workspaceId.equals(value.workspace.id))
-                        .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada no workspace"));
-                if (roleChanged && !Boolean.TRUE.equals(accounts.lockRoleActive(body.roleId(), workspaceId))) {
-                    throw new BusinessException("O cargo deve estar ativo para uma nova vinculação");
-                }
-                if (unitChanged && !Boolean.TRUE.equals(accounts.lockUnitActive(body.unitId(), workspaceId))) {
-                    throw new BusinessException("A unidade deve estar ativa para uma nova vinculação");
-                }
-                if (accounts.cpfExists(body.cpf(), user.getId())) throw new ConflictException("Já existe um usuário com este CPF");
-                if (accounts.emailExists(body.email(), user.getId())) throw new ConflictException("Já existe um usuário com este e-mail");
-                String previousEmail = user.getEmail();
-                // Generate the optional photo before changing the identity in either system.
-                String profilePhotoUrl = avatars.findUrl(user.getId());
-                mapper.applyUpdate(user, body, role, unit);
-                User saved = accounts.saveAndFlush(user);
-                if (!body.email().equalsIgnoreCase(previousEmail)) {
-                    FirebaseIdentityService.EmailState previous = identities.readEmailState(user.getFirebaseUid());
-                    if (previous.email() == null || previousEmail == null || !previousEmail.equalsIgnoreCase(previous.email())) {
-                        throw new ConflictException("O e-mail da autenticação precisa ser reconciliado antes da edição");
-                    }
-                    EmailChange change = new EmailChange(user.getId(), user.getFirebaseUid(), previous);
-                    try {
-                        identities.updateEmail(user.getFirebaseUid(), body.email());
-                    } catch (ConflictException conflict) {
-                        // Firebase explicitly rejected the duplicate; its identity was not changed.
-                        throw conflict;
-                    } catch (RuntimeException failure) {
-                        // A timeout can occur after Firebase applied the change.
-                        emailChange[0] = change;
-                        throw failure;
-                    }
-                    emailChange[0] = change;
-                }
-                return mapper.toDetails(saved, profilePhotoUrl);
-            });
+            AccountDetailsResponse updatedAccount = transactionTemplate.execute(transaction ->
+                    updateAccount(body, principal, emailChange));
+            return updatedAccount;
         } catch (RuntimeException failure) {
-            if (emailChange[0] != null) compensateEmail(emailChange[0], failure);
+            EmailChange change = emailChange.get();
+            if (change != null) compensateEmail(change, failure);
             throw failure;
         }
     }
 
+    private AccountDetailsResponse updateAccount(UpdateAccountDetailsRequest body, AuthenticatedUser principal,
+                                                 AtomicReference<EmailChange> emailChange) {
+        User user = accountRepository.findForUpdateByFirebaseUid(principal.firebaseUid())
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+        validateAccount(user, principal);
+        Long workspaceId = user.getUnit().workspace.id;
+        boolean roleChanged = user.getRole() == null || !Objects.equals(body.roleId(), user.getRole().getId());
+        boolean unitChanged = !Objects.equals(body.unitId(), user.getUnit().id);
+        if (principal.role() == Role.GESTOR && (roleChanged || unitChanged)) {
+            throw new AccessDeniedException("A alteração do próprio cargo ou unidade exige um gestor de workspace");
+        }
+        com.astro.api.role.model.Role role = requireRole(body.roleId(), workspaceId, roleChanged);
+        Unit unit = requireUnit(body.unitId(), workspaceId, unitChanged);
+        checkConflicts(body, user.getId());
+        String previousEmail = user.getEmail();
+        // Generate the optional photo before changing the identity in either system.
+        String profilePhotoUrl = userAvatarService.findUrl(user.getId());
+        accountMapper.applyUpdate(user, body, role, unit);
+        User saved = accountRepository.saveAndFlush(user);
+        synchronizeEmail(saved, previousEmail, emailChange);
+        AccountDetailsResponse updatedAccount = accountMapper.toDetails(saved, profilePhotoUrl);
+        return updatedAccount;
+    }
+
+    private com.astro.api.role.model.Role requireRole(Long roleId, Long workspaceId, boolean roleChanged) {
+        com.astro.api.role.model.Role role = roleRepository.findById(roleId)
+                .filter(value -> value.getWorkspace() != null && workspaceId.equals(value.getWorkspace().id))
+                .orElseThrow(() -> new ResourceNotFoundException("Cargo não encontrado no workspace"));
+        if (roleChanged && !Boolean.TRUE.equals(accountRepository.lockRoleActive(roleId, workspaceId))) {
+            throw new BusinessException("O cargo deve estar ativo para uma nova vinculação");
+        }
+        return role;
+    }
+
+    private Unit requireUnit(Long unitId, Long workspaceId, boolean unitChanged) {
+        Unit unit = unitRepository.findById(unitId)
+                .filter(value -> value.workspace != null && workspaceId.equals(value.workspace.id))
+                .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada no workspace"));
+        if (unitChanged && !Boolean.TRUE.equals(accountRepository.lockUnitActive(unitId, workspaceId))) {
+            throw new BusinessException("A unidade deve estar ativa para uma nova vinculação");
+        }
+        return unit;
+    }
+
+    private void checkConflicts(UpdateAccountDetailsRequest body, Long userId) {
+        if (accountRepository.existsByCpfAndIdNot(body.cpf(), userId)) {
+            throw new ConflictException("Já existe um usuário com este CPF");
+        }
+        if (accountRepository.existsByEmailIgnoreCaseAndIdNot(body.email(), userId)) {
+            throw new ConflictException("Já existe um usuário com este e-mail");
+        }
+    }
+
+    private void synchronizeEmail(User user, String previousEmail, AtomicReference<EmailChange> emailChange) {
+        if (user.getEmail().equalsIgnoreCase(previousEmail)) return;
+        FirebaseIdentityService.EmailState previous = firebaseIdentityService.readEmailState(user.getFirebaseUid());
+        if (previous.email() == null || previousEmail == null || !previousEmail.equalsIgnoreCase(previous.email())) {
+            throw new ConflictException("O e-mail da autenticação precisa ser reconciliado antes da edição");
+        }
+        EmailChange change = new EmailChange(user.getId(), user.getFirebaseUid(), previous);
+        try {
+            firebaseIdentityService.updateEmail(user.getFirebaseUid(), user.getEmail());
+        } catch (ConflictException conflict) {
+            // Firebase explicitly rejected the duplicate; its identity was not changed.
+            throw conflict;
+        } catch (RuntimeException failure) {
+            // A timeout can occur after Firebase applied the change.
+            emailChange.set(change);
+            throw failure;
+        }
+        emailChange.set(change);
+    }
+
     private void compensateEmail(EmailChange change, RuntimeException original) {
         try {
-            identities.restoreEmail(change.firebaseUid(), change.previous());
+            firebaseIdentityService.restoreEmail(change.firebaseUid(), change.previous());
         } catch (RuntimeException compensationFailure) {
             original.addSuppressed(compensationFailure);
             try {
-                transactions.executeWithoutResult(transaction -> {
-                    if (accounts.deactivateAfterEmailFailure(change.userId(), change.firebaseUid()) != 1) {
+                transactionTemplate.executeWithoutResult(transaction -> {
+                    if (accountRepository.deactivateAfterEmailFailure(change.userId(), change.firebaseUid()) != 1) {
                         throw new IllegalStateException("Conta não encontrada para contenção da falha");
                     }
                 });
@@ -145,11 +174,9 @@ public class AccountService {
         }
     }
 
-    private record EmailChange(Long userId, String firebaseUid, FirebaseIdentityService.EmailState previous) { }
-
     private User requireAccount(AuthenticatedUser principal) {
         requirePrincipal(principal);
-        User user = users.findByFirebaseUid(principal.firebaseUid())
+        User user = userRepository.findByFirebaseUid(principal.firebaseUid())
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
         validateAccount(user, principal);
         return user;

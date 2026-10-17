@@ -129,10 +129,10 @@ class AccountUpdateTest {
     }
 
     @Test void rejectsCpfAndEmailConflictsBeforeFirebase() {
-        when(accounts.cpfExists("52998224725", 100L)).thenReturn(true);
+        when(accounts.existsByCpfAndIdNot("52998224725", 100L)).thenReturn(true);
         assertThrows(ConflictException.class, () -> service.update(body(), principal()));
-        when(accounts.cpfExists("52998224725", 100L)).thenReturn(false);
-        when(accounts.emailExists("stored@example.com", 100L)).thenReturn(true);
+        when(accounts.existsByCpfAndIdNot("52998224725", 100L)).thenReturn(false);
+        when(accounts.existsByEmailIgnoreCaseAndIdNot("stored@example.com", 100L)).thenReturn(true);
         assertThrows(ConflictException.class, () -> service.update(body(), principal()));
         verify(accounts, never()).saveAndFlush(any()); verifyNoInteractions(identities);
     }

@@ -64,12 +64,12 @@ obrigatórios e não nulos; omissão, campo desconhecido e valor inválido retor
 
 ```json
 {
-  "nome": "Maria Rosa",
+  "name": "Maria Rosa",
   "cpf": "52998224725",
   "email": "maria@example.com",
   "roleId": 20,
   "unitId": 10,
-  "modalidade": "PRESENCIAL"
+  "workModel": "PRESENCIAL"
 }
 ```
 
@@ -84,6 +84,12 @@ usuário não fazem parte do request; campos adicionais são rejeitados.
 HTTP 200 retorna os mesmos nove campos de detalhes, atualizados, em `ApiResult`.
 A foto continua sendo enviada separadamente a `PUT /user/me/profile-photo`
 (multipart, campo `file`). Opções existentes: `GET /roles` e `GET /units`.
+
+O request usa os nomes Java em inglês, sem `@JsonProperty`: `name`, `cpf`,
+`email`, `roleId`, `unitId` e `workModel`. O frontend deve enviar esses nomes;
+`nome` e `modalidade` são campos desconhecidos no PUT e retornam 400.
+As respostas GET/PUT mantêm os nomes documentados acima (`nome`, `cargo`,
+`unidade`, `modalidade`), assim como o contrato mobile existente.
 
 ### Autorização dos vínculos
 

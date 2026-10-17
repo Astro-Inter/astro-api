@@ -24,10 +24,10 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
 @SecurityRequirement(name = "bearerAuth")
 public class AccountController {
-    private final AccountService accounts;
+    private final AccountService accountService;
 
-    public AccountController(AccountService accounts) {
-        this.accounts = accounts;
+    public AccountController(AccountService accountService) {
+        this.accountService = accountService;
     }
 
     @GetMapping("/user/me/account-summary")
@@ -42,7 +42,7 @@ public class AccountController {
     public ResponseEntity<ApiResult<AccountSummaryResponse>> summary(
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Resumo da conta retornado com sucesso",
-                accounts.findSummary(principal), request.getRequestURI()));
+                accountService.findSummary(principal), request.getRequestURI()));
     }
 
     @GetMapping("/user/me/account-details")
@@ -57,11 +57,11 @@ public class AccountController {
     public ResponseEntity<ApiResult<AccountDetailsResponse>> details(
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Detalhes da conta retornados com sucesso",
-                accounts.findDetails(principal), request.getRequestURI()));
+                accountService.findDetails(principal), request.getRequestURI()));
     }
 
     @PutMapping("/user/me/account-details")
-    @Operation(summary = "Substitui os seis campos editáveis da própria conta", description = "Exige nome, cpf, email, roleId, unitId e modalidade, sem nulos ou campos extras. GESTOR mantém cargo/unidade; GESTOR_WORKSPACE pode escolher vínculos ativos no próprio workspace. Preserva vínculos inativos atuais. Não recebe senha ou foto. E-mail alterado é sincronizado com Firebase e marcado como não verificado; confirmação deve ocorrer no fluxo Firebase do cliente.")
+    @Operation(summary = "Substitui os seis campos editáveis da própria conta", description = "Exige name, cpf, email, roleId, unitId e workModel, sem nulos ou campos extras. GESTOR mantém cargo/unidade; GESTOR_WORKSPACE pode escolher vínculos ativos no próprio workspace. Preserva vínculos inativos atuais. Não recebe senha ou foto. E-mail alterado é sincronizado com Firebase e marcado como não verificado; confirmação deve ocorrer no fluxo Firebase do cliente.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Detalhes atualizados no envelope ApiResult, após commit e sincronização de e-mail"),
             @ApiResponse(responseCode = "400", description = "Campos omitidos, nulos, desconhecidos, formatos inválidos ou novo vínculo inativo (ApiResult de erro)"),
@@ -74,6 +74,6 @@ public class AccountController {
     public ResponseEntity<ApiResult<AccountDetailsResponse>> update(@Valid @RequestBody UpdateAccountDetailsRequest body,
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Conta atualizada com sucesso",
-                accounts.update(body, principal), request.getRequestURI()));
+                accountService.update(body, principal), request.getRequestURI()));
     }
 }

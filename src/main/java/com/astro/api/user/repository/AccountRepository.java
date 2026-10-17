@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 
 public interface AccountRepository extends JpaRepository<User, Long> {
+    // Native queries below retain PostgreSQL row locks required by concurrent updates.
     @Query(value = "SELECT u.* FROM usuario u WHERE u.firebase_uid = :firebaseUid FOR UPDATE OF u", nativeQuery = true)
     Optional<User> findForUpdateByFirebaseUid(@Param("firebaseUid") String firebaseUid);
 
@@ -18,11 +19,10 @@ public interface AccountRepository extends JpaRepository<User, Long> {
     @Query(value = "SELECT ativo FROM unidade WHERE id_unidade = :unitId AND workspace_id = :workspaceId FOR SHARE", nativeQuery = true)
     Boolean lockUnitActive(@Param("unitId") Long unitId, @Param("workspaceId") Long workspaceId);
 
-    @Query(value = "SELECT EXISTS(SELECT 1 FROM usuario WHERE cpf = :cpf AND id_usuario <> :userId)", nativeQuery = true)
-    boolean cpfExists(@Param("cpf") String cpf, @Param("userId") Long userId);
+    // Simple existence checks use derived JPA queries instead of handwritten SQL.
+    boolean existsByCpfAndIdNot(String cpf, Long userId);
 
-    @Query(value = "SELECT EXISTS(SELECT 1 FROM usuario WHERE lower(email) = lower(:email) AND id_usuario <> :userId)", nativeQuery = true)
-    boolean emailExists(@Param("email") String email, @Param("userId") Long userId);
+    boolean existsByEmailIgnoreCaseAndIdNot(String email, Long userId);
 
     @Modifying(clearAutomatically = true)
     @Query(value = """

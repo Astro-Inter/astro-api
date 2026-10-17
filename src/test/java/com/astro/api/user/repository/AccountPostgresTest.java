@@ -146,13 +146,14 @@ class AccountPostgresTest {
 
     @Test void detectsConflictsGloballyAndPreservesUnchangedInactiveLinks() {
         AuthenticatedUser owner = principal(1, Role.GESTOR_WORKSPACE);
-        assertThrows(ConflictException.class, () -> service.update(body("other@example.com", 1, 1), owner));
+        assertThrows(ConflictException.class, () -> service.update(body("OTHER@EXAMPLE.COM", 1, 1), owner));
         jdbc.update("UPDATE usuario SET cpf='52998224725' WHERE id_usuario=3");
         assertThrows(ConflictException.class, () -> service.update(body("one@example.com", 1, 1), owner));
         jdbc.update("UPDATE usuario SET cpf=NULL WHERE id_usuario=3");
         jdbc.update("UPDATE cargo SET ativo=false WHERE id_cargo=1");
         jdbc.update("UPDATE unidade SET ativo=false WHERE id_unidade=1");
         assertEquals(1L, service.update(body("one@example.com", 1, 1), owner).unitId());
+        assertEquals("52998224725", service.update(body("one@example.com", 1, 1), owner).cpf());
     }
 
     static DriverManagerDataSource dataSource() {

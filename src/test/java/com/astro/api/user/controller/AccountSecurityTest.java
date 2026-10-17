@@ -135,7 +135,7 @@ class AccountSecurityTest {
     }
 
     String validUpdate() {
-        return "{\"nome\":\"Maria Rosa\",\"cpf\":\"52998224725\",\"email\":\"stored@example.com\",\"roleId\":20,\"unitId\":10,\"modalidade\":\"REMOTO\"}";
+        return "{\"name\":\"Maria Rosa\",\"cpf\":\"52998224725\",\"email\":\"stored@example.com\",\"roleId\":20,\"unitId\":10,\"workModel\":\"REMOTO\"}";
     }
 
     @Test void putUsesTheTokenAndReturnsUpdatedDetailsForBothProfiles() throws Exception {
@@ -157,7 +157,7 @@ class AccountSecurityTest {
     @Test void putRejectsEachMissingOrNullFieldBeforeCallingTheService() throws Exception {
         authenticate(Role.GESTOR_WORKSPACE);
         JsonMapper mapper = JsonMapper.builder().build();
-        for (String field : new String[]{"nome", "cpf", "email", "roleId", "unitId", "modalidade"}) {
+        for (String field : new String[]{"name", "cpf", "email", "roleId", "unitId", "workModel"}) {
             for (boolean omitted : new boolean[]{true, false}) {
                 ObjectNode body = (ObjectNode) mapper.readTree(validUpdate());
                 if (omitted) body.remove(field); else body.putNull(field);
@@ -187,7 +187,7 @@ class AccountSecurityTest {
                             .contentType("application/json").content(body))
                     .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false));
         }
-        for (String field : new String[]{"userId", "firebaseUid", "workspaceId", "status", "tipo", "senha", "password", "passwordHash", "file", "profilePhotoUrl", "nrs"}) {
+        for (String field : new String[]{"nome", "modalidade", "userId", "firebaseUid", "workspaceId", "status", "tipo", "senha", "password", "passwordHash", "file", "profilePhotoUrl", "nrs"}) {
             ObjectNode body = (ObjectNode) mapper.readTree(validUpdate());
             body.put(field, "not-allowed");
             mvc.perform(put("/user/me/account-details").header("Authorization", "Bearer valid")
