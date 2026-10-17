@@ -101,7 +101,7 @@ public class AccountService {
                 mapper.applyUpdate(user, body, role, unit);
                 User saved = accounts.saveAndFlush(user);
                 if (!body.email().equalsIgnoreCase(previousEmail)) {
-                    var previous = identities.readEmailState(user.getFirebaseUid());
+                    FirebaseIdentityService.EmailState previous = identities.readEmailState(user.getFirebaseUid());
                     if (previous.email() == null || previousEmail == null || !previousEmail.equalsIgnoreCase(previous.email())) {
                         throw new ConflictException("O e-mail da autenticação precisa ser reconciliado antes da edição");
                     }

@@ -10,20 +10,21 @@ import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.unit.repository.UnitRepository;
 import com.astro.api.user.dto.request.UpdateAccountDetailsRequest;
+import com.astro.api.user.dto.response.AccountDetailsResponse;
 import com.astro.api.user.mapper.AccountMapper;
 import com.astro.api.user.model.*;
 import com.astro.api.user.repository.AccountRepository;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.workspace.model.Workspace;
+import java.time.Instant;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
-
-import java.time.Instant;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -63,8 +64,8 @@ class AccountUpdateTest {
     @Test void fullUpdatePreservesIdentityScopeAndUnchangedInactiveLinksForBothProfiles() {
         for (UserType type : new UserType[]{UserType.GESTOR, UserType.GESTOR_WORKSPACE}) {
             user.setType(type);
-            var oldUnit = user.getUnit(); var createdAt = user.getCreatedAt();
-            var result = service.update(body(), principal());
+            Unit oldUnit = user.getUnit(); Instant createdAt = user.getCreatedAt();
+            AccountDetailsResponse result = service.update(body(), principal());
             assertEquals("Maria Rosa editada", result.name()); assertEquals("52998224725", result.cpf());
             assertEquals("stored@example.com", result.email()); assertEquals(WorkModel.REMOTO, result.workModel());
             assertEquals(20L, result.roleId()); assertEquals(10L, result.unitId());
@@ -93,7 +94,7 @@ class AccountUpdateTest {
     }
 
     com.astro.api.role.model.Role newRole(Long workspaceId) {
-        var role = new com.astro.api.role.model.Role();
+        com.astro.api.role.model.Role role = new com.astro.api.role.model.Role();
         Workspace workspace = new Workspace(); workspace.id = workspaceId;
         role.setId(21L); role.setName("Supervisora"); role.setWorkspace(workspace); role.setActive(true);
         when(roles.findById(21L)).thenReturn(Optional.of(role)); return role;
@@ -103,7 +104,7 @@ class AccountUpdateTest {
         newRole(1L); newUnit(1L);
         when(accounts.lockRoleActive(21L, 1L)).thenReturn(true);
         when(accounts.lockUnitActive(11L, 1L)).thenReturn(true);
-        var result = service.update(body(user.getEmail(), 21L, 11L), principal());
+        AccountDetailsResponse result = service.update(body(user.getEmail(), 21L, 11L), principal());
         assertEquals(21L, result.roleId()); assertEquals("Supervisora", result.roleName());
         assertEquals(11L, result.unitId()); assertEquals("São Paulo", result.unitName());
         assertEquals(1L, user.getUnit().workspace.id); assertEquals(UserType.GESTOR_WORKSPACE, user.getType());
@@ -137,15 +138,15 @@ class AccountUpdateTest {
     }
 
     FirebaseIdentityService.EmailState emailState() {
-        var state = new FirebaseIdentityService.EmailState("stored@example.com", true);
+        FirebaseIdentityService.EmailState state = new FirebaseIdentityService.EmailState("stored@example.com", true);
         when(identities.readEmailState("own-uid")).thenReturn(state); return state;
     }
 
     @Test void emailChangesReuseTheExistingIdentityAndOnlySucceedAfterCommit() {
         emailState();
-        var result = service.update(body("new@example.com", 20L, 10L), principal());
+        AccountDetailsResponse result = service.update(body("new@example.com", 20L, 10L), principal());
         assertEquals("new@example.com", result.email());
-        var order = inOrder(accounts, identities, transactions);
+        InOrder order = inOrder(accounts, identities, transactions);
         order.verify(accounts).saveAndFlush(user);
         order.verify(identities).readEmailState("own-uid");
         order.verify(identities).updateEmail("own-uid", "new@example.com");
@@ -161,14 +162,14 @@ class AccountUpdateTest {
     }
 
     @Test void databaseCommitFailureRestoresPreviousFirebaseEmailAndVerifiedState() {
-        var previous = emailState();
+        FirebaseIdentityService.EmailState previous = emailState();
         doThrow(new IllegalStateException("commit failure")).when(transactions).commit(any());
         assertThrows(IllegalStateException.class, () -> service.update(body("new@example.com", 20L, 10L), principal()));
         verify(identities).restoreEmail("own-uid", previous);
     }
 
     @Test void firebaseTimeoutRollsBackAndCompensatesAPotentialRemoteWrite() {
-        var previous = emailState();
+        FirebaseIdentityService.EmailState previous = emailState();
         doThrow(new IllegalStateException("timeout")).when(identities).updateEmail(any(), any());
         assertThrows(IllegalStateException.class, () -> service.update(body("new@example.com", 20L, 10L), principal()));
         verify(transactions).rollback(any()); verify(identities).restoreEmail("own-uid", previous);

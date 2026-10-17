@@ -2,26 +2,27 @@ package com.astro.api.user.service;
 
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.security.Role;
+import com.astro.api.auth.service.FirebaseIdentityService;
 import com.astro.api.common.exception.ResourceNotFoundException;
+import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.unit.model.Unit;
+import com.astro.api.unit.repository.UnitRepository;
+import com.astro.api.user.dto.response.AccountDetailsResponse;
+import com.astro.api.user.dto.response.AccountSummaryResponse;
 import com.astro.api.user.mapper.AccountMapper;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.model.WorkModel;
-import com.astro.api.user.repository.UserRepository;
 import com.astro.api.user.repository.AccountRepository;
-import com.astro.api.role.repository.RoleRepository;
-import com.astro.api.unit.repository.UnitRepository;
-import com.astro.api.auth.service.FirebaseIdentityService;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.SimpleTransactionStatus;
-import org.junit.jupiter.api.BeforeEach;
+import com.astro.api.user.repository.UserRepository;
 import com.astro.api.workspace.model.Workspace;
+import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
-
-import java.util.Optional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -55,7 +56,7 @@ class AccountServiceTest {
             User user = account(role);
             when(users.findByFirebaseUid("own-uid")).thenReturn(Optional.of(user));
             when(avatars.findUrl(100L)).thenReturn("https://r2.example.com/signed");
-            var result = service.findSummary(new AuthenticatedUser("own-uid", "stale-token@example.com", role));
+            AccountSummaryResponse result = service.findSummary(new AuthenticatedUser("own-uid", "stale-token@example.com", role));
             assertEquals("Maria Rosa", result.name());
             assertEquals("stored@example.com", result.email());
             assertEquals("https://r2.example.com/signed", result.profilePhotoUrl());
@@ -67,7 +68,7 @@ class AccountServiceTest {
     @Test void summaryKeepsMissingNameAndPhotoNull() {
         User user = account(Role.GESTOR); user.setName(null);
         when(users.findByFirebaseUid("own-uid")).thenReturn(Optional.of(user));
-        var result = service.findSummary(new AuthenticatedUser("own-uid", null, Role.GESTOR));
+        AccountSummaryResponse result = service.findSummary(new AuthenticatedUser("own-uid", null, Role.GESTOR));
         assertNull(result.name()); assertNull(result.profilePhotoUrl());
     }
 
@@ -75,11 +76,11 @@ class AccountServiceTest {
         for (Role role : new Role[]{Role.GESTOR, Role.GESTOR_WORKSPACE}) {
             User user = account(role);
             user.setCpf("52998224725"); user.setWorkModel(WorkModel.HIBRIDO);
-            var managerRole = new com.astro.api.role.model.Role();
+            com.astro.api.role.model.Role managerRole = new com.astro.api.role.model.Role();
             managerRole.setId(20L); managerRole.setName("Engenheira");
             managerRole.setWorkspace(user.getUnit().workspace); user.setRole(managerRole);
             when(users.findByFirebaseUid("own-uid")).thenReturn(Optional.of(user));
-            var result = service.findDetails(new AuthenticatedUser("own-uid", null, role));
+            AccountDetailsResponse result = service.findDetails(new AuthenticatedUser("own-uid", null, role));
             assertEquals("52998224725", result.cpf());
             assertEquals(20L, result.roleId()); assertEquals("Engenheira", result.roleName());
             assertEquals(10L, result.unitId()); assertEquals("Osasco", result.unitName());
@@ -89,15 +90,15 @@ class AccountServiceTest {
 
     @Test void detailsPreserveMissingCpfRoleModalityAndPhotoWithoutInventedValues() {
         when(users.findByFirebaseUid("own-uid")).thenReturn(Optional.of(account(Role.GESTOR_WORKSPACE)));
-        var result = service.findDetails(new AuthenticatedUser("own-uid", null, Role.GESTOR_WORKSPACE));
+        AccountDetailsResponse result = service.findDetails(new AuthenticatedUser("own-uid", null, Role.GESTOR_WORKSPACE));
         assertNull(result.cpf()); assertNull(result.workModel()); assertNull(result.roleId());
         assertNull(result.roleName()); assertNull(result.profilePhotoUrl());
     }
 
     @Test void detailsRejectCrossWorkspaceLinksBeforeLoadingPhotos() {
         User user = account(Role.GESTOR);
-        var managerRole = new com.astro.api.role.model.Role();
-        var foreignWorkspace = new Workspace(); foreignWorkspace.id = 2L;
+        com.astro.api.role.model.Role managerRole = new com.astro.api.role.model.Role();
+        Workspace foreignWorkspace = new Workspace(); foreignWorkspace.id = 2L;
         managerRole.setWorkspace(foreignWorkspace); user.setRole(managerRole);
         when(users.findByFirebaseUid("own-uid")).thenReturn(Optional.of(user));
         assertThrows(AccessDeniedException.class,
@@ -106,7 +107,7 @@ class AccountServiceTest {
     }
 
     @Test void absentAccountIsNotFoundAndUnauthorizedOrInactiveAccountsNeverReadPhotos() {
-        var principal = new AuthenticatedUser("own-uid", null, Role.GESTOR);
+        AuthenticatedUser principal = new AuthenticatedUser("own-uid", null, Role.GESTOR);
         assertThrows(ResourceNotFoundException.class, () -> service.findSummary(principal));
         assertThrows(AccessDeniedException.class, () -> service.findSummary(null));
         assertThrows(AccessDeniedException.class, () -> service.findSummary(new AuthenticatedUser("", null, Role.GESTOR)));

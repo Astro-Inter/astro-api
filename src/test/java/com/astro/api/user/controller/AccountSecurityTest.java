@@ -8,16 +8,18 @@ import com.astro.api.auth.service.AuthorizationService;
 import com.astro.api.auth.service.FirebaseTokenService;
 import com.astro.api.common.handler.GlobalExceptionHandler;
 import com.astro.api.config.CorsConfig;
-import com.astro.api.user.dto.response.AccountSummaryResponse;
-import com.astro.api.user.dto.response.AccountDetailsResponse;
-import com.astro.api.user.dto.response.UserProfileResponse;
 import com.astro.api.user.dto.request.UpdateAccountDetailsRequest;
+import com.astro.api.user.dto.response.AccountDetailsResponse;
+import com.astro.api.user.dto.response.AccountSummaryResponse;
+import com.astro.api.user.dto.response.UserProfileResponse;
+import com.astro.api.user.model.WorkModel;
 import com.astro.api.user.service.AccountService;
 import com.astro.api.user.service.UserService;
-import com.astro.api.user.model.WorkModel;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
 import jakarta.servlet.Filter;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.*;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,8 +31,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
-
-import java.util.Optional;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import static org.hamcrest.Matchers.aMapWithSize;
 import static org.mockito.Mockito.*;
@@ -93,7 +95,7 @@ class AccountSecurityTest {
     @Test void detailsExposeExactlyNineFieldsIncludingExplicitNullsAndStoredLinks() throws Exception {
         for (Role role : new Role[]{Role.GESTOR, Role.GESTOR_WORKSPACE}) {
             authenticate(role);
-            var principal = new AuthenticatedUser("own-uid", "token@example.com", role);
+            AuthenticatedUser principal = new AuthenticatedUser("own-uid", "token@example.com", role);
             when(accounts.findDetails(principal)).thenReturn(new AccountDetailsResponse("Maria Rosa", null,
                     "stored@example.com", 20L, "Engenheira", 10L, "Osasco", WorkModel.REMOTO, null));
             mvc.perform(get("/user/me/account-details?userId=999&workspaceId=2")
@@ -122,7 +124,7 @@ class AccountSecurityTest {
 
     @Test void mobileProfileKeepsItsExistingFieldsAndCollaboratorAccess() throws Exception {
         authenticate(Role.COLABORADOR);
-        var users = context.getBean(UserService.class);
+        UserService users = context.getBean(UserService.class);
         when(users.findProfileByFirebaseUid("own-uid")).thenReturn(new UserProfileResponse(
                 "Maria Rosa", "Engenheira", "Osasco", "REMOTO", "stored@example.com", null, java.util.List.of()));
         mvc.perform(get("/user/me").header("Authorization", "Bearer valid"))
@@ -139,8 +141,8 @@ class AccountSecurityTest {
     @Test void putUsesTheTokenAndReturnsUpdatedDetailsForBothProfiles() throws Exception {
         for (Role role : new Role[]{Role.GESTOR, Role.GESTOR_WORKSPACE}) {
             authenticate(role);
-            var principal = new AuthenticatedUser("own-uid", "token@example.com", role);
-            var body = new UpdateAccountDetailsRequest("Maria Rosa", "52998224725", "stored@example.com", 20L, 10L, WorkModel.REMOTO);
+            AuthenticatedUser principal = new AuthenticatedUser("own-uid", "token@example.com", role);
+            UpdateAccountDetailsRequest body = new UpdateAccountDetailsRequest("Maria Rosa", "52998224725", "stored@example.com", 20L, 10L, WorkModel.REMOTO);
             when(accounts.update(body, principal)).thenReturn(new AccountDetailsResponse("Maria Rosa", "52998224725",
                     "stored@example.com", 20L, "Engenheira", 10L, "Osasco", WorkModel.REMOTO, null));
             mvc.perform(put("/user/me/account-details?userId=999").header("Authorization", "Bearer valid")
@@ -154,10 +156,10 @@ class AccountSecurityTest {
 
     @Test void putRejectsEachMissingOrNullFieldBeforeCallingTheService() throws Exception {
         authenticate(Role.GESTOR_WORKSPACE);
-        var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
+        JsonMapper mapper = JsonMapper.builder().build();
         for (String field : new String[]{"nome", "cpf", "email", "roleId", "unitId", "modalidade"}) {
             for (boolean omitted : new boolean[]{true, false}) {
-                var body = (tools.jackson.databind.node.ObjectNode) mapper.readTree(validUpdate());
+                ObjectNode body = (ObjectNode) mapper.readTree(validUpdate());
                 if (omitted) body.remove(field); else body.putNull(field);
                 mvc.perform(put("/user/me/account-details").header("Authorization", "Bearer valid")
                                 .contentType("application/json").content(mapper.writeValueAsString(body)))
@@ -170,8 +172,8 @@ class AccountSecurityTest {
 
     @Test void putRejectsInvalidFormatsLimitsAndForbiddenFields() throws Exception {
         authenticate(Role.GESTOR_WORKSPACE);
-        var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
-        var invalid = java.util.List.of(
+        JsonMapper mapper = JsonMapper.builder().build();
+        List<String> invalid = List.of(
                 validUpdate().replace("Maria Rosa", " "), validUpdate().replace("Maria Rosa", "M"),
                 validUpdate().replace("Maria Rosa", "M".repeat(256)),
                 validUpdate().replace("52998224725", "11111111111"), validUpdate().replace("52998224725", "abc"),
@@ -186,7 +188,7 @@ class AccountSecurityTest {
                     .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false));
         }
         for (String field : new String[]{"userId", "firebaseUid", "workspaceId", "status", "tipo", "senha", "password", "passwordHash", "file", "profilePhotoUrl", "nrs"}) {
-            var body = (tools.jackson.databind.node.ObjectNode) mapper.readTree(validUpdate());
+            ObjectNode body = (ObjectNode) mapper.readTree(validUpdate());
             body.put(field, "not-allowed");
             mvc.perform(put("/user/me/account-details").header("Authorization", "Bearer valid")
                             .contentType("application/json").content(mapper.writeValueAsString(body)))
@@ -197,7 +199,7 @@ class AccountSecurityTest {
 
     @Test void putUsesStandardErrorEnvelopesForConflictInvalidLinkAndForbiddenChanges() throws Exception {
         authenticate(Role.GESTOR);
-        var failures = java.util.List.of(
+        List<RuntimeException> failures = List.of(
                 new com.astro.api.common.exception.ConflictException("Já existe um usuário com este CPF"),
                 new com.astro.api.common.exception.BusinessException("O cargo deve estar ativo"),
                 new org.springframework.security.access.AccessDeniedException("Sem permissão"));
@@ -214,7 +216,7 @@ class AccountSecurityTest {
     @Test void exposesOnlyThreeSummaryFieldsForBothManagersAndIgnoresTargetIds() throws Exception {
         for (Role role : new Role[]{Role.GESTOR, Role.GESTOR_WORKSPACE}) {
             authenticate(role);
-            var principal = new AuthenticatedUser("own-uid", "token@example.com", role);
+            AuthenticatedUser principal = new AuthenticatedUser("own-uid", "token@example.com", role);
             when(accounts.findSummary(principal)).thenReturn(new AccountSummaryResponse("Maria Rosa", "stored@example.com", null));
             mvc.perform(get("/user/me/account-summary?userId=999&firebaseUid=foreign-uid")
                             .header("Authorization", "Bearer valid"))

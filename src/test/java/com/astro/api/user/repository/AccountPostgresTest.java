@@ -9,16 +9,21 @@ import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.unit.repository.UnitRepository;
 import com.astro.api.user.dto.request.UpdateAccountDetailsRequest;
+import com.astro.api.user.dto.response.AccountDetailsResponse;
 import com.astro.api.user.mapper.AccountMapper;
 import com.astro.api.user.model.WorkModel;
 import com.astro.api.user.service.AccountService;
 import com.astro.api.user.service.UserAvatarService;
 import jakarta.persistence.EntityManagerFactory;
+import java.util.Map;
+import java.util.Properties;
+import java.util.UUID;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -31,11 +36,6 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.support.TransactionTemplate;
-
-import javax.sql.DataSource;
-import java.util.Map;
-import java.util.Properties;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -50,7 +50,7 @@ class AccountPostgresTest {
     FirebaseIdentityService identities;
 
     @BeforeAll static void open() {
-        var source = dataSource();
+        DriverManagerDataSource source = dataSource();
         jdbc = new JdbcTemplate(source);
         jdbc.execute("CREATE SCHEMA " + SCHEMA);
         new ResourceDatabasePopulator(new ClassPathResource("manager-fixture.sql")).execute(source);
@@ -83,11 +83,11 @@ class AccountPostgresTest {
     }
 
     @Test void readsOnlyTheAuthenticatedAccountAndPreservesAbsentValuesForBothProfiles() {
-        var owner = principal(1, Role.GESTOR_WORKSPACE);
-        var manager = principal(2, Role.GESTOR);
+        AuthenticatedUser owner = principal(1, Role.GESTOR_WORKSPACE);
+        AuthenticatedUser manager = principal(2, Role.GESTOR);
         assertEquals("one@example.com", service.findSummary(owner).email());
         assertEquals("two@example.com", service.findSummary(manager).email());
-        var result = service.findDetails(owner);
+        AccountDetailsResponse result = service.findDetails(owner);
         assertNull(result.cpf()); assertNull(result.workModel()); assertNull(result.profilePhotoUrl());
         assertEquals(1L, result.roleId()); assertEquals("Engenheira", result.roleName());
         assertEquals(1L, result.unitId()); assertEquals("Osasco", result.unitName());
@@ -95,8 +95,8 @@ class AccountPostgresTest {
     }
 
     @Test void persistsCompleteUpdatePreservingInternalAttributesAndOtherAccounts() {
-        var before = jdbc.queryForMap("SELECT * FROM usuario WHERE id_usuario=3");
-        var result = service.update(body("one@example.com", 2, 2), principal(1, Role.GESTOR_WORKSPACE));
+        Map<String, Object> before = jdbc.queryForMap("SELECT * FROM usuario WHERE id_usuario=3");
+        AccountDetailsResponse result = service.update(body("one@example.com", 2, 2), principal(1, Role.GESTOR_WORKSPACE));
         assertEquals("Nome editado", result.name()); assertEquals("52998224725", result.cpf());
         assertEquals("Supervisora", result.roleName()); assertEquals("São Paulo", result.unitName());
         assertEquals("GESTOR_WORKSPACE", jdbc.queryForObject("SELECT tipo FROM usuario WHERE id_usuario=1", String.class));
@@ -107,8 +107,8 @@ class AccountPostgresTest {
     }
 
     @Test void locksLinksAndRejectsInactiveOrForeignDestinationsAndManagerSelfReassignment() {
-        var owner = principal(1, Role.GESTOR_WORKSPACE);
-        var before = jdbc.queryForMap("SELECT * FROM usuario WHERE id_usuario=1");
+        AuthenticatedUser owner = principal(1, Role.GESTOR_WORKSPACE);
+        Map<String, Object> before = jdbc.queryForMap("SELECT * FROM usuario WHERE id_usuario=1");
         assertThrows(ResourceNotFoundException.class, () -> service.update(body("one@example.com", 3, 1), owner));
         assertThrows(ResourceNotFoundException.class, () -> service.update(body("one@example.com", 1, 3), owner));
         jdbc.update("UPDATE cargo SET ativo=false WHERE id_cargo=2");
@@ -118,9 +118,9 @@ class AccountPostgresTest {
         assertThrows(AccessDeniedException.class,
                 () -> service.update(body("two@example.com", 1, 2), principal(2, Role.GESTOR)));
         assertEquals(before, jdbc.queryForMap("SELECT * FROM usuario WHERE id_usuario=1"));
-        var template = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+        TransactionTemplate template = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
         template.executeWithoutResult(transaction -> {
-            var repository = context.getBean(AccountRepository.class);
+            AccountRepository repository = context.getBean(AccountRepository.class);
             assertFalse(repository.lockRoleActive(2L, 1L));
             assertNull(repository.lockRoleActive(3L, 1L));
             assertFalse(repository.lockUnitActive(2L, 1L));
@@ -129,11 +129,11 @@ class AccountPostgresTest {
     }
 
     @Test void realTransactionRollsBackAllFieldsOnFirebaseFailureAndContainsFailedCompensation() {
-        var previous = new FirebaseIdentityService.EmailState("one@example.com", true);
+        FirebaseIdentityService.EmailState previous = new FirebaseIdentityService.EmailState("one@example.com", true);
         when(identities.readEmailState("uid1")).thenReturn(previous);
         doThrow(new IllegalStateException("timeout")).when(identities).updateEmail("uid1", "new@example.com");
-        var before = jdbc.queryForMap("SELECT * FROM usuario WHERE id_usuario=1");
-        var request = body("new@example.com", 2, 2);
+        Map<String, Object> before = jdbc.queryForMap("SELECT * FROM usuario WHERE id_usuario=1");
+        UpdateAccountDetailsRequest request = body("new@example.com", 2, 2);
         assertThrows(IllegalStateException.class, () -> service.update(request, principal(1, Role.GESTOR_WORKSPACE)));
         assertEquals(before, jdbc.queryForMap("SELECT * FROM usuario WHERE id_usuario=1"));
         verify(identities).restoreEmail("uid1", previous);
@@ -145,7 +145,7 @@ class AccountPostgresTest {
     }
 
     @Test void detectsConflictsGloballyAndPreservesUnchangedInactiveLinks() {
-        var owner = principal(1, Role.GESTOR_WORKSPACE);
+        AuthenticatedUser owner = principal(1, Role.GESTOR_WORKSPACE);
         assertThrows(ConflictException.class, () -> service.update(body("other@example.com", 1, 1), owner));
         jdbc.update("UPDATE usuario SET cpf='52998224725' WHERE id_usuario=3");
         assertThrows(ConflictException.class, () -> service.update(body("one@example.com", 1, 1), owner));
@@ -160,7 +160,7 @@ class AccountPostgresTest {
         if (!url.matches("jdbc:postgresql://(localhost|127\\.0\\.0\\.1):[0-9]+/astro525")) {
             throw new IllegalArgumentException("Tests require a local disposable astro525 database");
         }
-        var source = new DriverManagerDataSource(url,
+        DriverManagerDataSource source = new DriverManagerDataSource(url,
                 System.getenv().getOrDefault("MANAGER_TEST_DATABASE_USER", "postgres"),
                 System.getenv().getOrDefault("MANAGER_TEST_DATABASE_PASSWORD", "astro525-isolated"));
         Properties properties = new Properties(); properties.setProperty("currentSchema", SCHEMA);
@@ -172,7 +172,7 @@ class AccountPostgresTest {
     static class Config {
         @Bean DataSource source() { return dataSource(); }
         @Bean LocalContainerEntityManagerFactoryBean entityManagerFactory(DataSource source) {
-            var factory = new LocalContainerEntityManagerFactoryBean();
+            LocalContainerEntityManagerFactoryBean factory = new LocalContainerEntityManagerFactoryBean();
             factory.setDataSource(source); factory.setPackagesToScan("com.astro.api");
             factory.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
             factory.setJpaPropertyMap(Map.of("hibernate.hbm2ddl.auto", "none")); return factory;
