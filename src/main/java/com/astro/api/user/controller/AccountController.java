@@ -3,6 +3,7 @@ package com.astro.api.user.controller;
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.response.ApiResult;
 import com.astro.api.user.dto.response.AccountSummaryResponse;
+import com.astro.api.user.dto.response.AccountDetailsResponse;
 import com.astro.api.user.service.AccountService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -38,5 +39,20 @@ public class AccountController {
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Resumo da conta retornado com sucesso",
                 accounts.findSummary(principal), request.getRequestURI()));
+    }
+
+    @GetMapping("/user/me/account-details")
+    @Operation(summary = "Consulta os detalhes da própria conta", description = "Retorna os nove campos da conta web, com IDs e nomes de cargo/unidade. CPF, modalidade, cargo e foto ausentes permanecem null. Não recebe senha nem exige confirmação de senha no frontend como autorização.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Detalhes no envelope ApiResult"),
+            @ApiResponse(responseCode = "403", description = "Token ausente/inválido, perfil sem acesso ou vínculo fora do workspace"),
+            @ApiResponse(responseCode = "404", description = "Usuário não encontrado (ApiResult de erro)"),
+            @ApiResponse(responseCode = "500", description = "Erro interno ou falha ao gerar foto (ApiResult de erro)"),
+            @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível (ApiResult de erro)")
+    })
+    public ResponseEntity<ApiResult<AccountDetailsResponse>> details(
+            @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
+        return ResponseEntity.ok(ApiResult.success("Detalhes da conta retornados com sucesso",
+                accounts.findDetails(principal), request.getRequestURI()));
     }
 }

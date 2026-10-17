@@ -4,6 +4,7 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.security.Role;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.user.dto.response.AccountSummaryResponse;
+import com.astro.api.user.dto.response.AccountDetailsResponse;
 import com.astro.api.user.mapper.AccountMapper;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
@@ -30,6 +31,12 @@ public class AccountService {
         return mapper.toSummary(user, avatars.findUrl(user.getId()));
     }
 
+    @Transactional(readOnly = true)
+    public AccountDetailsResponse findDetails(AuthenticatedUser principal) {
+        User user = requireAccount(principal);
+        return mapper.toDetails(user, avatars.findUrl(user.getId()));
+    }
+
     private User requireAccount(AuthenticatedUser principal) {
         requirePrincipal(principal);
         User user = users.findByFirebaseUid(principal.firebaseUid())
@@ -51,6 +58,10 @@ public class AccountService {
                 || user.getUnit() == null || user.getUnit().workspace == null
                 || user.getUnit().workspace.id == null) {
             throw new AccessDeniedException("Gestor ativo com workspace necessário");
+        }
+        if (user.getRole() != null && (user.getRole().getWorkspace() == null
+                || !user.getUnit().workspace.id.equals(user.getRole().getWorkspace().id))) {
+            throw new AccessDeniedException("Cargo fora do workspace da conta");
         }
     }
 }

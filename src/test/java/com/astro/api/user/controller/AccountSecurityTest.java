@@ -9,7 +9,11 @@ import com.astro.api.auth.service.FirebaseTokenService;
 import com.astro.api.common.handler.GlobalExceptionHandler;
 import com.astro.api.config.CorsConfig;
 import com.astro.api.user.dto.response.AccountSummaryResponse;
+import com.astro.api.user.dto.response.AccountDetailsResponse;
+import com.astro.api.user.dto.response.UserProfileResponse;
 import com.astro.api.user.service.AccountService;
+import com.astro.api.user.service.UserService;
+import com.astro.api.user.model.WorkModel;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
 import jakarta.servlet.Filter;
@@ -63,14 +67,58 @@ class AccountSecurityTest {
 
     @Test void rejectsMissingInvalidTokensAndOtherProfiles() throws Exception {
         when(tokens.verify("invalid")).thenThrow(mock(FirebaseAuthException.class));
-        mvc.perform(get("/user/me/account-summary")).andExpect(status().isForbidden());
-        mvc.perform(get("/user/me/account-summary").header("Authorization", "Bearer invalid"))
-                .andExpect(status().isForbidden());
-        for (Role role : new Role[]{Role.ADMIN, Role.COLABORADOR}) {
-            authenticate(role);
-            mvc.perform(get("/user/me/account-summary").header("Authorization", "Bearer valid"))
+        for (String path : new String[]{"/user/me/account-summary", "/user/me/account-details"}) {
+            mvc.perform(get(path)).andExpect(status().isForbidden());
+            mvc.perform(get(path).header("Authorization", "Bearer invalid"))
                     .andExpect(status().isForbidden());
+            for (Role role : new Role[]{Role.ADMIN, Role.COLABORADOR}) {
+                authenticate(role);
+                mvc.perform(get(path).header("Authorization", "Bearer valid"))
+                        .andExpect(status().isForbidden());
+            }
         }
+        verifyNoInteractions(accounts);
+    }
+
+    @Test void detailsExposeExactlyNineFieldsIncludingExplicitNullsAndStoredLinks() throws Exception {
+        for (Role role : new Role[]{Role.GESTOR, Role.GESTOR_WORKSPACE}) {
+            authenticate(role);
+            var principal = new AuthenticatedUser("own-uid", "token@example.com", role);
+            when(accounts.findDetails(principal)).thenReturn(new AccountDetailsResponse("Maria Rosa", null,
+                    "stored@example.com", 20L, "Engenheira", 10L, "Osasco", WorkModel.REMOTO, null));
+            mvc.perform(get("/user/me/account-details?userId=999&workspaceId=2")
+                            .header("Authorization", "Bearer valid"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data", aMapWithSize(9)))
+                    .andExpect(jsonPath("$.data.nome").value("Maria Rosa"))
+                    .andExpect(jsonPath("$.data.email").value("stored@example.com"))
+                    .andExpect(jsonPath("$.data.roleId").value(20))
+                    .andExpect(jsonPath("$.data.cargo").value("Engenheira"))
+                    .andExpect(jsonPath("$.data.unitId").value(10))
+                    .andExpect(jsonPath("$.data.unidade").value("Osasco"))
+                    .andExpect(jsonPath("$.data.modalidade").value("REMOTO"))
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("\"cpf\":null")))
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("\"profilePhotoUrl\":null")));
+            verify(accounts).findDetails(principal);
+        }
+    }
+
+    @Test void detailsUseTheStandardNotFoundErrorEnvelope() throws Exception {
+        authenticate(Role.GESTOR);
+        when(accounts.findDetails(any())).thenThrow(new com.astro.api.common.exception.ResourceNotFoundException("Usuário não encontrado"));
+        mvc.perform(get("/user/me/account-details").header("Authorization", "Bearer valid"))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errors[0]").value("Usuário não encontrado"));
+    }
+
+    @Test void mobileProfileKeepsItsExistingFieldsAndCollaboratorAccess() throws Exception {
+        authenticate(Role.COLABORADOR);
+        var users = context.getBean(UserService.class);
+        when(users.findProfileByFirebaseUid("own-uid")).thenReturn(new UserProfileResponse(
+                "Maria Rosa", "Engenheira", "Osasco", "REMOTO", "stored@example.com", null, java.util.List.of()));
+        mvc.perform(get("/user/me").header("Authorization", "Bearer valid"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data", aMapWithSize(7)))
+                .andExpect(jsonPath("$.data.nrs").isArray()).andExpect(jsonPath("$.data.nome").value("Maria Rosa"))
+                .andExpect(jsonPath("$.data.cargo").value("Engenheira"));
         verifyNoInteractions(accounts);
     }
 
@@ -92,9 +140,11 @@ class AccountSecurityTest {
     }
 
     @Configuration @EnableWebSecurity @EnableWebMvc
-    @Import({SecurityConfig.class, CorsConfig.class, FirebaseAuthenticationFilter.class, AccountController.class, GlobalExceptionHandler.class})
+    @Import({SecurityConfig.class, CorsConfig.class, FirebaseAuthenticationFilter.class, AccountController.class,
+            UserController.class, GlobalExceptionHandler.class})
     static class Config {
         @Bean AccountService accounts() { return mock(AccountService.class); }
+        @Bean UserService users() { return mock(UserService.class); }
         @Bean FirebaseTokenService tokens() { return mock(FirebaseTokenService.class); }
         @Bean AuthorizationService authorization() { return mock(AuthorizationService.class); }
     }
