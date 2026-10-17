@@ -13,52 +13,9 @@ jobs:
   build-and-test:
     name: Build and test
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_PASSWORD: astro525-isolated
-          POSTGRES_DB: astro525
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-      conformity-postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: scrum536
-          POSTGRES_HOST_AUTH_METHOD: trust
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      CONFORMITY_TEST_JDBC_URL: jdbc:postgresql://127.0.0.1:5433/scrum536
-      MANAGER_TEST_DATABASE_URL: jdbc:postgresql://localhost:5432/astro525
-      MANAGER_TEST_DATABASE_USER: postgres
-      MANAGER_TEST_DATABASE_PASSWORD: astro525-isolated
-      EVENT_CANDIDATES_SQL_PATH: ${{ github.workspace }}/.test-database/database/functions/18_fn_seleciona_candidatos_evento.sql
-
     steps:
       - name: Check out source code
         uses: actions/checkout@v4
-
-      - name: Check out official database function for integration tests
-        uses: actions/checkout@v4
-        with:
-          repository: Astro-Inter/banco-de-dados
-          # Function version merged by banco-de-dados PR #36.
-          ref: 488f301e5a2b8c2a0f382f3632018f41ae576651
-          path: .test-database
-          sparse-checkout: database/functions/18_fn_seleciona_candidatos_evento.sql
-          sparse-checkout-cone-mode: false
-          persist-credentials: false
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4

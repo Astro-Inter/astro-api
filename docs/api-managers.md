@@ -107,17 +107,16 @@ expiração dos links, invalidação e comportamento quando Redis está indispon
 
 ## Verificação local
 
-Executar `./mvnw --batch-mode --no-transfer-progress verify`. Para incluir os testes
-PostgreSQL, configurar `MANAGER_TEST_DATABASE_URL=jdbc:postgresql://localhost:55425/astro525`,
-`MANAGER_TEST_DATABASE_USER=postgres` e `MANAGER_TEST_DATABASE_PASSWORD` com a senha
-do banco descartável local. Sem a URL, somente a classe PostgreSQL é ignorada.
-O CI provisiona PostgreSQL 16 e executa essa classe. Os testes usam schema único e
-removem somente esse schema após a execução; aceitam apenas banco `astro525` local.
+Executar `./mvnw --batch-mode --no-transfer-progress verify`.
+Os testes PostgreSQL de gestores e o script SQL que preparava seu banco foram
+removidos da API. Permanecem os demais testes de gestores; o CI executa a mesma
+verificação sem provisionar o banco exclusivo dessa classe.
 MockMvc valida os contratos HTTP e a cadeia real de segurança. Firebase é simulado,
 sem alteração de contas reais. Testes HTTP por servidor local e testes dos novos
 endpoints publicados exigem execução separada; o PR não realiza implantação.
 
-Validação original desta entrega: Maven Wrapper 3.9.16, Java 21, `verify` em modo offline
+Histórico de validação anterior à remoção dos testes PostgreSQL de gestores:
+Maven Wrapper 3.9.16, Java 21, `verify` em modo offline
 com dependências já instaladas: 180 testes, zero falhas/erros, um teste de contexto
 previamente desabilitado, JAR empacotado com sucesso. Inclui 32 testes de gestores,
 dos quais oito usam PostgreSQL 16 isolado (leitura, isolamento, promoção concorrente,
@@ -129,16 +128,16 @@ endpoints não foram testados lá, pois não houve merge nem implantação.
 Após integrar a main com a SCRUM-517, `verify` passou novamente: 238 testes,
 zero falhas/erros e 18 ignorados (oito PostgreSQL de gestores, sete PostgreSQL de
 colaboradores, dois Redis e o teste de contexto já desabilitado). O Docker estava
-indisponível nesta atualização; os testes PostgreSQL de gestores são executados
-novamente pelo CI, que provisiona o banco isolado.
+indisponível nessa atualização; à época, o CI provisionava o banco isolado para
+executar os testes PostgreSQL de gestores.
 
 ## Dependências
 
 A view pertence à SCRUM-524, PR Astro-Inter/banco-de-dados#33. A API não cria nem
 altera objetos SQL de produção. No banco configurado, a view foi confirmada com
 as onze colunas do contrato, em conexão somente leitura e consulta `WHERE false`.
-Os testes PostgreSQL usam uma cópia do contrato existente em schema temporário
-exclusivo de um banco local descartável; não acessam contas reais.
+O contrato do banco permanece no repositório `Astro-Inter/banco-de-dados`;
+a API não mantém arquivos SQL de preparação dos testes de gestores.
 GET /collaborators passou a integrar a main pela SCRUM-517 (PR #30), incorporada
 na atualização desta branch para resolver conflitos. A implementação está disponível
 no código; sua publicação não foi verificada nesta atualização.

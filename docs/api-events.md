@@ -71,19 +71,17 @@ A instalação usa uma conexão autorizada para DDL; o usuário da API mantém s
 privilégios de leitura nas tabelas e EXECUTE na função. SECURITY INVOKER conserva
 as políticas e permissões de acesso existentes.
 
-Os testes PostgreSQL de eventos leem esse script externo por
-`EVENT_CANDIDATES_SQL_PATH`. Ao habilitar `MANAGER_TEST_DATABASE_URL` localmente,
-defina também essa variável com o caminho do arquivo no clone do banco. A ausência
-do caminho interrompe a preparação dos testes com uma mensagem explícita. No CI,
-o checkout esparso do banco é fixado no commit
-`488f301e5a2b8c2a0f382f3632018f41ae576651`, em `.test-database/`, diretório ignorado
-pelo Git e pelo build da imagem. O Maven não baixa nem instala SQL em produção.
+O teste PostgreSQL de eventos e seus scripts de preparação foram removidos da API.
+O CI não provisiona mais o banco nem faz checkout do repositório de banco para
+esse teste. A função de produção continua mantida no repositório do banco, com
+instalação separada da API. O Maven não baixa nem instala SQL em produção.
 
 A função foi escolhida porque esta leitura recebe identidade autenticada e NR
 opcional. Uma procedure é desnecessária para um SELECT; uma view não recebe esses
 parâmetros e exigiria filtros e a regra de elegibilidade na consulta do repository. A mudança
 centraliza a consulta, sem afirmar um ganho de desempenho apenas por encurtar o
-repository. Os testes instalam o mesmo script em schemas locais isolados.
+repository. Na validação original, os testes instalavam o mesmo script em schemas
+locais isolados.
 
 ## Criação e edição
 
@@ -137,20 +135,17 @@ anotações dos campos; não há uma classe com respostas JSON manuais duplicada
 `EventOpenApiTest` gera `/v3/api-docs` localmente e verifica operações, respostas,
 envelopes, exemplos e schemas. Os dados dos exemplos são fictícios.
 
-Com Java 21 e PostgreSQL 16 local descartável, execute:
+Com Java 21, execute:
 
 ```powershell
-$env:MANAGER_TEST_DATABASE_URL='jdbc:postgresql://localhost:55422/astro525'
-$env:MANAGER_TEST_DATABASE_USER='postgres'
-$env:MANAGER_TEST_DATABASE_PASSWORD='astro525-isolated'
 .\mvnw.cmd --batch-mode --no-transfer-progress verify
 ```
 
-Os testes PostgreSQL usam schemas exclusivos em uma base local chamada `astro525`;
-o CI já disponibiliza essa infraestrutura. As fixtures reproduzem constraints
-consultadas no catálogo publicado em modo somente leitura em 14/10/2026.
-Testes de escrita ocorrem exclusivamente no banco isolado. O objeto SQL foi criado
-somente nos schemas de teste; nenhum DDL, índice,
-trigger ou automatização de negócio foi aplicado no ambiente publicado.
+Permanecem os testes de serviço, segurança, controller e contrato OpenAPI de eventos.
+Na validação original, os testes PostgreSQL usavam schemas exclusivos em uma base
+local descartável e fixtures com constraints consultadas no catálogo publicado
+em modo somente leitura em 14/10/2026. Esses testes e suas fixtures foram removidos.
+Nenhum DDL, índice, trigger ou automatização de negócio foi aplicado no ambiente
+publicado por essa validação.
 Fluxos mobile de conclusão/evidências, aprovação, notificações, conformidade e
 encerramento automático permanecem fora desta entrega.
