@@ -141,7 +141,7 @@ public class HomeService {
     }
 
     private Long daysLeft(Instant dueDate) {
-        ZoneId zoneId = ZoneId.systemDefault();
+        ZoneId zoneId = ZoneId.of("America/Sao_Paulo");
         return daysLeft(dueDate, LocalDate.now(zoneId), zoneId);
     }
 
