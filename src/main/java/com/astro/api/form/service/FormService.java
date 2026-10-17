@@ -14,6 +14,7 @@ import com.astro.api.form.strategy.FormValidationMode;
 import com.astro.api.form.mapper.FormMapper;
 import com.astro.api.form.model.FormStatus;
 import com.astro.api.form.model.FormScope;
+import com.astro.api.form.model.FormWriteCondition;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -73,10 +74,10 @@ public class FormService {
         formValidationService.validate(formRequest, form.getStatus() == FormStatus.DRAFT ? FormValidationMode.DRAFT : FormValidationMode.PUBLISH);
         formValidationService.validateIdentifiers(formRequest, form.getQuestions() == null ? List.of() : form.getQuestions());
         formReferenceService.validate(formRequest, formScope);
-        Long expectedVersion = form.getVersion();
+        FormWriteCondition writeCondition = formAccessService.writeCondition(form, formScope);
         formMapper.applyContent(formRequest, form);
         form.setUpdatedAt(now());
-        return formMapper.toDetails(formRepository.update(form, formScope, expectedVersion)
+        return formMapper.toDetails(formRepository.update(form, writeCondition)
                 .orElseThrow(() -> new ConflictException("O formulário foi alterado; consulte novamente antes de salvar")));
     }
 
@@ -85,7 +86,7 @@ public class FormService {
         Form form = requireForm(formId, formScope);
         formAccessService.requireManagement(form, formScope);
         requireMutable(form);
-        if (!formRepository.delete(form, formScope)) {
+        if (!formRepository.deleteIfUnanswered(formAccessService.writeCondition(form, formScope))) {
             throw new ConflictException("O formulário foi alterado; consulte novamente antes de excluir");
         }
     }
@@ -106,8 +107,8 @@ public class FormService {
         }
         formValidationService.validate(savedDraftRequest, FormValidationMode.PUBLISH);
         formReferenceService.validate(savedDraftRequest, formScope);
-        form.setUpdatedAt(now());
-        return formMapper.toDetails(formRepository.publish(form, formScope)
+        FormWriteCondition writeCondition = formAccessService.writeCondition(form, formScope);
+        return formMapper.toDetails(formRepository.updateStatus(writeCondition, FormStatus.PENDING, now())
                 .orElseThrow(() -> new ConflictException("O formulário foi alterado; consulte novamente antes de publicar")));
     }
 
@@ -124,7 +125,8 @@ public class FormService {
         if (page < 0 || size < 1 || size > 100 || (search != null && search.length() > 240)) {
             throw new BusinessException("Use page >= 0, size entre 1 e 100 e busca de até 240 caracteres");
         }
-        FormRepositoryCustom.Listing formListing = formRepository.findAll(formScope, search, status, page, size);
+        String normalizedSearch = search == null ? null : search.strip();
+        FormRepositoryCustom.Listing formListing = formRepository.findAll(formAccessService.readFilter(formScope), normalizedSearch, status, page, size);
         return formMapper.toPage(formListing.forms(), page, size, formListing.total());
     }
 
@@ -145,7 +147,7 @@ public class FormService {
         } catch (IllegalArgumentException exception) {
             throw new BusinessException("O identificador do formulário deve ser um UUID válido");
         }
-        return formRepository.findById(formId, formScope)
+        return formRepository.findById(formId, formAccessService.readFilter(formScope))
                 .orElseThrow(() -> new ResourceNotFoundException("Formulário não encontrado"));
     }
 

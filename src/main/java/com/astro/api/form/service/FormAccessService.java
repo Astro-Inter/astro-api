@@ -7,6 +7,11 @@ import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.form.model.Form;
 import com.astro.api.form.model.FormScope;
+import com.astro.api.form.model.FormReadFilter;
+import com.astro.api.form.model.FormStatus;
+import com.astro.api.form.model.FormWriteCondition;
+
+import java.util.List;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +37,20 @@ public class FormAccessService {
             throw new AccessDeniedException("Gestor ativo com unidade e workspace válidos necessário");
         }
         return new FormScope(user.getId(), user.getUnit().workspace.id, user.getType() == UserType.GESTOR_WORKSPACE);
+    }
+
+    public FormReadFilter readFilter(FormScope formScope) {
+        if (formScope.workspaceManager()) {
+            return new FormReadFilter(formScope.workspaceId(), null, null, List.of());
+        }
+        return new FormReadFilter(formScope.workspaceId(), formScope.managerId(), formScope.managerId(),
+                List.of(FormStatus.PENDING, FormStatus.COMPLETED));
+    }
+
+    public FormWriteCondition writeCondition(Form form, FormScope formScope) {
+        Long senderManagerId = formScope.workspaceManager() ? null : formScope.managerId();
+        return new FormWriteCondition(form.getId(), formScope.workspaceId(), senderManagerId,
+                form.getVersion(), form.getStatus());
     }
 
     public void requireManagement(Form form, FormScope formScope) {

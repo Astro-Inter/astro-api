@@ -40,6 +40,7 @@ class FormRepositoryMongoTest {
     static MongoClient client;
     static MongoTemplate mongo;
     static FormRepository repository;
+    static final FormAccessService formAccessService = new FormAccessService(mock(UserRepository.class));
     static final String DATABASE = "forms_test_" + UUID.randomUUID().toString().replace("-", "");
 
     @BeforeAll static void connect() {
@@ -63,14 +64,14 @@ class FormRepositoryMongoTest {
         mongo.insert(form(4, 1, 30, 20, FormStatus.COMPLETED));
         mongo.insert(form(5, 2, 10, 20, FormStatus.PENDING));
         FormScope manager = new FormScope(10L, 1L, false);
-        FormRepositoryCustom.Listing result = repository.findAll(manager, "clima", null, 0, 1);
+        FormRepositoryCustom.Listing result = repository.findAll(formAccessService.readFilter(manager), "clima", null, 0, 1);
         assertEquals(2, result.total()); assertEquals(formId(3), result.forms().getFirst().getId());
         assertEquals(1, result.forms().getFirst().getQuestions().size());
         assertNull(result.forms().getFirst().getQuestions().getFirst().getAnswer());
-        assertEquals(formId(1), repository.findAll(manager, null, null, 1, 1).forms().getFirst().getId());
-        assertEquals(0, repository.findAll(manager, ".*", null, 0, 20).total());
-        assertEquals(4, repository.findAll(new FormScope(99L, 1L, true), null, null, 0, 20).total());
-        assertEquals(1, repository.findAll(manager, null, FormStatus.PENDING, 0, 20).total());
+        assertEquals(formId(1), repository.findAll(formAccessService.readFilter(manager), null, null, 1, 1).forms().getFirst().getId());
+        assertEquals(0, repository.findAll(formAccessService.readFilter(manager), ".*", null, 0, 20).total());
+        assertEquals(4, repository.findAll(formAccessService.readFilter(new FormScope(99L, 1L, true)), null, null, 0, 20).total());
+        assertEquals(1, repository.findAll(formAccessService.readFilter(manager), null, FormStatus.PENDING, 0, 20).total());
     }
 
     @Test void homeFindsOnlyPublishedPendingFormsIncludingThoseWithNoRequiredQuestions() {
@@ -86,11 +87,11 @@ class FormRepositoryMongoTest {
         value.getQuestions().getFirst().setType("foto");
         value.getQuestions().getFirst().setMaxFiles(3);
         mongo.insert(value);
-        assertTrue(repository.findById(formId(1), new FormScope(20L, 1L, false)).isEmpty());
-        assertTrue(repository.findById(formId(1), new FormScope(10L, 2L, true)).isEmpty());
-        assertEquals(3, repository.findById(formId(1), new FormScope(10L, 1L, false)).orElseThrow()
+        assertTrue(repository.findById(formId(1), formAccessService.readFilter(new FormScope(20L, 1L, false))).isEmpty());
+        assertTrue(repository.findById(formId(1), formAccessService.readFilter(new FormScope(10L, 2L, true))).isEmpty());
+        assertEquals(3, repository.findById(formId(1), formAccessService.readFilter(new FormScope(10L, 1L, false))).orElseThrow()
                 .getQuestions().getFirst().getMaxFiles());
-        assertTrue(repository.findById(formId(1), new FormScope(99L, 1L, true)).isPresent());
+        assertTrue(repository.findById(formId(1), formAccessService.readFilter(new FormScope(99L, 1L, true))).isPresent());
     }
 
     @Test void generatesUuidStringsForConcurrentCreationsWithoutAnAuxiliaryCollection() throws Exception {
@@ -135,69 +136,89 @@ class FormRepositoryMongoTest {
         assertEquals("alternativa", questions.get(1).getString("tipo"));
         assertTrue(questions.get(1).getList("opcoes", org.bson.Document.class).get(1).getBoolean("outra"));
         assertEquals(java.util.Date.from(Instant.parse("2026-10-30T03:00:00Z")), raw.get("data_limite"));
-        assertEquals(4, repository.findById(form.getId(), new FormScope(10L, 1L, false)).orElseThrow().getQuestions().size());
+        assertEquals(4, repository.findById(form.getId(), formAccessService.readFilter(new FormScope(10L, 1L, false))).orElseThrow().getQuestions().size());
     }
 
     @Test void updateAtomicallyChecksVersionPermissionsAndResponseState() throws Exception {
         Form value = form(1, 1, 10, 20, FormStatus.PENDING); value.setVersion(0L); mongo.insert(value);
         FormScope scope = new FormScope(10L, 1L, false);
-        Form first = repository.findById(formId(1), scope).orElseThrow(); first.setTitle("Primeira edição");
-        Form second = repository.findById(formId(1), scope).orElseThrow(); second.setTitle("Segunda edição");
-        assertTrue(repository.update(first, new FormScope(20L, 1L, false), 0L).isEmpty());
-        assertTrue(repository.update(first, new FormScope(10L, 2L, true), 0L).isEmpty());
+        Form first = repository.findById(formId(1), formAccessService.readFilter(scope)).orElseThrow(); first.setTitle("Primeira edição");
+        Form second = repository.findById(formId(1), formAccessService.readFilter(scope)).orElseThrow(); second.setTitle("Segunda edição");
+        assertTrue(repository.update(first, formAccessService.writeCondition(first, new FormScope(20L, 1L, false))).isEmpty());
+        assertTrue(repository.update(first, formAccessService.writeCondition(first, new FormScope(10L, 2L, true))).isEmpty());
         try (ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
             List<Future<Boolean>> results = executor.invokeAll(List.of(
-                    () -> repository.update(first, scope, 0L).isPresent(),
-                    () -> repository.update(second, scope, 0L).isPresent()));
+                    () -> repository.update(first, formAccessService.writeCondition(first, scope)).isPresent(),
+                    () -> repository.update(second, formAccessService.writeCondition(second, scope)).isPresent()));
             int successful = 0;
             for (Future<Boolean> result : results) if (result.get()) successful++;
             assertEquals(1, successful);
         }
-        Form saved = repository.findById(formId(1), scope).orElseThrow(); assertEquals(1L, saved.getVersion());
+        Form saved = repository.findById(formId(1), formAccessService.readFilter(scope)).orElseThrow(); assertEquals(1L, saved.getVersion());
         // Simulate a mobile submission after the web loaded the current version.
         mongo.getCollection("forms").updateOne(new org.bson.Document("_id", formId(1)),
                 new org.bson.Document("$set", new org.bson.Document("status", "CONCLUIDO")));
-        assertTrue(repository.update(saved, scope, 1L).isEmpty());
-        assertEquals(FormStatus.COMPLETED, repository.findById(formId(1), scope).orElseThrow().getStatus());
+        assertTrue(repository.update(saved, formAccessService.writeCondition(saved, scope)).isEmpty());
+        assertEquals(FormStatus.COMPLETED, repository.findById(formId(1), formAccessService.readFilter(scope)).orElseThrow().getStatus());
     }
 
     @Test void updateDoesNotEraseAnswersEvenWhenTheStatusHasNotBeenConcluded() {
         Form value = form(1, 1, 10, 20, FormStatus.PENDING); value.setVersion(0L);
         value.getQuestions().getFirst().setAnswer(List.of("Resposta")); mongo.insert(value);
-        assertTrue(repository.update(value, new FormScope(10L, 1L, false), 0L).isEmpty());
-        assertEquals(List.of("Resposta"), repository.findById(formId(1), new FormScope(10L, 1L, false)).orElseThrow()
+        assertTrue(repository.update(value, formAccessService.writeCondition(value, new FormScope(10L, 1L, false))).isEmpty());
+        assertEquals(List.of("Resposta"), repository.findById(formId(1), formAccessService.readFilter(new FormScope(10L, 1L, false))).orElseThrow()
                 .getQuestions().getFirst().getAnswer());
     }
 
     @Test void deletionChecksOwnershipWorkspaceVersionAndCompletionAtomically() {
         Form value = form(1, 1, 10, 20, FormStatus.PENDING); value.setVersion(0L); mongo.insert(value);
-        assertFalse(repository.delete(value, new FormScope(20L, 1L, false)));
-        assertFalse(repository.delete(value, new FormScope(10L, 2L, true)));
+        assertFalse(repository.deleteIfUnanswered(formAccessService.writeCondition(value, new FormScope(20L, 1L, false))));
+        assertFalse(repository.deleteIfUnanswered(formAccessService.writeCondition(value, new FormScope(10L, 2L, true))));
         mongo.getCollection("forms").updateOne(new org.bson.Document("_id", formId(1)),
                 new org.bson.Document("$set", new org.bson.Document("versao", 1L)));
-        assertFalse(repository.delete(value, new FormScope(10L, 1L, false)));
+        assertFalse(repository.deleteIfUnanswered(formAccessService.writeCondition(value, new FormScope(10L, 1L, false))));
         value.setVersion(1L);
         mongo.getCollection("forms").updateOne(new org.bson.Document("_id", formId(1)),
                 new org.bson.Document("$set", new org.bson.Document("status", "CONCLUIDO")));
-        assertFalse(repository.delete(value, new FormScope(99L, 1L, true)));
+        assertFalse(repository.deleteIfUnanswered(formAccessService.writeCondition(value, new FormScope(99L, 1L, true))));
         assertNotNull(mongo.findById(formId(1), Form.class));
         mongo.getCollection("forms").updateOne(new org.bson.Document("_id", formId(1)),
                 new org.bson.Document("$set", new org.bson.Document("status", "PENDENTE")));
-        assertTrue(repository.delete(value, new FormScope(99L, 1L, true)));
+        assertTrue(repository.deleteIfUnanswered(formAccessService.writeCondition(value, new FormScope(99L, 1L, true))));
         assertNull(mongo.findById(formId(1), Form.class));
     }
 
     @Test void publicationAllowsOneTransitionAndRejectsStaleEditsDeletesAndForeignManagers() {
         Form draft = form(1, 1, 10, 20, FormStatus.DRAFT); draft.setVersion(0L); mongo.insert(draft);
-        assertTrue(repository.publish(draft, new FormScope(20L, 1L, false)).isEmpty());
-        assertTrue(repository.publish(draft, new FormScope(10L, 2L, true)).isEmpty());
-        Form saved = repository.publish(draft, new FormScope(99L, 1L, true)).orElseThrow();
+        assertTrue(repository.updateStatus(formAccessService.writeCondition(draft, new FormScope(20L, 1L, false)), FormStatus.PENDING, Instant.now()).isEmpty());
+        assertTrue(repository.updateStatus(formAccessService.writeCondition(draft, new FormScope(10L, 2L, true)), FormStatus.PENDING, Instant.now()).isEmpty());
+        Form saved = repository.updateStatus(formAccessService.writeCondition(draft, new FormScope(99L, 1L, true)), FormStatus.PENDING, Instant.now()).orElseThrow();
         assertEquals(FormStatus.PENDING, saved.getStatus()); assertEquals(1L, saved.getVersion());
         assertTrue(saved.getQuestions().getFirst().getAnswer().isEmpty());
-        assertTrue(repository.publish(draft, new FormScope(10L, 1L, false)).isEmpty());
-        assertTrue(repository.update(draft, new FormScope(10L, 1L, false), 0L).isEmpty());
-        assertFalse(repository.delete(draft, new FormScope(10L, 1L, false)));
-        assertTrue(repository.findById(formId(1), new FormScope(20L, 1L, false)).isPresent());
+        assertTrue(repository.updateStatus(formAccessService.writeCondition(draft, new FormScope(10L, 1L, false)), FormStatus.PENDING, Instant.now()).isEmpty());
+        assertTrue(repository.update(draft, formAccessService.writeCondition(draft, new FormScope(10L, 1L, false))).isEmpty());
+        assertFalse(repository.deleteIfUnanswered(formAccessService.writeCondition(draft, new FormScope(10L, 1L, false))));
+        assertTrue(repository.findById(formId(1), formAccessService.readFilter(new FormScope(20L, 1L, false))).isPresent());
+    }
+
+    @Test void conditionalWritesRejectAnswersAddedAfterTheSnapshotWithoutChangingStatusOrVersion() {
+        Form draft = form(1, 1, 10, 20, FormStatus.DRAFT);
+        draft.setVersion(0L);
+        mongo.insert(draft);
+        FormWriteCondition senderCondition = formAccessService.writeCondition(draft, new FormScope(10L, 1L, false));
+        FormWriteCondition workspaceCondition = formAccessService.writeCondition(draft, new FormScope(99L, 1L, true));
+        mongo.getCollection("forms").updateOne(new Document("_id", draft.getId()),
+                new Document("$set", new Document("perguntas.0.resposta", List.of("Resposta recebida"))));
+
+        for (FormWriteCondition writeCondition : List.of(senderCondition, workspaceCondition)) {
+            assertTrue(repository.update(draft, writeCondition).isEmpty());
+            assertFalse(repository.deleteIfUnanswered(writeCondition));
+            assertTrue(repository.updateStatus(writeCondition, FormStatus.PENDING, Instant.now()).isEmpty());
+        }
+        Form saved = repository.findById(draft.getId()).orElseThrow();
+        assertEquals(FormStatus.DRAFT, saved.getStatus());
+        assertEquals(0L, saved.getVersion());
+        assertEquals(List.of("Resposta recebida"), saved.getQuestions().getFirst().getAnswer());
     }
 
     @Test void httpWorkflowPersistsDraftEditingPublicationAndAdministrativeRulesInMongo() throws Exception {
@@ -280,7 +301,7 @@ class FormRepositoryMongoTest {
         try (AnnotationConfigApplicationContext context = new org.springframework.context.annotation.AnnotationConfigApplicationContext(RepositoryConfiguration.class)) {
             FormRepository configuredRepository = context.getBean(FormRepository.class);
             configuredRepository.insert(form(1, 1, 10, 20, FormStatus.DRAFT));
-            assertEquals(1, configuredRepository.findAll(new FormScope(10L, 1L, false), null, FormStatus.DRAFT, 0, 20).total());
+            assertEquals(1, configuredRepository.findAll(formAccessService.readFilter(new FormScope(10L, 1L, false)), null, FormStatus.DRAFT, 0, 20).total());
             assertEquals(FormStatus.DRAFT, configuredRepository.findById(formId(1)).orElseThrow().getStatus());
         }
     }
