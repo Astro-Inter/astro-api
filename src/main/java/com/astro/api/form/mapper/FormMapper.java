@@ -20,15 +20,15 @@ import java.util.stream.Collectors;
 public class FormMapper {
     public static final ZoneId FORM_ZONE = ZoneId.of("America/Sao_Paulo");
 
-    public void applyContent(FormWriteRequest body, Form form) {
+    public void applyContent(FormWriteRequest formRequest, Form form) {
         List<Form.FormQuestion> previous = form.getQuestions() == null ? List.<Form.FormQuestion>of() : form.getQuestions();
-        form.setQuestions(toQuestions(body.questions() == null ? List.of() : body.questions(), previous));
-        form.setTitle(clean(body.title()));
-        form.setDescription(clean(body.description()));
-        form.setManagerId(body.managerId());
-        form.setNrCode(body.nrCode());
-        form.setUnitId(body.unitId());
-        form.setDueDate(body.dueDate() == null ? null : body.dueDate().atStartOfDay(FORM_ZONE).toInstant());
+        form.setQuestions(toQuestions(formRequest.questions() == null ? List.of() : formRequest.questions(), previous));
+        form.setTitle(clean(formRequest.title()));
+        form.setDescription(clean(formRequest.description()));
+        form.setManagerId(formRequest.managerId());
+        form.setNrCode(formRequest.nrCode());
+        form.setUnitId(formRequest.unitId());
+        form.setDueDate(formRequest.dueDate() == null ? null : formRequest.dueDate().atStartOfDay(FORM_ZONE).toInstant());
     }
 
     private List<Form.FormQuestion> toQuestions(List<FormQuestionRequest> requests,

@@ -14,28 +14,28 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 public class FormRepositoryCustomImpl implements FormRepositoryCustom {
-    private final MongoTemplate mongo;
+    private final MongoTemplate mongoTemplate;
 
-    public FormRepositoryCustomImpl(MongoTemplate mongo) { this.mongo = mongo; }
+    public FormRepositoryCustomImpl(MongoTemplate mongoTemplate) { this.mongoTemplate = mongoTemplate; }
 
     public Optional<Form> update(Form form, FormScope scope, Long expectedVersion) {
         Update update = new Update().set("titulo", form.getTitle()).set("descricao", form.getDescription())
                 .set("id_gestor", form.getManagerId()).set("nr", form.getNrCode()).set("id_unidade", form.getUnitId())
                 .set("data_limite", form.getDueDate()).set("perguntas", form.getQuestions())
                 .set("atualizado_em", form.getUpdatedAt()).set("versao", expectedVersion == null ? 1L : expectedVersion + 1);
-        return Optional.ofNullable(mongo.findAndModify(editableQuery(form, scope, expectedVersion), update,
+        return Optional.ofNullable(mongoTemplate.findAndModify(editableQuery(form, scope, expectedVersion), update,
                 FindAndModifyOptions.options().returnNew(true), Form.class));
     }
 
     public boolean delete(Form form, FormScope scope) {
-        return mongo.remove(editableQuery(form, scope, form.getVersion()), Form.class).getDeletedCount() == 1;
+        return mongoTemplate.remove(editableQuery(form, scope, form.getVersion()), Form.class).getDeletedCount() == 1;
     }
 
     public Optional<Form> publish(Form form, FormScope scope) {
         Query query = editableQuery(form, scope, form.getVersion()).addCriteria(Criteria.where("status").is(FormStatus.DRAFT));
         Update update = new Update().set("status", FormStatus.PENDING).set("atualizado_em", form.getUpdatedAt())
                 .set("versao", form.getVersion() == null ? 1L : form.getVersion() + 1);
-        return Optional.ofNullable(mongo.findAndModify(query, update,
+        return Optional.ofNullable(mongoTemplate.findAndModify(query, update,
                 FindAndModifyOptions.options().returnNew(true), Form.class));
     }
 
@@ -51,7 +51,7 @@ public class FormRepositoryCustomImpl implements FormRepositoryCustom {
     }
 
     public Optional<Form> findById(String id, FormScope scope) {
-        return Optional.ofNullable(mongo.findOne(Query.query(new Criteria().andOperator(
+        return Optional.ofNullable(mongoTemplate.findOne(Query.query(new Criteria().andOperator(
                 Criteria.where("_id").is(id), readable(scope))), Form.class));
     }
 
@@ -63,11 +63,11 @@ public class FormRepositoryCustomImpl implements FormRepositoryCustom {
             criteria = new Criteria().andOperator(criteria, new Criteria().orOperator(
                     Criteria.where("titulo").regex(literal), Criteria.where("descricao").regex(literal)));
         }
-        long total = mongo.count(Query.query(criteria), Form.class);
+        long total = mongoTemplate.count(Query.query(criteria), Form.class);
         Query query = Query.query(criteria).with(Sort.by(Sort.Order.desc("criado_em"), Sort.Order.desc("_id")))
                 .skip((long) page * size).limit(size);
         query.fields().include("_id", "titulo", "descricao", "status", "perguntas.id_pergunta");
-        return new Listing(mongo.find(query, Form.class), total);
+        return new Listing(mongoTemplate.find(query, Form.class), total);
     }
 
     private Criteria readable(FormScope scope) {

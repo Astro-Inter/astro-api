@@ -13,20 +13,20 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FormAccessService {
-    private final UserRepository users;
+    private final UserRepository userRepository;
 
-    public FormAccessService(UserRepository users) { this.users = users; }
+    public FormAccessService(UserRepository userRepository) { this.userRepository = userRepository; }
 
     @Transactional(readOnly = true)
-    public FormScope requireManager(AuthenticatedUser principal) {
-        if (principal == null || principal.firebaseUid() == null || principal.firebaseUid().isBlank()) {
+    public FormScope requireManager(AuthenticatedUser authenticatedUser) {
+        if (authenticatedUser == null || authenticatedUser.firebaseUid() == null || authenticatedUser.firebaseUid().isBlank()) {
             throw new AccessDeniedException("Gestor autenticado necessário");
         }
-        User user = users.findByFirebaseUid(principal.firebaseUid())
+        User user = userRepository.findByFirebaseUid(authenticatedUser.firebaseUid())
                 .orElseThrow(() -> new AccessDeniedException("Gestor ativo necessário"));
         if (user.getId() == null || user.getStatus() != UserStatus.ATIVO
                 || (user.getType() != UserType.GESTOR && user.getType() != UserType.GESTOR_WORKSPACE)
-                || principal.role() == null || !user.getType().name().equals(principal.role().name())
+                || authenticatedUser.role() == null || !user.getType().name().equals(authenticatedUser.role().name())
                 || user.getUnit() == null || !user.getUnit().isActive
                 || user.getUnit().workspace == null || user.getUnit().workspace.id == null) {
             throw new AccessDeniedException("Gestor ativo com unidade e workspace válidos necessário");
@@ -34,9 +34,9 @@ public class FormAccessService {
         return new FormScope(user.getId(), user.getUnit().workspace.id, user.getType() == UserType.GESTOR_WORKSPACE);
     }
 
-    public void requireManagement(Form form, FormScope scope) {
-        if (!scope.workspaceId().equals(form.getWorkspaceId())
-                || (!scope.workspaceManager() && !scope.managerId().equals(form.getSenderManagerId()))) {
+    public void requireManagement(Form form, FormScope formScope) {
+        if (!formScope.workspaceId().equals(form.getWorkspaceId())
+                || (!formScope.workspaceManager() && !formScope.managerId().equals(form.getSenderManagerId()))) {
             throw new AccessDeniedException("Somente o remetente ou o gestor do workspace pode gerenciar o formulário");
         }
     }
