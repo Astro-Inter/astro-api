@@ -8,6 +8,37 @@ conforme os componentes dos DTOs, sem `@JsonProperty`.
 Clientes devem enviar `title`, `managerId`, `questions`, `dueDate` e os demais
 nomes dos exemplos abaixo; os nomes antigos em português não são aliases da API.
 
+## Destinatários para o dropdown
+
+`GET /forms/recipients` retorna os gestores elegíveis para receber um formulário, sem usar a listagem administrativa `/managers`.
+
+Exige token Firebase válido e perfil `GESTOR` ou `GESTOR_WORKSPACE`. O `FormAccessService` valida a conta, o perfil atual, a unidade ativa e o workspace da identidade autenticada. O usuário e o workspace não são parâmetros de escopo desta rota; parâmetros adicionais como `workspaceId`, `currentManagerId`, `managerId`, `unitId` ou `firebaseUid` não alteram a consulta.
+
+O `UserRepository` consulta os usuários no PostgreSQL: somente `GESTOR` e `GESTOR_WORKSPACE` com status `ATIVO`, unidade ativa e pertencente ao mesmo workspace. A própria conta fica de fora. A lista é ordenada por nome e, em caso de empate, por ID. A consulta retorna somente ID, nome e nome da unidade; o mapper monta o DTO de resposta. Os formulários continuam armazenados no MongoDB.
+
+Exemplo de resposta HTTP 200 (IDs ilustrativos):
+
+```json
+{
+  "success": true,
+  "message": "Destinatários retornados com sucesso",
+  "data": {
+    "currentManagerId": 7,
+    "items": [
+      {"id": 8, "name": "Ana", "unitName": "Sede"}
+    ]
+  },
+  "errors": null,
+  "path": "/forms/recipients"
+}
+```
+
+`currentManagerId` e `items[].id` são números; `name` e `unitName` são strings. Sem destinatários, a resposta continua sendo sucesso com `items: []` e o ID da conta atual. Sem autenticação válida, perfil permitido ou conta/unidade elegíveis, a chamada é bloqueada conforme a segurança existente da API (HTTP 403).
+
+A rota literal `/forms/recipients` tem precedência sobre `/forms/{id}`; `recipients` não é validado como UUID. O endpoint não altera as permissões administrativas de `/managers`, que continuam reservadas ao gestor do workspace. Responder ou editar formulários continua seguindo as permissões próprias dessas operações.
+
+Os testes HTTP cobrem o envelope, tipos JSON, lista vazia, parâmetros forjados e a distinção da rota UUID. Os testes de segurança cobrem os dois perfis permitidos, token ausente/inválido e perfis proibidos. A integração do repository é executada com `FORM_TEST_JDBC_URL=jdbc:postgresql://127.0.0.1:5434/forms_recipients_test`, usuário `postgres` e senha isolada `forms-recipients-isolated`. Essa base deve ser descartável: o Hibernate cria/remove as tabelas de teste. O CI provisiona uma instância PostgreSQL exclusiva para esse teste, sem executar scripts SQL do projeto.
+
 ## Listagem
 
 `GET /forms?search=clima&status=PENDENTE&page=0&size=20`

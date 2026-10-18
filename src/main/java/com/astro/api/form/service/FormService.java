@@ -10,6 +10,12 @@ import com.astro.api.form.dto.response.FormDetailsResponse;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.exception.ConflictException;
 import com.astro.api.form.dto.request.FormRequest;
+import com.astro.api.form.dto.response.FormRecipientsResponse;
+import com.astro.api.user.model.UserStatus;
+import com.astro.api.user.model.UserType;
+import com.astro.api.user.repository.FormRecipientProjection;
+import com.astro.api.user.repository.UserRepository;
+import org.springframework.transaction.annotation.Transactional;
 import com.astro.api.form.strategy.FormValidationMode;
 import com.astro.api.form.mapper.FormMapper;
 import com.astro.api.form.model.FormStatus;
@@ -29,17 +35,29 @@ public class FormService {
     private final FormMapper formMapper;
     private final FormValidationService formValidationService;
     private final FormReferenceService formReferenceService;
+    private final UserRepository userRepository;
 
     public FormService(FormRepository formRepository,
                        FormAccessService formAccessService,
                        FormMapper formMapper,
                        FormValidationService formValidationService,
-                       FormReferenceService formReferenceService) {
+                       FormReferenceService formReferenceService,
+                       UserRepository userRepository) {
         this.formRepository = formRepository;
         this.formAccessService = formAccessService;
         this.formMapper = formMapper;
         this.formValidationService = formValidationService;
         this.formReferenceService = formReferenceService;
+        this.userRepository = userRepository;
+    }
+
+    @Transactional(readOnly = true)
+    public FormRecipientsResponse findRecipients(AuthenticatedUser authenticatedUser) {
+        FormScope formScope = formAccessService.requireManager(authenticatedUser);
+        List<FormRecipientProjection> recipients = userRepository.findFormRecipients(
+                formScope.workspaceId(), formScope.managerId(), UserStatus.ATIVO,
+                List.of(UserType.GESTOR, UserType.GESTOR_WORKSPACE));
+        return formMapper.toRecipients(formScope.managerId(), recipients);
     }
 
     public FormDetailsResponse create(FormRequest formRequest, AuthenticatedUser authenticatedUser) {

@@ -2,6 +2,7 @@ package com.astro.api.user.repository;
 
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
+import com.astro.api.user.model.UserType;
 import com.astro.api.workspace.model.Workspace;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,6 +17,22 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByFirebaseUid(String firebaseUid);
+    @Query("""
+            select recipient.id as id, recipient.name as name, recipientUnit.name as unitName
+            from User recipient
+            join recipient.unit recipientUnit
+            where recipientUnit.workspace.id = :workspaceId
+              and recipient.id <> :currentManagerId
+              and recipient.status = :status
+              and recipientUnit.isActive = true
+              and recipient.type in :managerTypes
+            order by recipient.name asc, recipient.id asc
+            """)
+    List<FormRecipientProjection> findFormRecipients(@Param("workspaceId") Long workspaceId,
+                                                     @Param("currentManagerId") Long currentManagerId,
+                                                     @Param("status") UserStatus status,
+                                                     @Param("managerTypes") Collection<UserType> managerTypes);
+
     Optional<User> findByEmail(String email);
     Optional<User> findByEmailIgnoreCase(String email);
 

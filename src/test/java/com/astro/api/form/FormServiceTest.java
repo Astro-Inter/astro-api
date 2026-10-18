@@ -42,7 +42,7 @@ class FormServiceTest {
     final UnitRepository units = mock(UnitRepository.class);
     final NrCatalogRepository nrs = mock(NrCatalogRepository.class);
     final FormService service = new FormService(repository, access, new FormMapper(),
-            FormTestFixtures.validator(), new FormReferenceService(users, units, nrs));
+            FormTestFixtures.validator(), new FormReferenceService(users, units, nrs), users);
     final AuthenticatedUser principal = new AuthenticatedUser("sender", "sender@astro.com", Role.GESTOR);
     User sender;
 

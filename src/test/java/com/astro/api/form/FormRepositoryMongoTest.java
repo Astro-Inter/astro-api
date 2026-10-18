@@ -99,7 +99,7 @@ class FormRepositoryMongoTest {
         when(access.requireManager(any())).thenReturn(new FormScope(10L, 1L, false));
         FormService service = new com.astro.api.form.service.FormService(repository, access,
                 new com.astro.api.form.mapper.FormMapper(), FormTestFixtures.validator(),
-                mock(com.astro.api.form.service.FormReferenceService.class));
+                mock(com.astro.api.form.service.FormReferenceService.class), mock(UserRepository.class));
         try (ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(8)) {
             List<Callable<String>> calls = java.util.stream.IntStream.range(0, 32)
                     .<java.util.concurrent.Callable<String>>mapToObj(index -> () ->
@@ -231,7 +231,7 @@ class FormRepositoryMongoTest {
         when(users.findByFirebaseUid("outsider")).thenReturn(Optional.of(manager(30, 2, com.astro.api.user.model.UserType.GESTOR_WORKSPACE)));
         when(users.findById(20L)).thenReturn(Optional.of(manager(20, 1, com.astro.api.user.model.UserType.GESTOR)));
         FormService service = new com.astro.api.form.service.FormService(repository, new com.astro.api.form.service.FormAccessService(users), new com.astro.api.form.mapper.FormMapper(),
-                FormTestFixtures.validator(), new com.astro.api.form.service.FormReferenceService(users, units, nrs));
+                FormTestFixtures.validator(), new com.astro.api.form.service.FormReferenceService(users, units, nrs), users);
         MockMvc mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders
                 .standaloneSetup(new com.astro.api.form.controller.FormController(service))
                 .setControllerAdvice(new com.astro.api.common.handler.GlobalExceptionHandler())
