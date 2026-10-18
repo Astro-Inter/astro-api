@@ -20,6 +20,9 @@ O contrato de `GET /home-workspace`, com os indicadores da Home WEB, está em
 Os contratos da própria conta autenticada no web estão em
 [docs/api-account.md](docs/api-account.md).
 
+O contrato dos endpoints de formulários da web, com rascunhos, publicação e
+validações por tipo de pergunta, está em [docs/forms.md](docs/forms.md).
+
 ## Stack técnica
 
 - **Java 21**
