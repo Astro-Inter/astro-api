@@ -1,6 +1,8 @@
 package com.astro.api.form.mapper;
 
 import java.util.Map;
+import com.astro.api.form.dto.response.FormRecipientsResponse;
+import com.astro.api.user.repository.FormRecipientProjection;
 import com.astro.api.form.dto.response.FormSummaryResponse;
 import com.astro.api.form.dto.response.FormPageResponse;
 import com.astro.api.form.dto.response.FormDetailsResponse;
@@ -77,6 +79,13 @@ public class FormMapper {
                         question.getMaxFiles(), question.getMaxFileSizeMb())).toList();
         return new FormRequest(form.getTitle(), form.getDescription(), form.getManagerId(), form.getNrCode(), form.getUnitId(),
                 form.getDueDate() == null ? null : form.getDueDate().atZone(FORM_ZONE).toLocalDate(), form.getStatus(), questions);
+    }
+
+    public FormRecipientsResponse toRecipients(Long currentManagerId, List<FormRecipientProjection> recipients) {
+        return new FormRecipientsResponse(currentManagerId, recipients.stream()
+                .map(recipient -> new FormRecipientsResponse.RecipientResponse(
+                        recipient.getId(), recipient.getName(), recipient.getUnitName()))
+                .toList());
     }
 
     public FormSummaryResponse toSummary(Form form) {

@@ -39,11 +39,17 @@ class FormSecurityTest {
             when(tokens.verify("invalid")).thenThrow(mock(com.google.firebase.auth.FirebaseAuthException.class));
             mvc.perform(get("/forms").header("Authorization", "Bearer invalid"))
                     .andExpect(result -> assertTrue(result.getResponse().getStatus() >= 400));
+            mvc.perform(get("/forms/recipients"))
+                    .andExpect(status().isForbidden());
+            mvc.perform(get("/forms/recipients").header("Authorization", "Bearer invalid"))
+                    .andExpect(status().isForbidden());
             FirebaseToken token = mock(FirebaseToken.class); when(token.getUid()).thenReturn("manager");
             when(tokens.verify("valid")).thenReturn(token);
             for (Role role : List.of(Role.COLABORADOR, Role.ADMIN)) {
                 when(authorization.getRole("manager")).thenReturn(Optional.of(role));
                 mvc.perform(get("/forms").header("Authorization", "Bearer valid")).andExpect(status().isForbidden());
+                mvc.perform(get("/forms/recipients").header("Authorization", "Bearer valid"))
+                        .andExpect(status().isForbidden());
                 mvc.perform(get("/forms/1").header("Authorization", "Bearer valid")).andExpect(status().isForbidden());
                 mvc.perform(post("/forms").header("Authorization", "Bearer valid")
                         .contentType("application/json").content("{\"status\":\"RASCUNHO\"}")).andExpect(status().isForbidden());
@@ -56,6 +62,8 @@ class FormSecurityTest {
             for (Role role : List.of(Role.GESTOR, Role.GESTOR_WORKSPACE)) {
                 when(authorization.getRole("manager")).thenReturn(Optional.of(role));
                 mvc.perform(get("/forms").header("Authorization", "Bearer valid")).andExpect(status().isOk());
+                mvc.perform(get("/forms/recipients").header("Authorization", "Bearer valid"))
+                        .andExpect(status().isOk());
             }
         }
     }

@@ -4,6 +4,7 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.response.ApiResult;
 import com.astro.api.form.dto.response.FormPageResponse;
 import com.astro.api.form.dto.response.FormDetailsResponse;
+import com.astro.api.form.dto.response.FormRecipientsResponse;
 import com.astro.api.form.model.FormStatus;
 import com.astro.api.form.service.FormService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -68,6 +69,14 @@ public class FormController {
         FormDetailsResponse form = formService.create(body, principal);
         return ResponseEntity.created(URI.create("/forms/" + form.id())).body(ApiResult.success(
                 "Formulário criado com sucesso", form, request.getRequestURI()));
+    }
+
+    @GetMapping("/recipients")
+    @Operation(summary = "Lista gestores ativos do workspace para selecionar o destinatário do formulário")
+    public ResponseEntity<ApiResult<FormRecipientsResponse>> findRecipients(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser, HttpServletRequest request) {
+        return ResponseEntity.ok(ApiResult.success("Destinatários retornados com sucesso",
+                formService.findRecipients(authenticatedUser), request.getRequestURI()));
     }
 
     @GetMapping("/{id}")
