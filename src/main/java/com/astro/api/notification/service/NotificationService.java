@@ -9,7 +9,9 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class NotificationService {
@@ -31,14 +33,43 @@ public class NotificationService {
                 notificationRepository.findAllByUserIdOrderByCreatedAtDescIdDesc(userId));
     }
 
+    public Notification findByIdForAuthenticatedUser(String firebaseUid, String notificationId) {
+        Long userId = findAuthenticatedUserId(firebaseUid);
+        return findNotification(notificationId, userId);
+    }
+
     public Long requireNotificationOwner(String firebaseUid, String notificationId) {
         Long userId = findAuthenticatedUserId(firebaseUid);
-        if (!ObjectId.isValid(notificationId)) {
-            throw new ResourceNotFoundException("Notificação não encontrada");
-        }
-        notificationRepository.findByIdAndUserId(notificationId, userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Notificação não encontrada"));
+        findNotification(notificationId, userId);
         return userId;
+    }
+
+    private Notification findNotification(String notificationId, Long userId) {
+        for (Object id : notificationIdCandidates(notificationId)) {
+            Optional<Notification> notification = notificationRepository.findByIdAndUserId(id, userId);
+            if (notification.isPresent()) {
+                return notification.get();
+            }
+        }
+        throw new ResourceNotFoundException("Notificação não encontrada");
+    }
+
+    private List<Object> notificationIdCandidates(String notificationId) {
+        List<Object> candidates = new ArrayList<>();
+        if (ObjectId.isValid(notificationId)) {
+            candidates.add(new ObjectId(notificationId));
+        }
+        parseLong(notificationId).ifPresent(candidates::add);
+        candidates.add(notificationId);
+        return candidates;
+    }
+
+    private Optional<Long> parseLong(String value) {
+        try {
+            return Optional.of(Long.valueOf(value));
+        } catch (NumberFormatException ignored) {
+            return Optional.empty();
+        }
     }
 
     private Long findAuthenticatedUserId(String firebaseUid) {

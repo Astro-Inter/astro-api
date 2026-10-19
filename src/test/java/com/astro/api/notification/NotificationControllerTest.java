@@ -56,7 +56,7 @@ class NotificationControllerTest {
         User user = new User();
         user.setId(42L);
         Notification notification = new Notification();
-        notification.setId("670f8df36a2ce84f6c12d230");
+        notification.setId(6L);
         notification.setUserId(42L);
         notification.setTitle("Treinamento pendente");
         notification.setMessage("Conclua o treinamento pendente.");
@@ -65,13 +65,13 @@ class NotificationControllerTest {
         when(userRepository.findByFirebaseUid("firebase-user")).thenReturn(Optional.of(user));
         when(notificationRepository.findAllByUserIdOrderByCreatedAtDescIdDesc(42L)).thenReturn(java.util.List.of(notification));
         when(viewedService.findViewed(42L, "notifications", java.util.List.of(notification.getId())))
-                .thenReturn(java.util.Set.of(notification.getId()));
+                .thenReturn(java.util.Set.of(String.valueOf(notification.getId())));
 
         mvc.perform(get("/notifications"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.path").value("/notifications"))
-                .andExpect(jsonPath("$.data[0].id").value("670f8df36a2ce84f6c12d230"))
+                .andExpect(jsonPath("$.data[0].id").value("6"))
                 .andExpect(jsonPath("$.data[0].titulo").value("Treinamento pendente"))
                 .andExpect(jsonPath("$.data[0].horas").value(2))
                 .andExpect(jsonPath("$.data[0].viewed").value(true))

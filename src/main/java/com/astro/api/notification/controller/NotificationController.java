@@ -3,6 +3,7 @@ package com.astro.api.notification.controller;
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.response.ApiResult;
 import com.astro.api.common.service.ViewedService;
+import com.astro.api.notification.dto.response.NotificationDetailsResponse;
 import com.astro.api.notification.dto.response.NotificationResponse;
 import com.astro.api.notification.model.Notification;
 import com.astro.api.notification.service.AuthenticatedNotifications;
@@ -54,12 +55,35 @@ public class NotificationController {
         Set<String> viewed = notifications.isEmpty() ? Set.of() : viewedService.findViewed(result.userId(), NOTIFICATIONS_RESOURCE,
                 notifications.stream().map(Notification::getId).toList());
         List<NotificationResponse> response = notifications.stream().map(notification -> new NotificationResponse(
-                notification.getId(),
+                String.valueOf(notification.getId()),
                 notification.getTitle() == null ? notification.getMessage() : notification.getTitle(),
-                viewed.contains(notification.getId()),
+                viewed.contains(String.valueOf(notification.getId())),
                 notificationService.elapsedWholeHours(notification.getCreatedAt())
         )).toList();
         return ResponseEntity.ok(ApiResult.success("Notificações retornadas com sucesso", response,
+                request.getRequestURI()));
+    }
+
+    @GetMapping("/{notificationId}")
+    @PreAuthorize("hasAnyRole('COLABORADOR', 'GESTOR', 'GESTOR_WORKSPACE')")
+    @Operation(summary = "Consulta uma notificação do usuário autenticado pelo ID",
+            description = "Retorna a mensagem, o título e o ID do evento associado, quando houver. A consulta não altera o estado de visualização.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Notificação retornada com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado"),
+            @ApiResponse(responseCode = "403", description = "Não autorizado"),
+            @ApiResponse(responseCode = "404", description = "Notificação inexistente ou não pertencente ao usuário"),
+            @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
+    })
+    public ResponseEntity<ApiResult<NotificationDetailsResponse>> findById(
+            @PathVariable String notificationId,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            HttpServletRequest request) {
+        Notification notification = notificationService.findByIdForAuthenticatedUser(
+                authenticatedUser.firebaseUid(), notificationId);
+        NotificationDetailsResponse response = new NotificationDetailsResponse(
+                notification.getMessage(), notification.getTitle(), notification.getEventId());
+        return ResponseEntity.ok(ApiResult.success("Notificação retornada com sucesso", response,
                 request.getRequestURI()));
     }
 
