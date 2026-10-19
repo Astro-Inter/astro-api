@@ -177,6 +177,21 @@ registra a necessidade de reconciliação e retorna erro. Não há transação
 distribuída entre PostgreSQL, Firebase e Redis.
 
 A leitura usa o mesmo `CollaboratorSpreadsheetReader` do cadastro inicial.
+Os dois fluxos também usam `CollaboratorMapper` para converter a modalidade e
+montar o colaborador, e `CollaboratorSpreadsheetValidator` para validar os dados
+pessoais. A validação mantém as diferenças existentes: o cadastro inicial exige
+nome não vazio e e-mail com domínio pontuado; a sincronização mantém os limites
+de tamanho e as constraints de `CollaboratorImportData`. Erros do cadastro
+continuam limitados ao primeiro erro de cada linha, com as mesmas mensagens.
+A modalidade inválida continua sendo reportada após conferir os vínculos no
+cadastro inicial.
+
+`PersonalDataNormalizer` centraliza nome, CPF e e-mail também nos DTOs de criação
+e edição individual. A limpeza legada do CPF no cadastro inicial continua
+removendo todos os caracteres que não são dígitos; os outros fluxos removem
+somente a pontuação prevista. A comparação de nomes no cadastro inicial e nos
+cargos usa o mesmo `NormalizedText.key` já utilizado pela sincronização.
+
 Na gravação, a importação também reaproveita os caminhos do cadastro:
 
 - Novos colaboradores passam por `UserBatchService.saveAllPreRegistered`, com

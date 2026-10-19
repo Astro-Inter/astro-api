@@ -1,11 +1,10 @@
 package com.astro.api.user.dto.request;
 
+import com.astro.api.common.text.PersonalDataNormalizer;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.astro.api.user.model.WorkModel;
 import jakarta.validation.constraints.*;
 import org.hibernate.validator.constraints.br.CPF;
-
-import java.util.Locale;
 
 public record CreateCollaboratorRequest(
         @JsonProperty("nome")
@@ -24,8 +23,8 @@ public record CreateCollaboratorRequest(
         @JsonProperty("modalidade")
         @NotNull(message = "{collaborator.workModel.notNull}") WorkModel workModel) {
     public CreateCollaboratorRequest {
-        name = name == null ? null : name.trim();
-        cpf = cpf == null ? null : cpf.trim().replace(".", "").replace("-", "");
-        email = email == null ? null : email.trim().toLowerCase(Locale.ROOT);
+        name = name == null ? null : PersonalDataNormalizer.name(name);
+        cpf = cpf == null ? null : PersonalDataNormalizer.cpf(cpf);
+        email = email == null ? null : PersonalDataNormalizer.email(email);
     }
 }

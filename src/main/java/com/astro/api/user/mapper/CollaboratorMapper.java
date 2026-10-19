@@ -1,6 +1,8 @@
 package com.astro.api.user.mapper;
 
 import com.astro.api.role.model.Role;
+import com.astro.api.common.text.NormalizedText;
+import com.astro.api.common.text.PersonalDataNormalizer;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.user.dto.request.CreateCollaboratorRequest;
 import com.astro.api.user.dto.request.UpdateCollaboratorRequest;
@@ -15,14 +17,28 @@ import com.astro.api.user.model.WorkModel;
 import com.astro.api.user.repository.CollaboratorDetailsProjection;
 import com.astro.api.user.repository.CollaboratorSummaryProjection;
 import java.time.Instant;
+import java.util.Locale;
 import org.springframework.stereotype.Component;
 
 import static com.astro.api.user.mapper.UserAvatarMapper.initials;
 
 @Component
 public class CollaboratorMapper {
-    public CollaboratorImportData toImportData(CollaboratorImportRow row, WorkModel workModel) {
-        return new CollaboratorImportData(row.name(), row.cpf(), row.email(), workModel);
+    public CollaboratorImportData toImportData(CollaboratorImportRow row) {
+        return new CollaboratorImportData(row.name(), row.cpf(), row.email(), workModel(row.workModel()));
+    }
+
+    public CollaboratorImportData toRegistrationData(CollaboratorImportRow row) {
+        String cpf = PersonalDataNormalizer.registrationCpf(row.cpf());
+        return new CollaboratorImportData(row.name(), cpf, row.email(), workModel(row.workModel()));
+    }
+
+    private WorkModel workModel(String value) {
+        try {
+            return WorkModel.valueOf(NormalizedText.key(value).toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 
     public void applyUpdate(User user, UpdateCollaboratorRequest body, Role role, Unit unit) {

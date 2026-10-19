@@ -3,6 +3,7 @@ package com.astro.api.user.service;
 import com.astro.api.common.exception.SpreadsheetImportException;
 import com.astro.api.common.model.SpreadsheetImportError;
 import com.astro.api.common.text.NormalizedText;
+import com.astro.api.common.text.PersonalDataNormalizer;
 import com.astro.api.role.model.Role;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.user.mapper.CollaboratorMapper;
@@ -16,14 +17,10 @@ import com.astro.api.user.model.WorkModel;
 import com.astro.api.user.repository.CollaboratorRepository;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.workspace.model.Workspace;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.Validator;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -34,16 +31,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CollaboratorImportService {
     private final UserRepository userRepository;
-    private final Validator validator;
+    private final CollaboratorSpreadsheetValidator spreadsheetValidator;
     private final CollaboratorMapper collaboratorMapper;
     private final CollaboratorRepository collaboratorRepository;
     private final UserBatchService userBatchService;
 
-    public CollaboratorImportService(UserRepository userRepository, Validator validator,
+    public CollaboratorImportService(UserRepository userRepository, CollaboratorSpreadsheetValidator spreadsheetValidator,
             CollaboratorMapper collaboratorMapper, CollaboratorRepository collaboratorRepository,
             UserBatchService userBatchService) {
         this.userRepository = userRepository;
-        this.validator = validator;
+        this.spreadsheetValidator = spreadsheetValidator;
         this.collaboratorMapper = collaboratorMapper;
         this.collaboratorRepository = collaboratorRepository;
         this.userBatchService = userBatchService;
@@ -54,15 +51,15 @@ public class CollaboratorImportService {
         Set<String> cpfs = new HashSet<>();
         Set<String> emails = new HashSet<>();
         for (CollaboratorImportRow row : rows) {
-            cpfs.add(normalizeCpf(row.cpf()));
-            emails.add(normalizeEmail(row.email()));
+            cpfs.add(PersonalDataNormalizer.cpf(row.cpf()));
+            emails.add(PersonalDataNormalizer.email(row.email()));
         }
         List<User> identities = userRepository.findImportIdentitiesForUpdate(cpfs, emails);
         Map<String, User> usersByCpf = new HashMap<>();
         Map<String, User> usersByEmail = new HashMap<>();
         for (User user : identities) {
             if (user.getCpf() != null) usersByCpf.put(user.getCpf(), user);
-            usersByEmail.put(normalizeEmail(user.getEmail()), user);
+            usersByEmail.put(PersonalDataNormalizer.email(user.getEmail()), user);
         }
         List<Change> changes = new ArrayList<>();
         List<SpreadsheetImportError> errors = new ArrayList<>();
@@ -71,8 +68,8 @@ public class CollaboratorImportService {
         Set<String> seenEmails = new HashSet<>();
         int unchanged = 0;
         for (CollaboratorImportRow row : rows) {
-            String cpf = normalizeCpf(row.cpf());
-            String email = normalizeEmail(row.email());
+            String cpf = PersonalDataNormalizer.cpf(row.cpf());
+            String email = PersonalDataNormalizer.email(row.email());
             User existing = usersByCpf.get(cpf);
             User emailOwner = usersByEmail.get(email);
             User matchedUser = existing != null ? existing : emailOwner;
@@ -80,17 +77,15 @@ public class CollaboratorImportService {
                 ignored.add(new SpreadsheetImportError(row.number(), "tipo", "Gestor mantido sem alterações"));
                 continue;
             }
-            WorkModel workModel = parseWorkModel(row.workModel());
-            CollaboratorImportData data = collaboratorMapper.toImportData(row, workModel);
+            CollaboratorImportData data = collaboratorMapper.toImportData(row);
+            WorkModel workModel = data.workModel();
             if (row.role() == null || row.role().trim().length() < 2 || row.role().trim().length() > 255) {
                 errors.add(new SpreadsheetImportError(row.number(), "cargo", "O cargo deve ter entre 2 e 255 caracteres"));
                 continue;
             }
-            Set<ConstraintViolation<CollaboratorImportData>> violations = validator.validate(data);
-            if (!violations.isEmpty()) {
-                violations.stream().sorted(Comparator.comparing(violation -> violation.getPropertyPath().toString()))
-                        .forEach(violation -> errors.add(new SpreadsheetImportError(row.number(),
-                                spreadsheetField(violation.getPropertyPath().toString()), violation.getMessage())));
+            List<SpreadsheetImportError> personalDataErrors = spreadsheetValidator.validate(data, row.number());
+            if (!personalDataErrors.isEmpty()) {
+                errors.addAll(personalDataErrors);
                 continue;
             }
             List<String> rowValues = List.of(data.name(), cpf, email, NormalizedText.key(row.unit()),
@@ -132,7 +127,7 @@ public class CollaboratorImportService {
                 continue;
             }
             boolean hasChanges = existing == null || !Objects.equals(existing.getName(), data.name())
-                    || !normalizeEmail(existing.getEmail()).equals(email) || existing.getWorkModel() != workModel
+                    || !PersonalDataNormalizer.email(existing.getEmail()).equals(email) || existing.getWorkModel() != workModel
                     || hasNewUnit(existing, unit) || hasNewRole(existing, role);
             if (hasChanges) changes.add(new Change(row.number(), data, existing, unit, role));
             else unchanged++;
@@ -168,27 +163,6 @@ public class CollaboratorImportService {
     private boolean inWorkspace(User user, Workspace workspace) {
         return user.getUnit() != null && user.getUnit().workspace != null
                 && Objects.equals(workspace.id, user.getUnit().workspace.id);
-    }
-
-    private String normalizeCpf(String value) {
-        return value == null ? "" : value.trim().replace(".", "").replace("-", "");
-    }
-
-    private String normalizeEmail(String value) {
-        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private WorkModel parseWorkModel(String value) {
-        try { return WorkModel.valueOf(NormalizedText.key(value).toUpperCase(Locale.ROOT)); }
-        catch (IllegalArgumentException exception) { return null; }
-    }
-
-    private String spreadsheetField(String field) {
-        return switch (field) {
-            case "name" -> "nome";
-            case "workModel" -> "modalidade";
-            default -> field;
-        };
     }
 
     public void validateNewLinks(CollaboratorImportPlan plan, Workspace workspace) {

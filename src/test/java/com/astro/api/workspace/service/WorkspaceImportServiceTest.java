@@ -21,6 +21,7 @@ import com.astro.api.user.model.*;
 import com.astro.api.user.model.CollaboratorImportRow;
 import com.astro.api.user.repository.*;
 import com.astro.api.user.service.CollaboratorImportService;
+import com.astro.api.user.service.CollaboratorSpreadsheetValidator;
 import com.astro.api.user.service.CollaboratorSpreadsheetReader;
 import com.astro.api.user.service.UserBatchService;
 import com.astro.api.workspace.dto.request.WorkspaceImportRequest;
@@ -61,7 +62,7 @@ class WorkspaceImportServiceTest {
     private final AuthenticatedUser principal = new AuthenticatedUser("uid", null,
             com.astro.api.auth.security.Role.GESTOR_WORKSPACE);
     private final WorkspaceImportService service = new WorkspaceImportService(access, reader,
-            new CollaboratorImportService(users, FACTORY.getValidator(), new CollaboratorMapper(), repository, userBatchService),
+            new CollaboratorImportService(users, new CollaboratorSpreadsheetValidator(FACTORY.getValidator()), new CollaboratorMapper(), repository, userBatchService),
             roleService, settings, firebase, events, manager);
 
     @BeforeEach

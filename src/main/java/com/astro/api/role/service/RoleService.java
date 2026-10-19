@@ -3,6 +3,7 @@ package com.astro.api.role.service;
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ConflictException;
+import com.astro.api.common.text.NormalizedText;
 import com.astro.api.conformity.repository.NrDocumentRepository;
 import com.astro.api.role.dto.request.RoleNrRequest;
 import com.astro.api.role.dto.request.RoleRequest;
@@ -14,13 +15,11 @@ import com.astro.api.role.model.Role;
 import com.astro.api.role.repository.RoleManagementRepository;
 import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.workspace.model.Workspace;
-import java.text.Normalizer;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -132,7 +131,7 @@ public class RoleService {
         Map<String, String> namesByNormalizedValue = new LinkedHashMap<>();
         names.stream()
                 .filter(this::hasText)
-                .forEach(name -> namesByNormalizedValue.putIfAbsent(normalize(name), name.trim()));
+                .forEach(name -> namesByNormalizedValue.putIfAbsent(NormalizedText.key(name), name.trim()));
 
         List<Role> roles = namesByNormalizedValue.values().stream()
                 .map(name -> create(workspace, name))
@@ -140,7 +139,7 @@ public class RoleService {
         List<Role> savedRoles = roleRepository.saveAll(roles);
 
         Map<String, Role> rolesByName = new LinkedHashMap<>();
-        savedRoles.forEach(role -> rolesByName.put(normalize(role.getName()), role));
+        savedRoles.forEach(role -> rolesByName.put(NormalizedText.key(role.getName()), role));
         return rolesByName;
     }
 
@@ -149,12 +148,12 @@ public class RoleService {
         Map<String, Role> rolesByName = new LinkedHashMap<>();
         List<Role> existingRoles = roleRepository.findByWorkspace(workspace);
         for (Role role : existingRoles) {
-            if (rolesByName.putIfAbsent(normalize(role.getName()), role) != null) {
+            if (rolesByName.putIfAbsent(NormalizedText.key(role.getName()), role) != null) {
                 throw new ConflictException("Existem cargos com nomes ambíguos no workspace");
             }
         }
         names.stream().filter(this::hasText).forEach(name ->
-                rolesByName.computeIfAbsent(normalize(name), key -> create(workspace, name.trim())));
+                rolesByName.computeIfAbsent(NormalizedText.key(name), key -> create(workspace, name.trim())));
         return rolesByName;
     }
 
@@ -183,11 +182,5 @@ public class RoleService {
 
     private boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
-    }
-
-    private String normalize(String value) {
-        return Normalizer.normalize(value.trim(), Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "")
-                .toLowerCase(Locale.ROOT);
     }
 }

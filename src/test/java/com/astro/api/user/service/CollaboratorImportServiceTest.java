@@ -22,7 +22,7 @@ class CollaboratorImportServiceTest {
     private static final ValidatorFactory FACTORY = Validation.buildDefaultValidatorFactory();
     private final UserRepository repository = mock(UserRepository.class);
     private final UserBatchService userBatchService = mock(UserBatchService.class);
-    private final CollaboratorImportService service = new CollaboratorImportService(repository, FACTORY.getValidator(),
+    private final CollaboratorImportService service = new CollaboratorImportService(repository, new CollaboratorSpreadsheetValidator(FACTORY.getValidator()),
             new CollaboratorMapper(), mock(CollaboratorRepository.class), userBatchService);
     private final Workspace workspace = new Workspace();
     private final Unit unit = new Unit();
