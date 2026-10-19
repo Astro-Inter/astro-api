@@ -2,10 +2,12 @@ package com.astro.api.unit.repository;
 
 import com.astro.api.unit.model.Unit;
 import com.astro.api.workspace.model.Workspace;
+import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,12 +18,8 @@ public interface UnitRepository extends JpaRepository<Unit, Long> {
     List<Unit> findByWorkspaceAndNameIn(Workspace workspace, Collection<String> names);
     List<Unit> findByWorkspace(Workspace workspace);
 
-    @Query(value = """
-            SELECT unit.* FROM unidade unit
-            WHERE unit.id_unidade = :id AND unit.workspace_id = :workspaceId
-            FOR UPDATE OF unit
-            """, nativeQuery = true)
-    Optional<Unit> findForUpdate(@Param("id") Long id, @Param("workspaceId") Long workspaceId);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<Unit> findByIdAndWorkspace_Id(Long unitId, Long workspaceId);
 
     @Query("select count(u) from User u where u.unit.id = :unitId and u.type = com.astro.api.user.model.UserType.COLABORADOR")
     long countCollaborators(@Param("unitId") Long unitId);

@@ -21,7 +21,8 @@ ALTER TABLE public.unidade_endereco
     ADD COLUMN numero VARCHAR(30);
 ```
 
-Não foi executado SQL contra o banco. Não há migração automática neste projeto.
+Não foi executado SQL contra o banco da aplicação. Os testes de integração usam
+somente um PostgreSQL local descartável. Não há migração automática neste projeto.
 Revisar o schema efetivo antes de aplicar a alteração e não preencher números
 legados com valores inventados.
 
@@ -93,6 +94,14 @@ Unidade e endereço são persistidos na mesma transação. O nome é comparado
 após trim, remoção de acentos e conversão para minúsculas. A edição exclui o
 próprio ID na checagem e preserva status, workspace e vínculos de NRs,
 colaboradores e eventos.
+
+A busca para edição usa o método derivado
+`UnitRepository.findByIdAndWorkspace_Id`, com `@Lock(PESSIMISTIC_WRITE)`.
+O Spring Data gera o filtro por ID e workspace; o SQL dessa busca não é escrito
+manualmente. O bloqueio é mantido até o término da transação.
+`UnitRepositoryPostgresTest` confere o escopo, endereços opcionais e a contenção
+de uma atualização concorrente em outra conexão. No CI, ele reutiliza o banco
+PostgreSQL descartável disponível, sempre dentro de um schema próprio.
 
 As respostas usam os campos existentes de `UnitResponse` em português,
 acrescentando `numero`, sem anotações `@JsonProperty`; os componentes do DTO

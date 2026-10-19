@@ -37,6 +37,7 @@ jobs:
           --health-retries 10
     env:
       FORM_TEST_JDBC_URL: jdbc:postgresql://127.0.0.1:5434/forms_recipients_test
+      UNIT_TEST_JDBC_URL: jdbc:postgresql://127.0.0.1:5434/forms_recipients_test
       FORM_TEST_MONGODB_URI: mongodb://127.0.0.1:27017
 
     steps:

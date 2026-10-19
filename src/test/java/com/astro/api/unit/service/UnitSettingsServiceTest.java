@@ -81,7 +81,7 @@ class UnitSettingsServiceTest {
         Unit unit = unit("Matriz", false);
         unit.address = new UnitMapper().toAddress(body("Matriz", "Antigo"), unit);
         when(units.findByWorkspace(workspace)).thenReturn(List.of(unit));
-        when(units.findForUpdate(12L, 3L)).thenReturn(Optional.of(unit));
+        when(units.findByIdAndWorkspace_Id(12L, 3L)).thenReturn(Optional.of(unit));
         UnitResponse response = service.update(12L, body("Matriz", " "), user);
         assertEquals(12L, response.id_unidade());
         assertEquals("Inativo", response.status());
