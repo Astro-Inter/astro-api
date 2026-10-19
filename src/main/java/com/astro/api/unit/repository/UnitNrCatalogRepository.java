@@ -18,6 +18,6 @@ public class UnitNrCatalogRepository {
 
     public List<NrDocument> findCompanyNrs() {
         return mongoTemplate.find(Query.query(Criteria.where("usabilidade").is("Empresa")),
-                NrDocument.class, "NRs");
+                NrDocument.class, "nrs");
     }
 }

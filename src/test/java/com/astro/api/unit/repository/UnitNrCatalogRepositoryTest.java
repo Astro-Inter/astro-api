@@ -13,15 +13,15 @@ import static org.mockito.Mockito.*;
 
 class UnitNrCatalogRepositoryTest {
     @Test
-    void selectsOnlyCompanyDocumentsFromTheCaseSensitiveCollection() {
+    void selectsOnlyCompanyDocumentsFromTheLowercaseNrsCollection() {
         MongoTemplate mongo = mock(MongoTemplate.class);
         NrDocument document = new NrDocument();
         document.setId(17);
-        when(mongo.find(any(Query.class), eq(NrDocument.class), eq("NRs"))).thenReturn(List.of(document));
+        when(mongo.find(any(Query.class), eq(NrDocument.class), eq("nrs"))).thenReturn(List.of(document));
         var repository = new UnitNrCatalogRepository(mongo);
         assertEquals(List.of(document), repository.findCompanyNrs());
         var query = ArgumentCaptor.forClass(Query.class);
-        verify(mongo).find(query.capture(), eq(NrDocument.class), eq("NRs"));
+        verify(mongo).find(query.capture(), eq(NrDocument.class), eq("nrs"));
         assertEquals("Empresa", query.getValue().getQueryObject().getString("usabilidade"));
     }
 }
