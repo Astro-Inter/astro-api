@@ -72,8 +72,8 @@ class NotificationControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.path").value("/notifications"))
                 .andExpect(jsonPath("$.data[0].id").value("6"))
-                .andExpect(jsonPath("$.data[0].titulo").value("Treinamento pendente"))
-                .andExpect(jsonPath("$.data[0].horas").value(2))
+                .andExpect(jsonPath("$.data[0].title").value("Treinamento pendente"))
+                .andExpect(jsonPath("$.data[0].hours").value(2))
                 .andExpect(jsonPath("$.data[0].viewed").value(true))
                 .andExpect(jsonPath("$.data[0].message").doesNotExist())
                 .andExpect(jsonPath("$.data[0].event_id").doesNotExist());
