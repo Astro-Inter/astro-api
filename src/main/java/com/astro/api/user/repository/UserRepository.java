@@ -9,12 +9,25 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
+    long countByUnit_WorkspaceAndType(Workspace workspace, UserType type);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update User u set u.type = :newType
+            where u.id = :userId and u.type = :expectedType and u.status = :expectedStatus
+            """)
+    int updateTypeIfCurrent(@Param("userId") Long userId,
+                          @Param("expectedType") UserType expectedType,
+                          @Param("newType") UserType newType,
+                          @Param("expectedStatus") UserStatus expectedStatus);
+
     Optional<User> findByFirebaseUid(String firebaseUid);
     @Query("""
             select recipient.id as id, recipient.name as name, recipientUnit.name as unitName

@@ -4,10 +4,13 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.response.ApiResult;
 import com.astro.api.workspace.dto.request.UpdateWorkspaceRequest;
 import com.astro.api.workspace.dto.request.WorkspaceImportRequest;
+import com.astro.api.workspace.dto.request.WorkspaceManagerTransferRequest;
+import com.astro.api.workspace.dto.response.WorkspaceManagerTransferResponse;
 import com.astro.api.workspace.dto.response.WorkspaceImportResponse;
 import com.astro.api.workspace.dto.response.WorkspaceResponse;
 import com.astro.api.workspace.service.WorkspaceImportService;
 import com.astro.api.workspace.service.WorkspaceSettingsService;
+import com.astro.api.workspace.service.WorkspaceManagerTransferService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Encoding;
@@ -34,10 +37,13 @@ import org.springframework.web.multipart.MultipartFile;
 public class WorkspaceSettingsController {
     private final WorkspaceSettingsService workspaceSettingsService;
     private final WorkspaceImportService workspaceImportService;
+    private final WorkspaceManagerTransferService workspaceManagerTransferService;
 
-    public WorkspaceSettingsController(WorkspaceSettingsService workspaceSettingsService, WorkspaceImportService workspaceImportService) {
+    public WorkspaceSettingsController(WorkspaceSettingsService workspaceSettingsService, WorkspaceImportService workspaceImportService,
+            WorkspaceManagerTransferService workspaceManagerTransferService) {
         this.workspaceSettingsService = workspaceSettingsService;
         this.workspaceImportService = workspaceImportService;
+        this.workspaceManagerTransferService = workspaceManagerTransferService;
     }
 
     @GetMapping
@@ -47,6 +53,23 @@ public class WorkspaceSettingsController {
         WorkspaceResponse workspaceResponse = workspaceSettingsService.find(user);
         ApiResult<WorkspaceResponse> result = ApiResult.success(
                 "Workspace retornado com sucesso", workspaceResponse, request.getRequestURI());
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/manager-transfer")
+    @Operation(summary = "Transfere a responsabilidade do workspace para outro gestor ativo",
+            description = "O responsável atual passa a GESTOR e o escolhido passa a GESTOR_WORKSPACE na mesma transação.")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Responsabilidade transferida na mesma transação"),
+        @ApiResponse(responseCode = "400", description = "Identificador inválido, própria conta ou gestor inativo"),
+        @ApiResponse(responseCode = "404", description = "Gestor não encontrado no próprio workspace")
+    })
+    public ResponseEntity<ApiResult<WorkspaceManagerTransferResponse>> transferManager(
+            @Valid @RequestBody WorkspaceManagerTransferRequest body,
+            @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
+        WorkspaceManagerTransferResponse response = workspaceManagerTransferService.transfer(body, user);
+        ApiResult<WorkspaceManagerTransferResponse> result = ApiResult.success(
+                "Responsabilidade do workspace transferida com sucesso", response, request.getRequestURI());
         return ResponseEntity.ok(result);
     }
 

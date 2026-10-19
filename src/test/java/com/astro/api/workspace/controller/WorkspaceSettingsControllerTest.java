@@ -11,6 +11,7 @@ import com.astro.api.unit.service.UnitSettingsService;
 import com.astro.api.workspace.dto.response.*;
 import com.astro.api.workspace.service.*;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.*;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
@@ -28,13 +29,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class WorkspaceSettingsControllerTest {
     private final WorkspaceSettingsService settings = mock(WorkspaceSettingsService.class);
     private final WorkspaceImportService imports = mock(WorkspaceImportService.class);
+    private final WorkspaceManagerTransferService transfers = mock(WorkspaceManagerTransferService.class);
     private final UnitSettingsService units = mock(UnitSettingsService.class);
     private final AuthenticatedUser principal = new AuthenticatedUser("uid", null, Role.GESTOR_WORKSPACE);
     private MockMvc mvc;
 
     @BeforeEach
     void setup() {
-        mvc = MockMvcBuilders.standaloneSetup(new WorkspaceSettingsController(settings, imports),
+        mvc = MockMvcBuilders.standaloneSetup(new WorkspaceSettingsController(settings, imports, transfers),
                         new UnitSettingsController(units))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
@@ -44,6 +46,36 @@ class WorkspaceSettingsControllerTest {
                     public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer container,
                             NativeWebRequest request, WebDataBinderFactory factory) { return principal; }
                 }).build();
+    }
+
+    @Test
+    void transfersTheWorkspaceResponsibilityUsingAnExistingManagerId() throws Exception {
+        when(transfers.transfer(any(), eq(principal)))
+                .thenReturn(new WorkspaceManagerTransferResponse(3L, 8L, 9L));
+        mvc.perform(post("/workspace/manager-transfer").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"newManagerId\":9}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.workspaceId").value(3))
+                .andExpect(jsonPath("$.data.previousManagerId").value(8))
+                .andExpect(jsonPath("$.data.newManagerId").value(9));
+        verify(transfers).transfer(argThat(body -> body.newManagerId().equals(9L)), eq(principal));
+    }
+
+    @Test
+    void rejectsMissingOrInvalidSuccessorBeforeCallingTheService() throws Exception {
+        Map<String, String> invalidRequests = Map.of(
+                "{}", "O novo gestor é obrigatório",
+                "{\"newManagerId\":null}", "O novo gestor é obrigatório",
+                "{\"newManagerId\":0}", "O identificador do novo gestor deve ser positivo",
+                "{\"newManagerId\":-1}", "O identificador do novo gestor deve ser positivo");
+        for (Map.Entry<String, String> invalidRequest : invalidRequests.entrySet()) {
+            mvc.perform(post("/workspace/manager-transfer").contentType(MediaType.APPLICATION_JSON)
+                    .content(invalidRequest.getKey()))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors[0]").value("newManagerId: " + invalidRequest.getValue()));
+        }
+        verifyNoInteractions(transfers);
     }
 
     @Test

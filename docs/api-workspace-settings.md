@@ -6,6 +6,9 @@ Implementação das subtarefas [SCRUM-585](https://luizacursino.atlassian.net/br
 [SCRUM-588](https://luizacursino.atlassian.net/browse/SCRUM-588) e
 [SCRUM-589](https://luizacursino.atlassian.net/browse/SCRUM-589).
 
+Inclui também a transferência de responsabilidade do workspace para outro gestor
+ativo, conforme as regras confirmadas em 19/10/2026.
+
 ## Dependência de banco antes do deploy
 
 A [documentação PostgreSQL](https://astro-inter.github.io/banco-de-dados/#/database)
@@ -34,7 +37,7 @@ nos fluxos existentes. Não disponibilizar a API antes dessa alteração.
 
 ## Autorização e rotas
 
-Todas as cinco rotas exigem `Authorization: Bearer <token Firebase>` e
+Todas as seis rotas exigem `Authorization: Bearer <token Firebase>` e
 `GESTOR_WORKSPACE` ativo. O UID vem do principal; o workspace é obtido pelo
 usuário persistido, sem aceitar um workspace arbitrário no body.
 Pagamentos, edição da conta e exclusão/desativação de unidades não fazem parte
@@ -45,6 +48,7 @@ deste contrato. As consultas existentes de unidades mantêm seus perfis atuais.
 | GET | /workspace | 200 com dados atuais da empresa |
 | PUT | /workspace | 200 com empresa atualizada |
 | POST | /workspace/import | 200 com resumo da sincronização |
+| POST | /workspace/manager-transfer | 200 com IDs do workspace e dos dois gestores |
 | POST | /units | 201 com nova unidade e Location |
 | PUT | /units/{unitId} | 200 com unidade atualizada |
 
@@ -52,6 +56,57 @@ As respostas usam `ApiResult`. A ausência de autenticação nessas rotas retorn
 401; perfil ou vínculo não autorizado retorna 403. Dados inválidos retornam
 400; conflitos de unicidade retornam 409; unidade fora do workspace retorna 404.
 Falhas de infraestrutura seguem o handler global.
+
+## Transferência do gestor responsável
+
+`POST /workspace/manager-transfer` recebe:
+
+```json
+{"newManagerId": 42}
+```
+
+O ID é obrigatório e positivo. O workspace e o responsável atual são obtidos da
+identidade autenticada; não são parâmetros da requisição.
+
+- Somente o `GESTOR_WORKSPACE` ativo pode transferir a responsabilidade.
+- O escolhido precisa ser outro usuário, do mesmo workspace, com tipo `GESTOR`,
+  status `ATIVO` e autenticação concluída (Firebase UID preenchido).
+- O responsável anterior passa a `GESTOR`; o escolhido passa a `GESTOR_WORKSPACE`.
+- Somente `usuario.tipo` é atualizado. Identidade, status, cargo profissional,
+  unidade, datas, histórico e demais vínculos são preservados.
+- A API exige um único responsável existente antes da operação e serializa as
+  transferências pelo bloqueio do workspace. O novo gestor também é bloqueado.
+- As duas mudanças acontecem na mesma transação. Uma falha na promoção desfaz
+  a mudança anterior; outros consumidores não observam um estado intermediário.
+- A gravação confere novamente os tipos e o status atuais no banco. Uma
+  requisição que leu a autorização antes de outra transferência terminar não
+  pode transferir novamente em nome do antigo responsável.
+
+Exemplo do conteúdo de `data` na resposta:
+
+```json
+{"workspaceId": 3, "previousManagerId": 8, "newManagerId": 42}
+```
+
+Dados inválidos, escolha da própria conta ou gestor inativo retornam 400.
+Conta de outro workspace ou inexistente retorna 404. Perfil escolhido diferente
+de `GESTOR`, responsabilidade ambígua ou conflito na promoção retornam 409.
+Solicitante sem autorização atual retorna 403; sem autenticação retorna 401.
+
+O seletor da interface pode reutilizar `GET /managers`, mantendo apenas os
+resultados com `status = ATIVO`. Essa listagem já retorna ID e e-mail e consulta
+somente gestores comuns do workspace; o envio usa o ID, mesmo exibindo o e-mail.
+O backend repete as validações na confirmação, independentemente da listagem.
+
+`FirebaseAuthenticationFilter` chama `AuthorizationService` a cada requisição.
+A [função de autorização documentada](https://github.com/Astro-Inter/banco-de-dados/blob/main/database/functions/03_fn_retornar_nivel_acesso.sql)
+lê `usuario.tipo`; não é necessário alterar credenciais ou claims do Firebase.
+Após o sucesso, o frontend deve atualizar o perfil exibido e a navegação do antigo
+responsável. Não há envio de convite nem criação de outra conta neste fluxo.
+
+`WorkspaceManagerTransferPostgresTest` valida a troca, o rollback integral e uma
+requisição concorrente com a autorização antiga em um schema exclusivo do banco
+local descartável. O CI habilita o teste com `WORKSPACE_TEST_JDBC_URL`.
 
 ## Empresa
 
