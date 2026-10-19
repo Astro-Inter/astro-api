@@ -4,6 +4,7 @@ import com.astro.api.workspace.model.Workspace;
 import jakarta.persistence.*;
 
 @Entity
+@org.hibernate.annotations.DynamicUpdate
 @Table(
         name = "unidade",
         uniqueConstraints = @UniqueConstraint(columnNames = {"workspace_id", "nome"})

@@ -2,24 +2,30 @@ package com.astro.api.unit.repository;
 
 import com.astro.api.unit.model.Unit;
 import com.astro.api.workspace.model.Workspace;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import java.util.Collection;
-import java.util.List;
 
 @Repository
 public interface UnitRepository extends JpaRepository<Unit, Long> {
     List<Unit> findByWorkspaceAndNameIn(Workspace workspace, Collection<String> names);
+    List<Unit> findByWorkspace(Workspace workspace);
+
+    @Query("select count(u) from User u where u.unit.id = :unitId and u.type = com.astro.api.user.model.UserType.COLABORADOR")
+    long countCollaborators(@Param("unitId") Long unitId);
 
     @Query(value = """
-            SELECT id_unidade AS "unitId", id_workspace AS "workspaceId", nome AS "name",
-                   status, quantidade_colaboradores AS "collaboratorCount", cep AS "postalCode",
-                   rua AS "street", cidade AS "city", bairro AS "neighborhood", estado AS "state",
-                   complemento AS "addressLine2"
-            FROM fn_seleciona_unidades(:firebaseUid)
+            SELECT listed.id_unidade AS "unitId", listed.id_workspace AS "workspaceId", listed.nome AS "name",
+                   listed.status, listed.quantidade_colaboradores AS "collaboratorCount", listed.cep AS "postalCode",
+                   listed.rua AS "street", listed.cidade AS "city", listed.bairro AS "neighborhood", listed.estado AS "state",
+                   listed.complemento AS "addressLine2", address.numero AS "number"
+            FROM fn_seleciona_unidades(:firebaseUid) listed
+            LEFT JOIN unidade_endereco address ON address.unidade_id = listed.id_unidade
             """, nativeQuery = true)
     List<UnitProjection> findAllByFirebaseUid(@Param("firebaseUid") String firebaseUid);
 

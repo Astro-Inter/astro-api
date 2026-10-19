@@ -18,14 +18,19 @@ public class UnitMapper {
 
     public UnitAddress toAddress(UnitRequest request, Unit unit) {
         UnitAddress address = new UnitAddress();
+        updateAddress(request, address);
+        address.unit = unit;
+        return address;
+    }
+
+    public void updateAddress(UnitRequest request, UnitAddress address) {
         address.cep = request.cep();
         address.street = request.street();
+        address.number = request.number();
         address.city = request.city();
         address.neighborhood = request.neighborhood();
         address.state = request.state();
         address.addressLine2 = hasText(request.addressLine2()) ? request.addressLine2().trim() : null;
-        address.unit = unit;
-        return address;
     }
 
     private boolean hasText(String value) {
