@@ -42,11 +42,11 @@ class HomeServiceTest {
     @Test
     void combinesSqlMongoAndRedisData() {
         when(homeRepository.loadCollaboratorHome("uid")).thenReturn(json("URGENT", "[{\"id\":101,\"title\":\"EPI\",\"limit_date\":\"2026-10-12\"}]"));
-        Notification notification = notification("670f8df36a2ce84f6c12d230");
+        Notification notification = notification(6L);
         when(notificationService.findLatestForUser(42L)).thenReturn(List.of(notification));
         when(notificationService.elapsedWholeHours(notification.getCreatedAt())).thenReturn(2L);
         when(viewedService.findViewed(42L, "events", List.of(101L))).thenReturn(java.util.Set.of("101"));
-        when(viewedService.findViewed(42L, "notifications", List.of("670f8df36a2ce84f6c12d230"))).thenReturn(java.util.Set.of());
+        when(viewedService.findViewed(42L, "notifications", List.of(6L))).thenReturn(java.util.Set.of());
 
         CollaboratorHomeResponse response = service.getCollaboratorHome("uid");
 
@@ -80,7 +80,7 @@ class HomeServiceTest {
                 + events + ",\"status_message\":\"" + status + "\"}";
     }
 
-    private Notification notification(String id) {
+    private Notification notification(Long id) {
         Notification notification = new Notification();
         notification.setId(id);
         notification.setMessage("Lembrete");

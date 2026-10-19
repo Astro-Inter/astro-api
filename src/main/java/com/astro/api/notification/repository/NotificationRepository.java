@@ -6,11 +6,11 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import java.util.List;
 import java.util.Optional;
 
-public interface NotificationRepository extends MongoRepository<Notification, String> {
+public interface NotificationRepository extends MongoRepository<Notification, Object> {
     List<Notification> findTop3ByUserIdOrderByCreatedAtDescIdDesc(Long userId);
 
     List<Notification> findAllByUserIdOrderByCreatedAtDescIdDesc(Long userId);
 
-    Optional<Notification> findByIdAndUserId(String id, Long userId);
+    Optional<Notification> findByIdAndUserId(Object id, Long userId);
 
 }

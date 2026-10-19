@@ -91,8 +91,9 @@ public class HomeService {
                 events.stream().map(event -> new CollaboratorHomeResponse.PendingEventResponse(
                         event.id(), event.title(), event.limitDate(), viewedEvents.contains(event.id().toString()))).toList(),
                 notifications.stream().map(notification -> new CollaboratorHomeResponse.HomeNotificationResponse(
-                        notification.getId(), notification.getMessage(), notificationService.elapsedWholeHours(notification.getCreatedAt()),
-                        viewedNotifications.contains(notification.getId()))).toList());
+                        String.valueOf(notification.getId()), notification.getMessage(),
+                        notificationService.elapsedWholeHours(notification.getCreatedAt()),
+                        viewedNotifications.contains(String.valueOf(notification.getId())))).toList());
     }
 
     private Long userId(String firebaseUid) {
