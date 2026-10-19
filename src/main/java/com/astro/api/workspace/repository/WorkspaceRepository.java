@@ -12,6 +12,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     boolean existsByCnpj(String cnpj);
+    boolean existsByCnpjAndIdNot(String cnpj, Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select w from Workspace w where w.id = :id")

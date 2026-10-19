@@ -2,6 +2,7 @@ package com.astro.api.workspace.controller;
 
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.response.ApiResult;
+import com.astro.api.workspace.dto.request.UpdateWorkspaceRequest;
 import com.astro.api.workspace.dto.response.WorkspaceResponse;
 import com.astro.api.workspace.service.WorkspaceSettingsService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -41,6 +42,16 @@ public class WorkspaceSettingsController {
         WorkspaceResponse workspaceResponse = workspaceSettingsService.find(user);
         ApiResult<WorkspaceResponse> result = ApiResult.success(
                 "Workspace retornado com sucesso", workspaceResponse, request.getRequestURI());
+        return ResponseEntity.ok(result);
+    }
+
+    @PutMapping
+    @Operation(summary = "Atualiza nome e CNPJ do workspace autenticado")
+    public ResponseEntity<ApiResult<WorkspaceResponse>> update(@Valid @RequestBody UpdateWorkspaceRequest body,
+            @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
+        WorkspaceResponse workspaceResponse = workspaceSettingsService.update(body, user);
+        ApiResult<WorkspaceResponse> result = ApiResult.success(
+                "Workspace atualizado com sucesso", workspaceResponse, request.getRequestURI());
         return ResponseEntity.ok(result);
     }
 
