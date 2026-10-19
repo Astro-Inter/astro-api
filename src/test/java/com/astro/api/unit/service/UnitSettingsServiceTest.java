@@ -23,7 +23,8 @@ class UnitSettingsServiceTest {
     private final WorkspaceAccessService access = mock(WorkspaceAccessService.class);
     private final UnitRepository units = mock(UnitRepository.class);
     private final UnitAddressRepository addresses = mock(UnitAddressRepository.class);
-    private final UnitSettingsService service = new UnitSettingsService(access, units, addresses, new UnitMapper(), new UnitResponseMapper());
+    private final UnitService unitService = mock(UnitService.class);
+    private final UnitSettingsService service = new UnitSettingsService(access, units, addresses, new UnitMapper(), new UnitResponseMapper(), unitService);
     private final AuthenticatedUser user = new AuthenticatedUser("uid", null, Role.GESTOR_WORKSPACE);
     private final Workspace workspace = new Workspace();
 
@@ -49,6 +50,30 @@ class UnitSettingsServiceTest {
         assertEquals("SP", response.estado());
         assertEquals("Sala 1", response.complemento());
         verify(addresses).save(argThat(address -> "10A".equals(address.number) && address.unit.id == 12L));
+    }
+
+    @Test
+    void createsNewImportUnitsTogetherThroughTheRegistrationService() {
+        UnitRequest firstRequest = body("Filial Norte", null);
+        UnitRequest secondRequest = body("Filial Sul", null);
+        List<UnitRequest> requests = List.of(firstRequest, secondRequest);
+        Map<String, Unit> resolvedUnits = service.resolveForImport(workspace, requests);
+        Unit firstSavedUnit = new UnitMapper().toUnit(firstRequest, workspace);
+        firstSavedUnit.id = 20L;
+        Unit secondSavedUnit = new UnitMapper().toUnit(secondRequest, workspace);
+        secondSavedUnit.id = 21L;
+        when(unitService.createForWorkspace(workspace, requests))
+                .thenReturn(List.of(firstSavedUnit, secondSavedUnit));
+
+        Map<Unit, Unit> persistedUnits = service.persistNewForImport(workspace, requests, resolvedUnits,
+                List.of(resolvedUnits.get("filial norte")));
+
+        assertEquals(2, persistedUnits.size());
+        assertSame(firstSavedUnit, persistedUnits.get(resolvedUnits.get("filial norte")));
+        assertSame(secondSavedUnit, persistedUnits.get(resolvedUnits.get("filial sul")));
+        verify(unitService).createForWorkspace(workspace, requests);
+        verify(units, never()).saveAndFlush(any());
+        verifyNoInteractions(addresses);
     }
 
     @Test

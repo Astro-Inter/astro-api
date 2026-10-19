@@ -147,7 +147,8 @@ public class RoleService {
     @Transactional(readOnly = true)
     public Map<String, Role> resolveForImport(Workspace workspace, Collection<String> names) {
         Map<String, Role> rolesByName = new LinkedHashMap<>();
-        for (Role role : roleRepository.findByWorkspace(workspace)) {
+        List<Role> existingRoles = roleRepository.findByWorkspace(workspace);
+        for (Role role : existingRoles) {
             if (rolesByName.putIfAbsent(normalize(role.getName()), role) != null) {
                 throw new ConflictException("Existem cargos com nomes ambíguos no workspace");
             }
@@ -159,15 +160,17 @@ public class RoleService {
 
     @Transactional
     public int persistNewForImport(Collection<Role> roles) {
-        int created = 0;
-        for (Role role : roles.stream().distinct().toList()) {
-            if (role.getId() == null) {
-                checkName(role.getName());
-                roleRepository.saveAndFlush(role);
-                created++;
-            }
+        List<Role> newRoles = roles.stream()
+                .filter(role -> role.getId() == null)
+                .distinct()
+                .toList();
+        for (Role role : newRoles) {
+            checkName(role.getName());
         }
-        return created;
+        if (!newRoles.isEmpty()) {
+            roleRepository.saveAll(newRoles);
+        }
+        return newRoles.size();
     }
 
     private Role create(Workspace workspace, String name) {

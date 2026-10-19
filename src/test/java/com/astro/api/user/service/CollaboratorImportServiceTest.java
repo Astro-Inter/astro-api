@@ -21,8 +21,9 @@ import static org.mockito.Mockito.*;
 class CollaboratorImportServiceTest {
     private static final ValidatorFactory FACTORY = Validation.buildDefaultValidatorFactory();
     private final UserRepository repository = mock(UserRepository.class);
+    private final UserBatchService userBatchService = mock(UserBatchService.class);
     private final CollaboratorImportService service = new CollaboratorImportService(repository, FACTORY.getValidator(),
-            new CollaboratorMapper(), mock(CollaboratorRepository.class));
+            new CollaboratorMapper(), mock(CollaboratorRepository.class), userBatchService);
     private final Workspace workspace = new Workspace();
     private final Unit unit = new Unit();
     private final Role role = new Role();
@@ -51,7 +52,31 @@ class CollaboratorImportServiceTest {
         List<User> persisted = service.persist(plan);
         assertEquals(UserStatus.PRE_CADASTRADO, persisted.getFirst().getStatus());
         assertNull(persisted.getFirst().getFirebaseUid());
+        verify(userBatchService).saveAllPreRegistered(persisted);
+        verify(repository, never()).saveAllAndFlush(any());
         verify(repository, never()).delete(any());
+    }
+
+    @Test
+    void usesTheRegistrationBatchOnlyForNewCollaboratorsInAMixedImport() {
+        User existing = existing();
+        when(repository.findImportIdentitiesForUpdate(anyCollection(), anyCollection())).thenReturn(List.of(existing));
+        CollaboratorImportPlan plan = plan(List.of(
+                row(2, "Ana Atualizada", "52998224725", "novo@astro.com"),
+                row(3, "Bruno", "11144477735", "bruno@astro.com")));
+
+        List<User> changedUsers = service.persist(plan);
+
+        assertEquals(2, changedUsers.size());
+        assertSame(existing, changedUsers.getFirst());
+        assertEquals(8L, existing.getId());
+        assertEquals("firebase", existing.getFirebaseUid());
+        assertEquals(UserStatus.ATIVO, existing.getStatus());
+        verify(repository).saveAllAndFlush(List.of(existing));
+        User newCollaborator = changedUsers.getLast();
+        assertEquals(UserStatus.PRE_CADASTRADO, newCollaborator.getStatus());
+        assertNull(newCollaborator.getFirebaseUid());
+        verify(userBatchService).saveAllPreRegistered(List.of(newCollaborator));
     }
 
     @Test
@@ -77,6 +102,7 @@ class CollaboratorImportServiceTest {
         assertTrue(plan.changes().isEmpty());
         service.persist(plan);
         verify(repository, never()).saveAllAndFlush(any());
+        verifyNoInteractions(userBatchService);
     }
 
     @Test

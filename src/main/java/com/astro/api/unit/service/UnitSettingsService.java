@@ -34,14 +34,17 @@ public class UnitSettingsService {
     private final UnitAddressRepository unitAddressRepository;
     private final UnitMapper unitMapper;
     private final UnitResponseMapper unitResponseMapper;
+    private final UnitService unitService;
 
     public UnitSettingsService(WorkspaceAccessService workspaceAccessService, UnitRepository unitRepository,
-                               UnitAddressRepository unitAddressRepository, UnitMapper unitMapper, UnitResponseMapper unitResponseMapper) {
+                               UnitAddressRepository unitAddressRepository, UnitMapper unitMapper,
+                               UnitResponseMapper unitResponseMapper, UnitService unitService) {
         this.workspaceAccessService = workspaceAccessService;
         this.unitRepository = unitRepository;
         this.unitAddressRepository = unitAddressRepository;
         this.unitMapper = unitMapper;
         this.unitResponseMapper = unitResponseMapper;
+        this.unitService = unitService;
     }
 
     @Transactional
@@ -89,7 +92,8 @@ public class UnitSettingsService {
     @Transactional(readOnly = true)
     public Map<String, Unit> resolveForImport(Workspace workspace, List<UnitRequest> requests) {
         Map<String, Unit> unitsByName = new LinkedHashMap<>();
-        for (Unit unit : unitRepository.findByWorkspace(workspace)) {
+        List<Unit> existingUnits = unitRepository.findByWorkspace(workspace);
+        for (Unit unit : existingUnits) {
             if (unitsByName.putIfAbsent(NormalizedText.key(unit.name), unit) != null) {
                 throw new ConflictException("Existem unidades com nomes ambíguos no workspace");
             }
@@ -112,12 +116,18 @@ public class UnitSettingsService {
         requests.forEach(request -> requestsByName.put(NormalizedText.key(request.name()), request));
         Set<Unit> selectedUnits = new LinkedHashSet<>(referencedUnits);
         requestsByName.keySet().forEach(key -> selectedUnits.add(resolvedUnits.get(key)));
-        Map<Unit, Unit> persistedUnits = new IdentityHashMap<>();
-        for (Unit unit : selectedUnits) {
-            if (unit.id == null) {
-                persistedUnits.put(unit, createInWorkspace(workspace, requestsByName.get(NormalizedText.key(unit.name))));
-            }
+        List<Unit> newUnits = selectedUnits.stream().filter(unit -> unit.id == null).toList();
+        if (newUnits.isEmpty()) {
+            return Map.of();
         }
+        List<UnitRequest> newUnitRequests = newUnits.stream()
+                .map(unit -> requestsByName.get(NormalizedText.key(unit.name)))
+                .toList();
+        List<Unit> savedUnits = unitService.createForWorkspace(workspace, newUnitRequests);
+        Map<String, Unit> savedUnitsByName = new LinkedHashMap<>();
+        savedUnits.forEach(unit -> savedUnitsByName.put(NormalizedText.key(unit.name), unit));
+        Map<Unit, Unit> persistedUnits = new IdentityHashMap<>();
+        newUnits.forEach(unit -> persistedUnits.put(unit, savedUnitsByName.get(NormalizedText.key(unit.name))));
         return persistedUnits;
     }
 }

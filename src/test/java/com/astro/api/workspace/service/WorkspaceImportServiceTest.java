@@ -15,12 +15,14 @@ import com.astro.api.unit.model.Unit;
 import com.astro.api.unit.repository.UnitAddressRepository;
 import com.astro.api.unit.repository.UnitRepository;
 import com.astro.api.unit.service.UnitSettingsService;
+import com.astro.api.unit.service.UnitService;
 import com.astro.api.user.mapper.CollaboratorMapper;
 import com.astro.api.user.model.*;
 import com.astro.api.user.model.CollaboratorImportRow;
 import com.astro.api.user.repository.*;
 import com.astro.api.user.service.CollaboratorImportService;
 import com.astro.api.user.service.CollaboratorSpreadsheetReader;
+import com.astro.api.user.service.UserBatchService;
 import com.astro.api.workspace.dto.request.WorkspaceImportRequest;
 import com.astro.api.workspace.dto.response.WorkspaceImportResponse;
 import com.astro.api.workspace.event.PreRegisteredCollaboratorsCreatedEvent;
@@ -44,8 +46,10 @@ class WorkspaceImportServiceTest {
     private final UserRepository users = mock(UserRepository.class);
     private final UnitRepository units = mock(UnitRepository.class);
     private final RoleRepository roles = mock(RoleRepository.class);
-    private final UnitSettingsService settings = spy(new UnitSettingsService(access, units,
-            mock(UnitAddressRepository.class), new UnitMapper(), new UnitResponseMapper()));
+    private final UnitService unitService = mock(UnitService.class);
+    private final UserBatchService userBatchService = mock(UserBatchService.class);
+    private final UnitSettingsService settings = new UnitSettingsService(access, units,
+            mock(UnitAddressRepository.class), new UnitMapper(), new UnitResponseMapper(), unitService);
     private final RoleService roleService = new RoleService(roles, mock(RoleManagementRepository.class),
             mock(NrDocumentRepository.class), JsonMapper.builder().build());
     private final FirebaseIdentityService firebase = mock(FirebaseIdentityService.class);
@@ -57,7 +61,7 @@ class WorkspaceImportServiceTest {
     private final AuthenticatedUser principal = new AuthenticatedUser("uid", null,
             com.astro.api.auth.security.Role.GESTOR_WORKSPACE);
     private final WorkspaceImportService service = new WorkspaceImportService(access, reader,
-            new CollaboratorImportService(users, FACTORY.getValidator(), new CollaboratorMapper(), repository),
+            new CollaboratorImportService(users, FACTORY.getValidator(), new CollaboratorMapper(), repository, userBatchService),
             roleService, settings, firebase, events, manager);
 
     @BeforeEach
@@ -79,15 +83,17 @@ class WorkspaceImportServiceTest {
         CollaboratorImportRow row = row("ana@astro.com");
         when(reader.read(file, 10L * 1024 * 1024)).thenReturn(List.of(row));
         Unit persisted = unit(12L);
-        doReturn(persisted).when(settings).createInWorkspace(eq(workspace), any());
-        when(roles.saveAndFlush(any())).thenAnswer(call -> {
-            Role role = call.getArgument(0); role.setId(9L); return role;
+        when(unitService.createForWorkspace(eq(workspace), anyList())).thenReturn(List.of(persisted));
+        when(roles.saveAll(any())).thenAnswer(call -> {
+            List<Role> newRoles = call.getArgument(0);
+            newRoles.forEach(role -> role.setId(9L));
+            return newRoles;
         });
         WorkspaceImportResponse result = service.importFile(file, body(), principal);
         assertEquals(1, result.created());
         assertEquals(1, result.unitsCreated());
         assertEquals(1, result.rolesCreated());
-        verify(users).saveAllAndFlush(argThat(changed -> {
+        verify(userBatchService).saveAllPreRegistered(argThat(changed -> {
             User first = changed.iterator().next();
             return first.getUnit() == persisted && first.getRole().getId() == 9L;
         }));
@@ -102,9 +108,9 @@ class WorkspaceImportServiceTest {
         SpreadsheetImportException failure = assertThrows(SpreadsheetImportException.class,
                 () -> service.importFile(file, new WorkspaceImportRequest(null), principal));
         assertEquals("unidade", failure.getImportErrors().getFirst().field());
-        verify(settings, never()).createInWorkspace(any(), any());
-        verify(roles, never()).saveAndFlush(any());
-        verifyNoInteractions(events, firebase);
+        verify(unitService, never()).createForWorkspace(any(), anyList());
+        verify(roles, never()).saveAll(any());
+        verifyNoInteractions(events, firebase, userBatchService);
         verify(manager).rollback(any());
     }
 
@@ -139,21 +145,23 @@ class WorkspaceImportServiceTest {
         assertEquals(0, result.created());
         assertEquals(0, result.updated());
         verify(users, never()).saveAllAndFlush(any());
-        verifyNoInteractions(events, firebase);
-        verify(settings, never()).createInWorkspace(any(), any());
+        verifyNoInteractions(events, firebase, userBatchService);
+        verify(unitService, never()).createForWorkspace(any(), anyList());
     }
 
     @Test
     void refusesAUnitDeactivatedBetweenPlanningAndWriting() {
         when(reader.read(file, 10L * 1024 * 1024)).thenReturn(List.of(row("ana@astro.com")));
-        doReturn(unit(12L)).when(settings).createInWorkspace(eq(workspace), any());
-        when(roles.saveAndFlush(any())).thenAnswer(call -> {
-            Role role = call.getArgument(0); role.setId(9L); return role;
+        when(unitService.createForWorkspace(eq(workspace), anyList())).thenReturn(List.of(unit(12L)));
+        when(roles.saveAll(any())).thenAnswer(call -> {
+            List<Role> newRoles = call.getArgument(0);
+            newRoles.forEach(role -> role.setId(9L));
+            return newRoles;
         });
         when(repository.lockUnitActive(12L, 3L)).thenReturn(false);
         assertThrows(SpreadsheetImportException.class, () -> service.importFile(file, body(), principal));
         verify(users, never()).saveAllAndFlush(any());
-        verifyNoInteractions(events, firebase);
+        verifyNoInteractions(events, firebase, userBatchService);
         verify(manager).rollback(any());
     }
 
@@ -173,6 +181,28 @@ class WorkspaceImportServiceTest {
                 () -> service.importFile(file, new WorkspaceImportRequest(null), principal));
         assertTrue(failure.getMessage().contains("reconciliação"));
         verify(repository).deactivateAfterEmailFailure(8L, "firebase");
+        verifyNoInteractions(events);
+    }
+
+    @Test
+    void rollsBackAndRestoresExistingEmailWhenTheNewCollaboratorBatchFails() {
+        User existing = existing();
+        when(units.findByWorkspace(workspace)).thenReturn(List.of(existing.getUnit()));
+        when(roles.findByWorkspace(workspace)).thenReturn(List.of(existing.getRole()));
+        when(users.findImportIdentitiesForUpdate(anyCollection(), anyCollection())).thenReturn(List.of(existing));
+        when(reader.read(file, 10L * 1024 * 1024)).thenReturn(List.of(row("novo@astro.com"),
+                new CollaboratorImportRow(3, "Bruno", "11144477735", "bruno@astro.com", "Filial", "Dev", "Remoto")));
+        FirebaseIdentityService.EmailState previousEmailState = new FirebaseIdentityService.EmailState("ana@astro.com", true);
+        when(firebase.readEmailState("firebase")).thenReturn(previousEmailState);
+        doThrow(new IllegalStateException("Batch unavailable")).when(userBatchService).saveAllPreRegistered(anyList());
+
+        assertThrows(IllegalStateException.class,
+                () -> service.importFile(file, new WorkspaceImportRequest(null), principal));
+
+        verify(users).saveAllAndFlush(List.of(existing));
+        verify(firebase).restoreEmail("firebase", previousEmailState);
+        verify(manager).rollback(any());
+        verify(manager, never()).commit(any());
         verifyNoInteractions(events);
     }
 

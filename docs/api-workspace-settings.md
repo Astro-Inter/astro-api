@@ -167,6 +167,23 @@ o serviço tenta desativar o colaborador para conter uma identidade inconsistent
 registra a necessidade de reconciliação e retorna erro. Não há transação
 distribuída entre PostgreSQL, Firebase e Redis.
 
+A leitura usa o mesmo `CollaboratorSpreadsheetReader` do cadastro inicial.
+Na gravação, a importação também reaproveita os caminhos do cadastro:
+
+- Novos colaboradores passam por `UserBatchService.saveAllPreRegistered`, com
+  `JdbcTemplate.batchUpdate` em grupos de até 500 registros.
+- Colaboradores existentes alterados são atualizados separadamente, preservando
+  IDs, Firebase UID e status, com um `saveAllAndFlush` para o conjunto alterado.
+- Novas unidades e endereços usam `UnitService.createForWorkspace`, que salva
+  as coleções de unidades e endereços com `saveAll`.
+- Cargos novos usam `saveAll`, como no cadastro, depois de validar todos os
+  nomes; não há `saveAndFlush` por cargo.
+
+As gravações continuam dentro da transação do lote. Usar `saveAll` para cargos
+ou unidades não significa um único INSERT SQL: entidades com IDs gerados por
+`IDENTITY` ainda podem exigir inserts individuais. A mudança remove os flushes
+explícitos por cargo e compartilha o batch JDBC já existente para colaboradores.
+
 Somente novos colaboradores geram o evento de convite, consumido pela fila
 existente após commit. A fila atual registra falhas Redis sem reverter o commit;
 este trabalho não adiciona mecanismo de outbox/reprocessamento.
@@ -199,7 +216,7 @@ e não reenvia convites dos registros existentes.
 `WorkspaceSettingsController` mantém as rotas autenticadas separadas do
 cadastro público. `WorkspaceAccessService` resolve o escopo comum;
 `WorkspaceSettingsService` edita a empresa; `UnitSettingsService` compartilha
-a criação de sedes com o import. `WorkspaceImportService` coordena o lote e
+a criação de sedes com o import por meio de `UnitService.createForWorkspace`. `WorkspaceImportService` coordena o lote e
 a compensação Firebase; `CollaboratorImportService` valida, compara e persiste
 os colaboradores usando `CollaboratorMapper`. A leitura Excel fica em
 `CollaboratorSpreadsheetReader`, com o modelo `CollaboratorImportRow`,

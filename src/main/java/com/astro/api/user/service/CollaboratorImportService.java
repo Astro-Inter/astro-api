@@ -37,13 +37,16 @@ public class CollaboratorImportService {
     private final Validator validator;
     private final CollaboratorMapper collaboratorMapper;
     private final CollaboratorRepository collaboratorRepository;
+    private final UserBatchService userBatchService;
 
     public CollaboratorImportService(UserRepository userRepository, Validator validator,
-            CollaboratorMapper collaboratorMapper, CollaboratorRepository collaboratorRepository) {
+            CollaboratorMapper collaboratorMapper, CollaboratorRepository collaboratorRepository,
+            UserBatchService userBatchService) {
         this.userRepository = userRepository;
         this.validator = validator;
         this.collaboratorMapper = collaboratorMapper;
         this.collaboratorRepository = collaboratorRepository;
+        this.userBatchService = userBatchService;
     }
 
     public CollaboratorImportPlan plan(Workspace workspace, List<CollaboratorImportRow> rows, Map<String, Unit> unitsByName,
@@ -140,16 +143,25 @@ public class CollaboratorImportService {
 
     public List<User> persist(CollaboratorImportPlan plan) {
         List<User> changedUsers = new ArrayList<>();
+        List<User> newCollaborators = new ArrayList<>();
+        List<User> updatedCollaborators = new ArrayList<>();
         for (Change change : plan.changes()) {
             User user = change.existingCollaborator();
             if (user == null) {
                 user = collaboratorMapper.toNewUser(change.data(), change.role(), change.unit());
+                newCollaborators.add(user);
             } else {
                 collaboratorMapper.applyImportUpdate(user, change.data(), change.role(), change.unit());
+                updatedCollaborators.add(user);
             }
             changedUsers.add(user);
         }
-        if (!changedUsers.isEmpty()) userRepository.saveAllAndFlush(changedUsers);
+        if (!updatedCollaborators.isEmpty()) {
+            userRepository.saveAllAndFlush(updatedCollaborators);
+        }
+        if (!newCollaborators.isEmpty()) {
+            userBatchService.saveAllPreRegistered(newCollaborators);
+        }
         return changedUsers;
     }
 
