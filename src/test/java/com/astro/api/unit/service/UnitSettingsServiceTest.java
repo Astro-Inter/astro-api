@@ -52,9 +52,24 @@ class UnitSettingsServiceTest {
     }
 
     @Test
+    void updatesAddressWithoutChangingStatusOrIdentityAndClearsComplement() {
+        Unit unit = unit("Matriz", false);
+        unit.address = new UnitMapper().toAddress(body("Matriz", "Antigo"), unit);
+        when(units.findByWorkspace(workspace)).thenReturn(List.of(unit));
+        when(units.findForUpdate(12L, 3L)).thenReturn(Optional.of(unit));
+        UnitResponse response = service.update(12L, body("Matriz", " "), user);
+        assertEquals(12L, response.id_unidade());
+        assertEquals("Inativo", response.status());
+        assertNull(response.complemento());
+        assertSame(workspace, unit.workspace);
+        assertSame(unit, unit.address.unit);
+    }
+
+    @Test
     void rejectsNormalizedDuplicateAndOutOfScopeId() {
         when(units.findByWorkspace(workspace)).thenReturn(List.of(unit("MÁTRIZ", true)));
         assertThrows(ConflictException.class, () -> service.create(body("matriz", null), user));
+        assertThrows(ResourceNotFoundException.class, () -> service.update(99L, body("Filial", null), user));
         verifyNoInteractions(addresses);
     }
 

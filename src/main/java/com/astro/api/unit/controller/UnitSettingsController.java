@@ -44,4 +44,14 @@ public class UnitSettingsController {
         return ResponseEntity.created(location).body(result);
     }
 
+    @PutMapping("/{unitId}")
+    @Operation(summary = "Edita nome e endereço da unidade, preservando seus vínculos e status")
+    public ResponseEntity<ApiResult<UnitResponse>> update(@PathVariable Long unitId,
+            @Valid @RequestBody UnitRequest body, @AuthenticationPrincipal AuthenticatedUser user,
+            HttpServletRequest request) {
+        UnitResponse response = unitSettingsService.update(unitId, body, user);
+        ApiResult<UnitResponse> result = ApiResult.success(
+                "Unidade atualizada com sucesso", response, request.getRequestURI());
+        return ResponseEntity.ok(result);
+    }
 }

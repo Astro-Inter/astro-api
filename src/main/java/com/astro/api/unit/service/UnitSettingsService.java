@@ -52,6 +52,19 @@ public class UnitSettingsService {
     }
 
     @Transactional
+    public UnitResponse update(Long unitId, UnitRequest body, AuthenticatedUser user) {
+        Workspace workspace = workspaceAccessService.requireWorkspace(user, true);
+        if (unitId == null || unitId <= 0) throw new BusinessException("O identificador da unidade deve ser positivo");
+        Unit unit = unitRepository.findForUpdate(unitId, workspace.id)
+                .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada no workspace"));
+        ensureNameAvailable(workspace, body.name(), unitId);
+        unitMapper.applyUpdate(body, unit);
+        unitAddressRepository.save(unit.address);
+        unitRepository.saveAndFlush(unit);
+        return buildUnitResponse(unit);
+    }
+
+    @Transactional
     public Unit createInWorkspace(Workspace workspace, UnitRequest body) {
         ensureNameAvailable(workspace, body.name(), null);
         Unit unit = unitRepository.saveAndFlush(unitMapper.toUnit(body, workspace));

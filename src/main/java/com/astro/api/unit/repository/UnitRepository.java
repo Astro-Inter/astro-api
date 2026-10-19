@@ -16,6 +16,13 @@ public interface UnitRepository extends JpaRepository<Unit, Long> {
     List<Unit> findByWorkspaceAndNameIn(Workspace workspace, Collection<String> names);
     List<Unit> findByWorkspace(Workspace workspace);
 
+    @Query(value = """
+            SELECT unit.* FROM unidade unit
+            WHERE unit.id_unidade = :id AND unit.workspace_id = :workspaceId
+            FOR UPDATE OF unit
+            """, nativeQuery = true)
+    Optional<Unit> findForUpdate(@Param("id") Long id, @Param("workspaceId") Long workspaceId);
+
     @Query("select count(u) from User u where u.unit.id = :unitId and u.type = com.astro.api.user.model.UserType.COLABORADOR")
     long countCollaborators(@Param("unitId") Long unitId);
 

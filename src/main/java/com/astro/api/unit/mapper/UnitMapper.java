@@ -23,6 +23,15 @@ public class UnitMapper {
         return address;
     }
 
+    public void applyUpdate(UnitRequest request, Unit unit) {
+        unit.name = request.name();
+        if (unit.address == null) {
+            unit.address = toAddress(request, unit);
+        } else {
+            updateAddress(request, unit.address);
+        }
+    }
+
     public void updateAddress(UnitRequest request, UnitAddress address) {
         address.cep = request.cep();
         address.street = request.street();
