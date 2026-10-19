@@ -3,16 +3,16 @@ package com.astro.api.user.model;
 import com.astro.api.role.model.Role;
 import com.astro.api.unit.model.Unit;
 import jakarta.persistence.*;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.time.Instant;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @Entity
+@org.hibernate.annotations.DynamicUpdate
 @Table(name = "usuario")
 public class User extends Account {
 

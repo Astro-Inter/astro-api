@@ -1,25 +1,17 @@
 package com.astro.api.workspace.service;
 
-import com.astro.api.role.model.Role;
 import com.astro.api.common.exception.BusinessException;
+import com.astro.api.common.model.SpreadsheetImportError;
+import com.astro.api.role.model.Role;
 import com.astro.api.unit.dto.request.UnitRequest;
 import com.astro.api.unit.model.Unit;
+import com.astro.api.user.model.CollaboratorImportRow;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.model.WorkModel;
 import com.astro.api.user.repository.UserRepository;
-import com.astro.api.workspace.dto.response.ImportErrorResponse;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.DataFormatter;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.usermodel.WorkbookFactory;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.io.IOException;
+import com.astro.api.user.service.CollaboratorSpreadsheetReader;
 import java.text.Normalizer;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -31,56 +23,27 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class SpreadsheetImportService {
-    private static final List<String> REQUIRED_HEADERS = List.of("nome", "cpf", "email", "unidade", "cargo", "modalidade");
     private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
     private final UserRepository userRepository;
 
-    public SpreadsheetImportService(UserRepository userRepository) {
+    private final CollaboratorSpreadsheetReader collaboratorSpreadsheetReader;
+
+    public SpreadsheetImportService(UserRepository userRepository, CollaboratorSpreadsheetReader collaboratorSpreadsheetReader) {
         this.userRepository = userRepository;
+        this.collaboratorSpreadsheetReader = collaboratorSpreadsheetReader;
     }
 
-    public List<SpreadsheetRow> read(MultipartFile file) {
-        if (file != null && file.getSize() > 5L * 1024 * 1024) {
-            throw new org.springframework.web.multipart.MaxUploadSizeExceededException(5L * 1024 * 1024);
-        }
-        if (file == null || file.isEmpty()) {
-            throw new BusinessException("A planilha de colaboradores é obrigatória");
-        }
-        try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
-            Sheet sheet = workbook.getNumberOfSheets() == 0 ? null : workbook.getSheetAt(0);
-            if (sheet == null || sheet.getPhysicalNumberOfRows() == 0) {
-                throw new BusinessException("A planilha não possui linhas para importar");
-            }
-            DataFormatter formatter = new DataFormatter(Locale.forLanguageTag("pt-BR"));
-            Row header = sheet.getRow(sheet.getFirstRowNum());
-            Map<String, Integer> columns = columns(header, formatter);
-            for (String requiredHeader : REQUIRED_HEADERS) {
-                if (!columns.containsKey(requiredHeader)) {
-                    throw new BusinessException("A planilha deve conter a coluna '" + requiredHeader + "'");
-                }
-            }
-            List<SpreadsheetRow> rows = new ArrayList<>();
-            for (int index = header.getRowNum() + 1; index <= sheet.getLastRowNum(); index++) {
-                Row row = sheet.getRow(index);
-                if (row == null || isBlankRow(row, formatter)) continue;
-                rows.add(new SpreadsheetRow(index + 1,
-                        value(row, columns.get("nome"), formatter), value(row, columns.get("cpf"), formatter),
-                        value(row, columns.get("email"), formatter), value(row, columns.get("unidade"), formatter),
-                        value(row, columns.get("cargo"), formatter), value(row, columns.get("modalidade"), formatter)));
-            }
-            return rows;
-        } catch (BusinessException exception) {
-            throw exception;
-        } catch (IOException | RuntimeException exception) {
-            throw new BusinessException("Não foi possível ler a planilha XLS/XLSX enviada");
-        }
+    public List<CollaboratorImportRow> read(MultipartFile file) {
+        return collaboratorSpreadsheetReader.read(file, 5L * 1024 * 1024);
     }
 
-    public SpreadsheetRow findManagerRow(List<SpreadsheetRow> rows, String managerEmail) {
-        List<SpreadsheetRow> managerRows = rows.stream()
+    public CollaboratorImportRow findManagerRow(List<CollaboratorImportRow> rows, String managerEmail) {
+        List<CollaboratorImportRow> managerRows = rows.stream()
                 .filter(row -> email(row.email()).equals(email(managerEmail)))
                 .toList();
         if (managerRows.isEmpty()) {
@@ -89,7 +52,7 @@ public class SpreadsheetImportService {
         if (managerRows.size() > 1) {
             throw new BusinessException("Planilha: o e-mail do gestor aparece em mais de uma linha");
         }
-        SpreadsheetRow managerRow = managerRows.getFirst();
+        CollaboratorImportRow managerRow = managerRows.getFirst();
         if (!notBlank(managerRow.name())) {
             throw new BusinessException("Planilha: o nome do gestor é obrigatório");
         }
@@ -102,26 +65,26 @@ public class SpreadsheetImportService {
         return managerRow;
     }
 
-    public Unit findManagerUnit(SpreadsheetRow managerRow, List<Unit> units) {
+    public Unit findManagerUnit(CollaboratorImportRow managerRow, List<Unit> units) {
         return units.stream()
                 .filter(unit -> normalized(unit.name).equals(normalized(managerRow.unit())))
                 .findFirst()
                 .orElseThrow(() -> new BusinessException("Planilha: a unidade informada para o gestor não existe no workspace"));
     }
 
-    public Role findManagerRole(SpreadsheetRow managerRow, Map<String, Role> rolesByName) {
+    public Role findManagerRole(CollaboratorImportRow managerRow, Map<String, Role> rolesByName) {
         return rolesByName.get(normalized(managerRow.role()));
     }
 
-    public ImportProcessingResult validateForRegistration(List<SpreadsheetRow> rows, List<UnitRequest> unitRequests,
-                                                           SpreadsheetRow managerRow) {
+    public ImportProcessingResult validateForRegistration(List<CollaboratorImportRow> rows, List<UnitRequest> unitRequests,
+                                                           CollaboratorImportRow managerRow) {
         List<Unit> units = unitRequests.stream().map(request -> {
             Unit unit = new Unit();
             unit.name = request.name();
             return unit;
         }).toList();
         Map<String, Role> rolesByName = new HashMap<>();
-        rows.stream().map(SpreadsheetRow::role).filter(this::notBlank).forEach(name -> {
+        rows.stream().map(CollaboratorImportRow::role).filter(this::notBlank).forEach(name -> {
             Role role = new Role();
             role.setName(name.trim());
             role.setActive(true);
@@ -141,11 +104,11 @@ public class SpreadsheetImportService {
         });
     }
 
-    public ImportProcessingResult validateAndBuild(List<SpreadsheetRow> rows, List<Unit> units,
-                                                    SpreadsheetRow managerRow, Map<String, Role> rolesByName) {
-        List<SpreadsheetRow> collaboratorRows = rows.stream().filter(row -> row != managerRow).toList();
-        Set<String> emails = collaboratorRows.stream().map(SpreadsheetRow::email).filter(this::notBlank).map(this::email).collect(Collectors.toSet());
-        Set<String> cpfs = collaboratorRows.stream().map(SpreadsheetRow::cpf).filter(this::notBlank).map(this::cpf).collect(Collectors.toSet());
+    public ImportProcessingResult validateAndBuild(List<CollaboratorImportRow> rows, List<Unit> units,
+                                                    CollaboratorImportRow managerRow, Map<String, Role> rolesByName) {
+        List<CollaboratorImportRow> collaboratorRows = rows.stream().filter(row -> row != managerRow).toList();
+        Set<String> emails = collaboratorRows.stream().map(CollaboratorImportRow::email).filter(this::notBlank).map(this::email).collect(Collectors.toSet());
+        Set<String> cpfs = collaboratorRows.stream().map(CollaboratorImportRow::cpf).filter(this::notBlank).map(this::cpf).collect(Collectors.toSet());
         Set<String> existingEmails = emails.isEmpty() ? Set.of() : userRepository.findByEmailInIgnoreCase(emails).stream()
                 .map(User::getEmail)
                 .map(this::email)
@@ -161,8 +124,8 @@ public class SpreadsheetImportService {
             cpfsInSpreadsheet.add(cpf(managerRow.cpf()));
         }
         List<User> validUsers = new ArrayList<>();
-        List<ImportErrorResponse> errors = new ArrayList<>();
-        for (SpreadsheetRow row : collaboratorRows) {
+        List<SpreadsheetImportError> errors = new ArrayList<>();
+        for (CollaboratorImportRow row : collaboratorRows) {
             String normalizedEmail = email(row.email());
             String normalizedCpf = cpf(row.cpf());
             if (!notBlank(row.name())) { error(errors, row, "nome", "Nome é obrigatório"); continue; }
@@ -187,14 +150,7 @@ public class SpreadsheetImportService {
         return new ImportProcessingResult(validUsers, errors);
     }
 
-    private Map<String, Integer> columns(Row header, DataFormatter formatter) {
-        Map<String, Integer> result = new HashMap<>();
-        for (Cell cell : header) result.put(normalized(formatter.formatCellValue(cell)), cell.getColumnIndex());
-        return result;
-    }
-    private String value(Row row, int column, DataFormatter formatter) { Cell cell = row.getCell(column, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL); return cell == null ? "" : formatter.formatCellValue(cell).trim(); }
-    private boolean isBlankRow(Row row, DataFormatter formatter) { for (Cell cell : row) if (notBlank(formatter.formatCellValue(cell))) return false; return true; }
-    private void error(List<ImportErrorResponse> errors, SpreadsheetRow row, String field, String message) { errors.add(new ImportErrorResponse(row.number(), field, message)); }
+    private void error(List<SpreadsheetImportError> errors, CollaboratorImportRow row, String field, String message) { errors.add(new SpreadsheetImportError(row.number(), field, message)); }
     private boolean notBlank(String value) { return value != null && !value.trim().isEmpty(); }
     private String email(String value) { return value == null ? "" : value.trim().toLowerCase(Locale.ROOT); }
     private String cpf(String value) { return value == null ? "" : value.replaceAll("\\D", ""); }
@@ -206,6 +162,5 @@ public class SpreadsheetImportService {
     }
     private int digit(String cpf, int length) { int sum = 0; for (int i = 0; i < length; i++) sum += (cpf.charAt(i) - '0') * (length + 1 - i); int result = (sum * 10) % 11; return result == 10 ? 0 : result; }
 
-    public record SpreadsheetRow(int number, String name, String cpf, String email, String unit, String role, String workModel) { }
-    public record ImportProcessingResult(List<User> validUsers, List<ImportErrorResponse> errors) { }
+    public record ImportProcessingResult(List<User> validUsers, List<SpreadsheetImportError> errors) { }
 }

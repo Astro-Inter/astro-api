@@ -3,33 +3,43 @@ package com.astro.api.common.handler;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ConflictException;
 import com.astro.api.common.exception.ResourceNotFoundException;
+import com.astro.api.common.exception.SpreadsheetImportException;
+import com.astro.api.common.model.SpreadsheetImportError;
 import com.astro.api.common.response.ApiResult;
 import com.mongodb.MongoTimeoutException;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
-import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
-import org.springframework.web.HttpRequestMethodNotSupportedException;
-import org.springframework.web.multipart.support.MissingServletRequestPartException;
-import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.List;
-import java.util.stream.Collectors;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(SpreadsheetImportException.class)
+    public ResponseEntity<ApiResult<List<SpreadsheetImportError>>> handleSpreadsheet(
+            SpreadsheetImportException exception, HttpServletRequest request) {
+        ApiResult<List<SpreadsheetImportError>> result = new ApiResult<>(false, exception.getMessage(),
+                exception.getImportErrors(), List.of("Corrija as linhas indicadas e envie novamente"),
+                request.getRequestURI());
+        return ResponseEntity.status(422).body(result);
+    }
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 

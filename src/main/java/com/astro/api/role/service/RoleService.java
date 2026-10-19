@@ -1,6 +1,10 @@
 package com.astro.api.role.service;
 
 import com.astro.api.auth.security.AuthenticatedUser;
+import com.astro.api.common.exception.BusinessException;
+import com.astro.api.common.exception.ConflictException;
+import com.astro.api.conformity.repository.NrDocumentRepository;
+import com.astro.api.role.dto.request.RoleNrRequest;
 import com.astro.api.role.dto.request.RoleRequest;
 import com.astro.api.role.dto.request.UpdateRoleNrsRequest;
 import com.astro.api.role.dto.response.RoleNrOptionResponse;
@@ -9,15 +13,7 @@ import com.astro.api.role.dto.response.RoleResponse;
 import com.astro.api.role.model.Role;
 import com.astro.api.role.repository.RoleManagementRepository;
 import com.astro.api.role.repository.RoleRepository;
-import com.astro.api.common.exception.BusinessException;
-import com.astro.api.conformity.repository.NrDocumentRepository;
 import com.astro.api.workspace.model.Workspace;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.json.JsonMapper;
-
 import java.text.Normalizer;
 import java.util.Collection;
 import java.util.Comparator;
@@ -28,6 +24,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 
 @Service
 public class RoleService {
@@ -71,7 +72,7 @@ public class RoleService {
         checkIdentity(body.firebaseUid(), user);
         checkRoleId(roleId);
         Set<Integer> codes = new HashSet<>();
-        for (var nr : body.nrs()) {
+        for (RoleNrRequest nr : body.nrs()) {
             if (!codes.add(nr.nr())) {
                 throw new BusinessException("A lista não pode repetir códigos de NR");
             }
@@ -141,6 +142,32 @@ public class RoleService {
         Map<String, Role> rolesByName = new LinkedHashMap<>();
         savedRoles.forEach(role -> rolesByName.put(normalize(role.getName()), role));
         return rolesByName;
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Role> resolveForImport(Workspace workspace, Collection<String> names) {
+        Map<String, Role> rolesByName = new LinkedHashMap<>();
+        for (Role role : roleRepository.findByWorkspace(workspace)) {
+            if (rolesByName.putIfAbsent(normalize(role.getName()), role) != null) {
+                throw new ConflictException("Existem cargos com nomes ambíguos no workspace");
+            }
+        }
+        names.stream().filter(this::hasText).forEach(name ->
+                rolesByName.computeIfAbsent(normalize(name), key -> create(workspace, name.trim())));
+        return rolesByName;
+    }
+
+    @Transactional
+    public int persistNewForImport(Collection<Role> roles) {
+        int created = 0;
+        for (Role role : roles.stream().distinct().toList()) {
+            if (role.getId() == null) {
+                checkName(role.getName());
+                roleRepository.saveAndFlush(role);
+                created++;
+            }
+        }
+        return created;
     }
 
     private Role create(Workspace workspace, String name) {

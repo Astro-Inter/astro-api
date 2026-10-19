@@ -86,4 +86,38 @@ public class UnitSettingsService {
         return unitResponseMapper.toResponse(unit, collaboratorCount);
     }
 
+    @Transactional(readOnly = true)
+    public Map<String, Unit> resolveForImport(Workspace workspace, List<UnitRequest> requests) {
+        Map<String, Unit> unitsByName = new LinkedHashMap<>();
+        for (Unit unit : unitRepository.findByWorkspace(workspace)) {
+            if (unitsByName.putIfAbsent(NormalizedText.key(unit.name), unit) != null) {
+                throw new ConflictException("Existem unidades com nomes ambíguos no workspace");
+            }
+        }
+        Set<String> suppliedNames = new HashSet<>();
+        for (UnitRequest request : requests) {
+            String key = NormalizedText.key(request.name());
+            if (!suppliedNames.add(key)) {
+                throw new ConflictException("Há unidades repetidas nos dados complementares");
+            }
+            unitsByName.computeIfAbsent(key, name -> unitMapper.toUnit(request, workspace));
+        }
+        return unitsByName;
+    }
+
+    @Transactional
+    public Map<Unit, Unit> persistNewForImport(Workspace workspace, List<UnitRequest> requests,
+            Map<String, Unit> resolvedUnits, Collection<Unit> referencedUnits) {
+        Map<String, UnitRequest> requestsByName = new LinkedHashMap<>();
+        requests.forEach(request -> requestsByName.put(NormalizedText.key(request.name()), request));
+        Set<Unit> selectedUnits = new LinkedHashSet<>(referencedUnits);
+        requestsByName.keySet().forEach(key -> selectedUnits.add(resolvedUnits.get(key)));
+        Map<Unit, Unit> persistedUnits = new IdentityHashMap<>();
+        for (Unit unit : selectedUnits) {
+            if (unit.id == null) {
+                persistedUnits.put(unit, createInWorkspace(workspace, requestsByName.get(NormalizedText.key(unit.name))));
+            }
+        }
+        return persistedUnits;
+    }
 }

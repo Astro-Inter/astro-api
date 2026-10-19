@@ -2,16 +2,16 @@ package com.astro.api.workspace.service;
 
 import com.astro.api.auth.service.FirebaseIdentityService;
 import com.astro.api.common.exception.ConflictException;
+import com.astro.api.common.exception.SpreadsheetImportException;
+import com.astro.api.user.model.CollaboratorImportRow;
+import com.astro.api.user.repository.UserRepository;
 import com.astro.api.workspace.dto.request.CreateWorkspaceRequest;
 import com.astro.api.workspace.dto.response.RegisterWorkspaceResponse;
-import com.astro.api.workspace.exception.SpreadsheetImportException;
 import com.astro.api.workspace.repository.WorkspaceRepository;
-import com.astro.api.user.repository.UserRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-
 import java.util.List;
 import java.util.Locale;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class WorkspaceService {
@@ -33,8 +33,8 @@ public class WorkspaceService {
 
     public RegisterWorkspaceResponse register(CreateWorkspaceRequest request, MultipartFile file) {
         validateStructuralConflicts(request);
-        List<SpreadsheetImportService.SpreadsheetRow> rows = spreadsheetImportService.read(file);
-        SpreadsheetImportService.SpreadsheetRow managerRow = spreadsheetImportService.findManagerRow(rows, request.email());
+        List<CollaboratorImportRow> rows = spreadsheetImportService.read(file);
+        CollaboratorImportRow managerRow = spreadsheetImportService.findManagerRow(rows, request.email());
         SpreadsheetImportService.ImportProcessingResult importResult = spreadsheetImportService
                 .validateForRegistration(rows, request.units(), managerRow);
         if (!importResult.errors().isEmpty()) {
