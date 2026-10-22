@@ -1,6 +1,7 @@
 package com.astro.api.conformity.service;
 
 import com.astro.api.common.exception.BusinessException;
+import com.astro.api.common.text.PersonalDataNormalizer;
 import com.astro.api.conformity.model.ConformityImportRow;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
@@ -108,7 +109,7 @@ public class ConformitySpreadsheetReader {
         } else if (cell.getCellType() == CellType.STRING) {
             String text = cell.getStringCellValue().trim();
             if (!text.matches("[0-9.\\-\\s]+")) throw new BusinessException("CPF deve conter 11 dígitos");
-            digits = text.replaceAll("[^0-9]", "");
+            digits = PersonalDataNormalizer.cpfDigits(text);
         } else throw new BusinessException("CPF inválido");
         if (digits.length() != 11) throw new BusinessException("CPF deve conter 11 dígitos");
         return digits;

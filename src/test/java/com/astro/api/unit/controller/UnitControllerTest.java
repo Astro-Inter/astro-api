@@ -52,20 +52,22 @@ class UnitControllerTest {
     @Test
     void listsUnitsWithoutAClientUidAndMapsAllDatabaseFields() throws Exception {
         when(service.findAll(user)).thenReturn(List.of(new UnitResponse(12L, 3L, "Matriz", "Ativo", 25,
-                "01234567", "Rua A", "São Paulo", "Centro", "SP", "Sala 1")));
+                "01234567", "Rua A", "São Paulo", "Centro", "SP", "Sala 1", "10A")));
         mvc.perform(get("/units").param("firebase_uid", "untrusted"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id_unidade").value(12))
-                .andExpect(jsonPath("$.data[0].id_workspace").value(3))
-                .andExpect(jsonPath("$.data[0].nome").value("Matriz"))
+                .andExpect(jsonPath("$.data[0].unitId").value(12))
+                .andExpect(jsonPath("$.data[0].workspaceId").value(3))
+                .andExpect(jsonPath("$.data[0].name").value("Matriz"))
                 .andExpect(jsonPath("$.data[0].status").value("Ativo"))
-                .andExpect(jsonPath("$.data[0].quantidade_colaboradores").value(25))
-                .andExpect(jsonPath("$.data[0].cep").value("01234567"))
-                .andExpect(jsonPath("$.data[0].rua").value("Rua A"))
-                .andExpect(jsonPath("$.data[0].cidade").value("São Paulo"))
-                .andExpect(jsonPath("$.data[0].bairro").value("Centro"))
-                .andExpect(jsonPath("$.data[0].estado").value("SP"))
-                .andExpect(jsonPath("$.data[0].complemento").value("Sala 1"));
+                .andExpect(jsonPath("$.data[0].collaboratorCount").value(25))
+                .andExpect(jsonPath("$.data[0].postalCode").value("01234567"))
+                .andExpect(jsonPath("$.data[0].street").value("Rua A"))
+                .andExpect(jsonPath("$.data[0].city").value("São Paulo"))
+                .andExpect(jsonPath("$.data[0].neighborhood").value("Centro"))
+                .andExpect(jsonPath("$.data[0].state").value("SP"))
+                .andExpect(jsonPath("$.data[0].addressLine2").value("Sala 1"))
+                .andExpect(jsonPath("$.data[0].number").value("10A"))
+                .andExpect(jsonPath("$.data[0].id_unidade").doesNotExist());
         verify(service).findAll(user);
     }
 

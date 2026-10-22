@@ -15,6 +15,9 @@ public class UnitAddress {
     @Column(name = "rua", nullable = false)
     public String street;
 
+    @Column(name = "numero", length = 30)
+    public String number;
+
     @Column(name = "cidade", nullable = false)
     public String city;
 

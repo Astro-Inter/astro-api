@@ -2,6 +2,7 @@ package com.astro.api.user.service;
 
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.storage.R2StorageService;
+import com.astro.api.common.text.PersonalDataNormalizer;
 import com.astro.api.conformity.model.NrDocument;
 import com.astro.api.conformity.repository.NrDocumentRepository;
 import com.astro.api.user.dto.request.EmailVerificationRequestDto;
@@ -23,7 +24,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -85,7 +85,7 @@ public class UserService {
     }
 
     public boolean verifyAccessKey(AccessKeyVerificationRequestDto dto, UserType tipoConta) {
-        String email = dto.email().trim().toLowerCase(Locale.ROOT);
+        String email = PersonalDataNormalizer.email(dto.email());
         String redisKey;
 
         if (tipoConta == UserType.GESTOR_WORKSPACE) {

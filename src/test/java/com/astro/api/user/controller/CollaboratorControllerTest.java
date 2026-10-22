@@ -89,8 +89,8 @@ class CollaboratorControllerTest {
     }
 
     static final String CREATE_JSON = """
-            {"nome":"  Colaborador teste  ","cpf":"529.982.247-25","email":" TEST@EXAMPLE.COM ",
-             "roleId":5,"unitId":12,"modalidade":"HIBRIDO"}
+            {"name":"  Colaborador teste  ","cpf":"529.982.247-25","email":" TEST@EXAMPLE.COM ",
+             "roleId":5,"unitId":12,"workModel":"HIBRIDO"}
             """;
 
     @Test
@@ -130,7 +130,7 @@ class CollaboratorControllerTest {
 
     @Test
     void requiresAllEditableFieldsForPutAndUsesTheAuthenticatedPrincipal() throws Exception {
-        String body = CREATE_JSON.trim().replace("\"modalidade\":\"HIBRIDO\"", "\"modalidade\":\"HIBRIDO\",\"status\":\"DESATIVADO\"");
+        String body = CREATE_JSON.trim().replace("\"workModel\":\"HIBRIDO\"", "\"workModel\":\"HIBRIDO\",\"status\":\"DESATIVADO\"");
         when(service.update(anyLong(), any(), eq(principal))).thenReturn(new CollaboratorDetailsResponse(2L, "Colaborador teste",
                 "52998224725", "test@example.com", WorkModel.HIBRIDO, UserStatus.DESATIVADO, 5L, "Operador", 12L, "Matriz", 3L, null, "CT"));
         mvc.perform(put("/collaborators/2").contentType(MediaType.APPLICATION_JSON).content(body))
