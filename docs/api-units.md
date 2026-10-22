@@ -25,20 +25,9 @@ Java em inglês. As respostas seguem `ApiResult`, com o resultado em `data`.
 
 A listagem retorna `unitId`, `workspaceId`, `name`, `status`, `collaboratorCount`,
 `postalCode`, `street`, `city`, `neighborhood`, `state`, `addressLine2` e `number`.
-O mapper converte os dados do banco para os campos em inglês do `UnitResponse`.
-Para manter a compatibilidade com o web publicado, a resposta também inclui
-`id_unidade`, `id_workspace`, `nome` e `quantidade_colaboradores`, com os mesmos
-valores de `unitId`, `workspaceId`, `name` e `collaboratorCount`, respectivamente.
-Esses quatro aliases são calculados a partir dos campos canônicos; não há estado
-duplicado. Os campos em inglês e o endereço continuam disponíveis para as
-configurações do workspace. O endereço pode ser nulo.
-
-A mudança anterior para nomes exclusivamente em inglês fazia o web rejeitar
-`GET /units` com “A API retornou dados inválidos para a unidade”. O editor de
-formulários também consome essa listagem em `getFormOptions`, bloqueando sua
-inicialização pelo mesmo erro. Os aliases recuperam ambos os consumidores sem
-exigir publicação coordenada do frontend. Como compartilham `UnitResponse`, as
-respostas de criação e edição também incluem esses aliases adicionais.
+O mapper converte os dados do banco para os campos em inglês do `UnitResponse`,
+sem `@JsonProperty`. Consumidores que usavam os nomes anteriores em português
+precisam atualizar a leitura dessas respostas. O endereço pode ser nulo.
 O PATCH não exige body e retorna
 `data: true` para ativa e `data: false` para inativa. Os triggers PostgreSQL executam
 as regras de desativação dos usuários vinculados.

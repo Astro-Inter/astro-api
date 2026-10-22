@@ -96,15 +96,15 @@ class WorkspaceSettingsControllerTest {
                 .andExpect(jsonPath("$.data.workspaceId").value(3))
                 .andExpect(jsonPath("$.data.name").value("Filial"))
                 .andExpect(jsonPath("$.data.collaboratorCount").value(0))
-                .andExpect(jsonPath("$.data.id_unidade").value(12))
-                .andExpect(jsonPath("$.data.id_workspace").value(3))
-                .andExpect(jsonPath("$.data.nome").value("Filial"))
-                .andExpect(jsonPath("$.data.quantidade_colaboradores").value(0));
+                .andExpect(jsonPath("$.data.id_unidade").doesNotExist())
+                .andExpect(jsonPath("$.data.id_workspace").doesNotExist())
+                .andExpect(jsonPath("$.data.nome").doesNotExist())
+                .andExpect(jsonPath("$.data.quantidade_colaboradores").doesNotExist());
         mvc.perform(put("/units/12").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.unitId").value(12))
                 .andExpect(jsonPath("$.data.name").value("Filial"))
                 .andExpect(jsonPath("$.data.number").value("10A"))
-                .andExpect(jsonPath("$.data.id_unidade").value(12));
+                .andExpect(jsonPath("$.data.id_unidade").doesNotExist());
         mvc.perform(post("/units").contentType(MediaType.APPLICATION_JSON)
                 .content(body.replace("\"number\":\"10A\"", "\"number\":\"\"")))
                 .andExpect(status().isBadRequest());

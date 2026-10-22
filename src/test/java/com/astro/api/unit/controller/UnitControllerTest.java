@@ -67,29 +67,29 @@ class UnitControllerTest {
                 .andExpect(jsonPath("$.data[0].state").value("SP"))
                 .andExpect(jsonPath("$.data[0].addressLine2").value("Sala 1"))
                 .andExpect(jsonPath("$.data[0].number").value("10A"))
-                .andExpect(jsonPath("$.data[0].id_unidade").value(12))
-                .andExpect(jsonPath("$.data[0].id_workspace").value(3))
-                .andExpect(jsonPath("$.data[0].nome").value("Matriz"))
-                .andExpect(jsonPath("$.data[0].quantidade_colaboradores").value(25));
+                .andExpect(jsonPath("$.data[0].id_unidade").doesNotExist())
+                .andExpect(jsonPath("$.data[0].id_workspace").doesNotExist())
+                .andExpect(jsonPath("$.data[0].nome").doesNotExist())
+                .andExpect(jsonPath("$.data[0].quantidade_colaboradores").doesNotExist());
         verify(service).findAll(user);
     }
 
     @Test
-    void preservesInactiveUnitsAndZeroCountsForWebConsumers() throws Exception {
+    void preservesInactiveUnitsAndZeroCountsWithCanonicalFields() throws Exception {
         when(service.findAll(user)).thenReturn(List.of(new UnitResponse(12L, 3L, "Filial", "Inativo", 0,
                 null, null, null, null, null, null)));
         mvc.perform(get("/units"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].unitId").value(12))
-                .andExpect(jsonPath("$.data[0].id_unidade").value(12))
+                .andExpect(jsonPath("$.data[0].id_unidade").doesNotExist())
                 .andExpect(jsonPath("$.data[0].workspaceId").value(3))
-                .andExpect(jsonPath("$.data[0].id_workspace").value(3))
+                .andExpect(jsonPath("$.data[0].id_workspace").doesNotExist())
                 .andExpect(jsonPath("$.data[0].name").value("Filial"))
-                .andExpect(jsonPath("$.data[0].nome").value("Filial"))
+                .andExpect(jsonPath("$.data[0].nome").doesNotExist())
                 .andExpect(jsonPath("$.data[0].status").value("Inativo"))
                 .andExpect(jsonPath("$.data[0].collaboratorCount").value(0))
-                .andExpect(jsonPath("$.data[0].quantidade_colaboradores").value(0));
+                .andExpect(jsonPath("$.data[0].quantidade_colaboradores").doesNotExist());
     }
 
     @Test
