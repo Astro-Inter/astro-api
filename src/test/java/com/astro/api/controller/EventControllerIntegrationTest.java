@@ -19,6 +19,7 @@ import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.model.CompletionMode;
 import com.astro.api.event.model.EventCompletionStatus;
 import com.astro.api.event.model.EventStatus;
+import com.astro.api.event.model.ParticipationStatus;
 import com.astro.api.event.service.EventService;
 import com.astro.api.user.model.WorkModel;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -160,7 +161,7 @@ class EventControllerIntegrationTest {
                 "Treinamento NR 10",
                 LocalDateTime.of(2026, 10, 5, 12, 0),
                 true,
-                "PENDENTE",
+                ParticipationStatus.PENDENTE,
                 "Grupo 1",
                 EventStatus.ATIVO);
         when(eventService.findForCollaborator(anyString())).thenReturn(List.of(event));
@@ -169,7 +170,7 @@ class EventControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].classLimitDate").value("2026-10-05T12:00:00"))
-                .andExpect(jsonPath("$.data[0].classStatus").value("PENDENTE"))
+                .andExpect(jsonPath("$.data[0].participationStatus").value("PENDENTE"))
                 .andExpect(jsonPath("$.data[0].eventStatus").value("ATIVO"));
 
         verify(eventService).findForCollaborator(anyString());
