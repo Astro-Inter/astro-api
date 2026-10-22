@@ -17,7 +17,7 @@ public interface EventClassParticipantRepository extends JpaRepository<EventClas
     @EntityGraph(attributePaths = {"user", "user.role", "user.role.workspace", "user.unit", "user.unit.workspace", "user.unit.address"})
     List<EventClassParticipant> findByEventClassIn(List<EventClass> eventClasses);
     // Conclusions and evidence remain owned by their existing modules/database contracts.
-    @Query(value = "select exists (select 1 from conclusao_evento where turma_funcionario_id in (:ids))", nativeQuery = true)
+    @Query(value = "select exists (select 1 from conclusao_evento where turma_colaborador_id in (:ids))", nativeQuery = true)
     boolean hasConclusions(@Param("ids") Collection<Long> ids);
 
     List<EventClassParticipant> findByUser_IdOrderByEventClass_StartDateAsc(Long userId);
