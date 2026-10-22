@@ -462,7 +462,7 @@ class EventServiceTest {
         futureParticipation.setEventClass(futureClass);
         futureParticipation.setUser(collaborator);
         when(userRepository.findByFirebaseUid("collaborator")).thenReturn(Optional.of(collaborator));
-        when(eventClassParticipantRepository.findByUser_IdOrderByEventClass_StartDateAsc(2L))
+        when(eventClassParticipantRepository.findByUser_IdOrderByEventClass_EndDateAsc(2L))
                 .thenReturn(List.of(pastParticipation, futureParticipation));
         when(viewedService.findViewed(2L, "events", List.of(31L, 32L))).thenReturn(Set.of("31"));
 
