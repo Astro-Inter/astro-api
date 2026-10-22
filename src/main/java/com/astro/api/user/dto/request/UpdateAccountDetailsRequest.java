@@ -1,12 +1,11 @@
 package com.astro.api.user.dto.request;
 
+import com.astro.api.common.text.PersonalDataNormalizer;
 import com.astro.api.user.model.WorkModel;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import org.hibernate.validator.constraints.br.CPF;
-
-import java.util.Locale;
 
 @Schema(description = "Conjunto completo dos seis campos editáveis da própria conta; todos obrigatórios e não nulos",
         additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
@@ -24,9 +23,9 @@ public record UpdateAccountDetailsRequest(
         @NotNull(message = "{account.workModel.required}")
         @Schema(example = "PRESENCIAL") WorkModel workModel) {
     public UpdateAccountDetailsRequest {
-        name = name == null ? null : name.trim();
-        cpf = cpf == null ? null : cpf.trim().replace(".", "").replace("-", "");
-        email = email == null ? null : email.trim().toLowerCase(Locale.ROOT);
+        name = name == null ? null : PersonalDataNormalizer.name(name);
+        cpf = cpf == null ? null : PersonalDataNormalizer.cpf(cpf);
+        email = email == null ? null : PersonalDataNormalizer.email(email);
     }
 
     @JsonAnySetter

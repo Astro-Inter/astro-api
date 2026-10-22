@@ -12,4 +12,5 @@ public interface UnitProjection {
     String getNeighborhood();
     String getState();
     String getAddressLine2();
+    String getNumber();
 }

@@ -2,16 +2,17 @@ package com.astro.api.role.repository;
 
 import com.astro.api.role.model.Role;
 import com.astro.api.workspace.model.Workspace;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
 import java.util.Collection;
 import java.util.List;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
 @Repository
 public interface RoleRepository extends JpaRepository<Role, Long> {
+    List<Role> findByWorkspace(Workspace workspace);
     @Query(value = """
             SELECT id_cargo AS "roleId", id_workspace AS "workspaceId", cargo AS "name",
                    quantidade_colaboradores AS "collaboratorCount", status

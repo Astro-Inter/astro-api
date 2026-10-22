@@ -23,9 +23,12 @@ Java em inglês. As respostas seguem `ApiResult`, com o resultado em `data`.
 | SCRUM-511 | `GET /units/{unitId}/nrs` | MongoDB `NRs` + `fn_seleciona_unidade_nrs` |
 | SCRUM-512 | `POST /units/{unitId}/nrs` | `pr_alterar_unidade_nrs(firebase_uid, unitId, JSONB)` |
 
-A listagem retorna `id_unidade`, `id_workspace`, `nome`, `status`,
-`quantidade_colaboradores`, `cep`, `rua`, `cidade`, `bairro`, `estado` e `complemento`,
-conforme `vw_unidades`. O endereço pode ser nulo. O PATCH não exige body e retorna
+A listagem retorna `unitId`, `workspaceId`, `name`, `status`, `collaboratorCount`,
+`postalCode`, `street`, `city`, `neighborhood`, `state`, `addressLine2` e `number`.
+O mapper converte os dados do banco para os campos em inglês do `UnitResponse`,
+sem `@JsonProperty`. Consumidores que usavam os nomes anteriores em português
+precisam atualizar a leitura dessas respostas. O endereço pode ser nulo.
+O PATCH não exige body e retorna
 `data: true` para ativa e `data: false` para inativa. Os triggers PostgreSQL executam
 as regras de desativação dos usuários vinculados.
 

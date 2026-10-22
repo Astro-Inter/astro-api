@@ -17,6 +17,10 @@ Todas as interfaces consomem uma única API backend.
 O contrato de `GET /home-workspace`, com os indicadores da Home WEB, está em
 [docs/home-workspace.md](docs/home-workspace.md).
 
+Os contratos de Configurações > Workspace, incluindo sincronização de
+colaboradores por planilha e a alteração de schema necessária para o número do
+endereço, estão em [docs/api-workspace-settings.md](docs/api-workspace-settings.md).
+
 Os contratos da própria conta autenticada no web estão em
 [docs/api-account.md](docs/api-account.md).
 

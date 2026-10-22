@@ -1,9 +1,11 @@
 package com.astro.api.workspace.service;
 
+import com.astro.api.common.text.PersonalDataNormalizer;
 import com.astro.api.role.model.Role;
 import com.astro.api.role.service.RoleService;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.unit.service.UnitService;
+import com.astro.api.user.model.CollaboratorImportRow;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
@@ -12,17 +14,15 @@ import com.astro.api.user.service.UserBatchService;
 import com.astro.api.workspace.dto.request.CreateWorkspaceRequest;
 import com.astro.api.workspace.dto.response.RegisterWorkspaceResponse;
 import com.astro.api.workspace.event.PreRegisteredCollaboratorsCreatedEvent;
-import com.astro.api.workspace.model.Workspace;
 import com.astro.api.workspace.mapper.WorkspaceMapper;
+import com.astro.api.workspace.model.Workspace;
 import com.astro.api.workspace.repository.WorkspaceRepository;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 
 @Service
 public class WorkspaceRegistrationTransactionalService {
@@ -51,19 +51,19 @@ public class WorkspaceRegistrationTransactionalService {
 
     @Transactional
     public RegisterWorkspaceResponse register(CreateWorkspaceRequest request, String firebaseUid,
-                                              List<SpreadsheetImportService.SpreadsheetRow> rows,
-                                              SpreadsheetImportService.SpreadsheetRow managerRow,
+                                              List<CollaboratorImportRow> rows,
+                                              CollaboratorImportRow managerRow,
                                               SpreadsheetImportService.ImportProcessingResult importResult) {
         Workspace workspace = workspaceRepository.save(workspaceMapper.toEntity(request.workspace()));
 
         List<Unit> units = unitService.createForWorkspace(workspace, request.units());
         Unit managerUnit = spreadsheetImportService.findManagerUnit(managerRow, units);
         Map<String, Role> rolesByName = roleService.createForWorkspace(workspace,
-                rows.stream().map(SpreadsheetImportService.SpreadsheetRow::role).toList());
+                rows.stream().map(CollaboratorImportRow::role).toList());
         Role managerRole = spreadsheetImportService.findManagerRole(managerRow, rolesByName);
         User manager = new User();
-        manager.setName(managerRow.name().trim());
-        manager.setEmail(request.email().trim().toLowerCase(Locale.ROOT));
+        manager.setName(PersonalDataNormalizer.name(managerRow.name()));
+        manager.setEmail(PersonalDataNormalizer.email(request.email()));
         manager.setFirebaseUid(firebaseUid);
         manager.setType(UserType.GESTOR_WORKSPACE);
         manager.setStatus(UserStatus.ATIVO);

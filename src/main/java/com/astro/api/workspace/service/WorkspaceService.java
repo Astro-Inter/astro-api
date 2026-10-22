@@ -2,16 +2,16 @@ package com.astro.api.workspace.service;
 
 import com.astro.api.auth.service.FirebaseIdentityService;
 import com.astro.api.common.exception.ConflictException;
+import com.astro.api.common.exception.SpreadsheetImportException;
+import com.astro.api.common.text.PersonalDataNormalizer;
+import com.astro.api.user.model.CollaboratorImportRow;
+import com.astro.api.user.repository.UserRepository;
 import com.astro.api.workspace.dto.request.CreateWorkspaceRequest;
 import com.astro.api.workspace.dto.response.RegisterWorkspaceResponse;
-import com.astro.api.workspace.exception.SpreadsheetImportException;
 import com.astro.api.workspace.repository.WorkspaceRepository;
-import com.astro.api.user.repository.UserRepository;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.List;
-import java.util.Locale;
 
 @Service
 public class WorkspaceService {
@@ -33,14 +33,15 @@ public class WorkspaceService {
 
     public RegisterWorkspaceResponse register(CreateWorkspaceRequest request, MultipartFile file) {
         validateStructuralConflicts(request);
-        List<SpreadsheetImportService.SpreadsheetRow> rows = spreadsheetImportService.read(file);
-        SpreadsheetImportService.SpreadsheetRow managerRow = spreadsheetImportService.findManagerRow(rows, request.email());
+        List<CollaboratorImportRow> rows = spreadsheetImportService.read(file);
+        CollaboratorImportRow managerRow = spreadsheetImportService.findManagerRow(rows, request.email());
         SpreadsheetImportService.ImportProcessingResult importResult = spreadsheetImportService
                 .validateForRegistration(rows, request.units(), managerRow);
         if (!importResult.errors().isEmpty()) {
             throw new SpreadsheetImportException(importResult.errors());
         }
-        String firebaseUid = firebaseIdentityService.createUser(request.email().trim(), request.password(), managerRow.name().trim());
+        String firebaseUid = firebaseIdentityService.createUser(
+                request.email().trim(), request.password(), PersonalDataNormalizer.name(managerRow.name()));
         try {
             return transactionalService.register(request, firebaseUid, rows, managerRow, importResult);
         } catch (RuntimeException exception) {
@@ -53,7 +54,7 @@ public class WorkspaceService {
         if (workspaceRepository.existsByCnpj(request.workspace().cnpj())) {
             throw new ConflictException("Já existe um workspace com este CNPJ");
         }
-        String email = request.email().trim().toLowerCase(Locale.ROOT);
+        String email = PersonalDataNormalizer.email(request.email());
         if (userRepository.findByEmailIgnoreCase(email).isPresent()) {
             throw new ConflictException("Já existe um usuário com este e-mail");
         }

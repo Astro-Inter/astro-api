@@ -49,7 +49,11 @@ public class SecurityConfig {
             )
             .exceptionHandling(errors -> errors.authenticationEntryPoint((request, response, exception) ->
                     response.sendError(request.getRequestURI().equals("/events")
-                            || request.getRequestURI().startsWith("/events/") ? 401 : 403)))
+                            || request.getRequestURI().startsWith("/events/")
+                            || request.getRequestURI().equals("/workspace")
+                            || request.getRequestURI().startsWith("/workspace/")
+                            || request.getRequestURI().equals("/units")
+                            || request.getRequestURI().startsWith("/units/") ? 401 : 403)))
             .addFilterBefore(
                 firebaseAuthenticationFilter,
                 UsernamePasswordAuthenticationFilter.class
