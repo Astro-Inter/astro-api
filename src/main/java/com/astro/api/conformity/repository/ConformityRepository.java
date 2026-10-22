@@ -12,7 +12,6 @@ import java.util.Optional;
 public interface ConformityRepository extends JpaRepository<Conformity, Long> {
     Optional<Conformity> findByEventCompletionId(Long eventCompletionId);
 
-    // Explicit NULLS LAST and ID ordering must match vw_conformidades; Limit restricts the result.
     @Query("""
             SELECT c FROM Conformity c WHERE c.collaboratorId = :collaboratorId AND c.nrId = :nrId
               AND c.applicable = TRUE
@@ -21,7 +20,6 @@ public interface ConformityRepository extends JpaRepository<Conformity, Long> {
     Optional<Conformity> findApplicableRepresentative(@Param("collaboratorId") Long collaboratorId,
                                                      @Param("nrId") Integer nrId, Limit limit);
 
-    // Mutations need the entity for this exact ID, including records no longer selected by the view.
     @Query(value = """
             SELECT c.* FROM conformidade c
             JOIN usuario u ON u.id_usuario = c.usuario_id AND u.tipo = 'COLABORADOR'
@@ -32,10 +30,9 @@ public interface ConformityRepository extends JpaRepository<Conformity, Long> {
     Optional<Conformity> findRecordInScope(@Param("conformityId") Long conformityId,
             @Param("firebaseUid") String firebaseUid, @Param("workspaceId") Long workspaceId);
 
-    // Event completion has no entity mapping; SQL follows its participation/class/event relation.
     @Query(value = """
             SELECT EXISTS (SELECT 1 FROM conclusao_evento ce
-            JOIN turma_funcionario tf ON tf.id_turma_funcionario = ce.turma_funcionario_id
+            JOIN turma_colaborador tf ON tf.id_turma_colaborador = ce.turma_colaborador_id
             JOIN turma t ON t.id_turma = tf.turma_id
             JOIN evento e ON e.id_evento = t.evento_id
             WHERE ce.id_conclusao_evento = :eventCompletionId
@@ -44,8 +41,6 @@ public interface ConformityRepository extends JpaRepository<Conformity, Long> {
     boolean completionMatchesNr(@Param("eventCompletionId") Long eventCompletionId,
             @Param("collaboratorId") Long collaboratorId, @Param("nrId") Integer nrId);
 
-    // Serializes check-and-write against all PostgreSQL DML, including writers outside this API.
-    // Readers remain concurrent. Acquire before locking collaborators or conformities.
     @Modifying
     @Query(value = "LOCK TABLE conformidade IN SHARE ROW EXCLUSIVE MODE", nativeQuery = true)
     void lockWrites();
@@ -58,7 +53,6 @@ public interface ConformityRepository extends JpaRepository<Conformity, Long> {
     boolean hasApplicableConflict(@Param("collaboratorId") Long collaboratorId, @Param("nrId") Integer nrId,
                                   @Param("excludedId") Long excludedId);
 
-    // A direct-table projection keeps historical IDs readable and computes status in the DB timezone.
     @Query(value = """
             SELECT c.id_conformidade AS id, c.usuario_id AS "collaboratorId",
                    u.nome AS "collaboratorName", u.email AS "collaboratorEmail",
@@ -77,7 +71,6 @@ public interface ConformityRepository extends JpaRepository<Conformity, Long> {
     Optional<ConformityProjection> findDetailsInScope(@Param("conformityId") Long conformityId,
             @Param("firebaseUid") String firebaseUid, @Param("workspaceId") Long workspaceId);
 
-    // The view owns consolidation; fn_seleciona_unidades applies the existing authorization policy.
     @Query(value = """
             SELECT v.id_conformidade AS id, v.usuario_id AS "collaboratorId",
                    v.nome AS "collaboratorName", v.email AS "collaboratorEmail",

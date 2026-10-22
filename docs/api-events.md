@@ -21,7 +21,7 @@ Eventos inexistentes ou de outro workspace retornam 404; falta de autenticação
 `EventResponse` preserva os campos anteriores e acrescenta `managerId`, `canEdit`,
 `canCancel` e `detailsEditable`. Cada turma tem `editable`; cada participante
 preserva `id` (ID do usuário), `name`, `email` e acrescenta `participationId`
-(ID persistido de `turma_funcionario`). Turmas são ordenadas por início e ID;
+(ID persistido de `turma_colaborador`). Turmas são ordenadas por início e ID;
 participantes, por nome e ID do usuário. Listas vazias são `[]`.
 
 - `canEdit`: criador de evento ativo; pode editar/adicionar turmas futuras mesmo
