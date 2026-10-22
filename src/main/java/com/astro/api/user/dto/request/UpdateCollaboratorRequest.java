@@ -1,14 +1,12 @@
 package com.astro.api.user.dto.request;
 
 import com.astro.api.common.text.PersonalDataNormalizer;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.WorkModel;
 import jakarta.validation.constraints.*;
 import org.hibernate.validator.constraints.br.CPF;
 
 public record UpdateCollaboratorRequest(
-        @JsonProperty("nome")
         @NotBlank(message = "{collaborator.name.notBlank}")
         @Size(min = 2, max = 255, message = "{collaborator.name.size}") String name,
         @NotBlank(message = "{collaborator.cpf.notBlank}")
@@ -21,7 +19,6 @@ public record UpdateCollaboratorRequest(
         @Positive(message = "{collaborator.roleId.positive}") Long roleId,
         @NotNull(message = "{collaborator.unitId.notNull}")
         @Positive(message = "{collaborator.unitId.positive}") Long unitId,
-        @JsonProperty("modalidade")
         @NotNull(message = "{collaborator.workModel.notNull}") WorkModel workModel,
         @NotNull(message = "{collaborator.status.notNull}") UserStatus status) {
     public UpdateCollaboratorRequest {

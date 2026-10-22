@@ -38,7 +38,7 @@ sem alterar o endpoint de perfil próprio `/user/me`.
 `POST /collaborators` recebe todos os campos obrigatórios:
 
 ```json
-{"nome":"Ana Silva","cpf":"529.982.247-25","email":"ana@example.com","roleId":5,"unitId":12,"modalidade":"HIBRIDO"}
+{"name":"Ana Silva","cpf":"529.982.247-25","email":"ana@example.com","roleId":5,"unitId":12,"workModel":"HIBRIDO"}
 ```
 
 O nome é aparado, o CPF é validado por dígitos verificadores e armazenado com
@@ -59,7 +59,9 @@ existente de registrar o erro para reprocessamento operacional.
 
 ## Edição — SCRUM-521
 
-`PUT /collaborators/{collaboratorId}` exige os seis campos do cadastro e `status`.
+`PUT /collaborators/{collaboratorId}` exige `name`, `cpf`, `email`, `roleId`,
+`unitId`, `workModel` e `status`. Cadastro e edição usam os nomes dos campos
+diretamente, sem `@JsonProperty`.
 Todos são obrigatórios e não nulos: é uma substituição dos campos editáveis.
 O status pode ser mantido como `PRE_CADASTRADO` apenas se já estiver assim; não
 é permitido voltar ao pré-cadastro nem concluir o cadastro por esta rota.

@@ -1,5 +1,6 @@
 package com.astro.api.workspace.service;
 
+import com.astro.api.common.text.PersonalDataNormalizer;
 import com.astro.api.role.model.Role;
 import com.astro.api.role.service.RoleService;
 import com.astro.api.unit.model.Unit;
@@ -18,7 +19,6 @@ import com.astro.api.workspace.model.Workspace;
 import com.astro.api.workspace.repository.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -62,8 +62,8 @@ public class WorkspaceRegistrationTransactionalService {
                 rows.stream().map(CollaboratorImportRow::role).toList());
         Role managerRole = spreadsheetImportService.findManagerRole(managerRow, rolesByName);
         User manager = new User();
-        manager.setName(managerRow.name().trim());
-        manager.setEmail(request.email().trim().toLowerCase(Locale.ROOT));
+        manager.setName(PersonalDataNormalizer.name(managerRow.name()));
+        manager.setEmail(PersonalDataNormalizer.email(request.email()));
         manager.setFirebaseUid(firebaseUid);
         manager.setType(UserType.GESTOR_WORKSPACE);
         manager.setStatus(UserStatus.ATIVO);

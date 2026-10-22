@@ -4,7 +4,7 @@ import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ConflictException;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.exception.SpreadsheetImportException;
-import com.astro.api.common.model.SpreadsheetImportError;
+import com.astro.api.common.model.SpreadsheetImportMessage;
 import com.astro.api.common.response.ApiResult;
 import com.mongodb.MongoTimeoutException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,16 +32,16 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     @ExceptionHandler(SpreadsheetImportException.class)
-    public ResponseEntity<ApiResult<List<SpreadsheetImportError>>> handleSpreadsheet(
+    public ResponseEntity<ApiResult<List<SpreadsheetImportMessage>>> handleSpreadsheet(
             SpreadsheetImportException exception, HttpServletRequest request) {
-        ApiResult<List<SpreadsheetImportError>> result = new ApiResult<>(false, exception.getMessage(),
+        ApiResult<List<SpreadsheetImportMessage>> result = new ApiResult<>(false, exception.getMessage(),
                 exception.getImportErrors(), List.of("Corrija as linhas indicadas e envie novamente"),
                 request.getRequestURI());
         return ResponseEntity.status(422).body(result);
     }
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ApiResult<Void>> handleInvalidParameter(Exception ex, HttpServletRequest request) {

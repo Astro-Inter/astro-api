@@ -1,6 +1,6 @@
 package com.astro.api.user.service;
 
-import com.astro.api.common.model.SpreadsheetImportError;
+import com.astro.api.common.model.SpreadsheetImportMessage;
 import com.astro.api.user.model.CollaboratorImportData;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
@@ -18,22 +18,22 @@ public class CollaboratorSpreadsheetValidator {
         this.validator = validator;
     }
 
-    public List<SpreadsheetImportError> validate(CollaboratorImportData data, int rowNumber) {
+    public List<SpreadsheetImportMessage> validate(CollaboratorImportData data, int rowNumber) {
         return validator.validate(data).stream()
                 .sorted(Comparator.comparing(violation -> violation.getPropertyPath().toString()))
-                .map(violation -> new SpreadsheetImportError(rowNumber,
+                .map(violation -> new SpreadsheetImportMessage(rowNumber,
                         spreadsheetField(violation.getPropertyPath().toString()), violation.getMessage()))
                 .toList();
     }
 
-    public Optional<SpreadsheetImportError> validateForRegistration(CollaboratorImportData data, int rowNumber) {
+    public Optional<SpreadsheetImportMessage> validateForRegistration(CollaboratorImportData data, int rowNumber) {
         return validator.validate(data, CollaboratorImportData.Registration.class).stream()
                 .min(Comparator.comparingInt(violation ->
                         REGISTRATION_FIELD_ORDER.indexOf(violation.getPropertyPath().toString())))
                 .map(violation -> registrationError(rowNumber, violation));
     }
 
-    private SpreadsheetImportError registrationError(int rowNumber, ConstraintViolation<CollaboratorImportData> violation) {
+    private SpreadsheetImportMessage registrationError(int rowNumber, ConstraintViolation<CollaboratorImportData> violation) {
         String field = violation.getPropertyPath().toString();
         String message = switch (field) {
             case "name" -> "Nome é obrigatório";
@@ -41,7 +41,7 @@ public class CollaboratorSpreadsheetValidator {
             case "cpf" -> "CPF inválido";
             default -> throw new IllegalArgumentException("Campo pessoal desconhecido: " + field);
         };
-        return new SpreadsheetImportError(rowNumber, spreadsheetField(field), message);
+        return new SpreadsheetImportMessage(rowNumber, spreadsheetField(field), message);
     }
 
     private String spreadsheetField(String field) {

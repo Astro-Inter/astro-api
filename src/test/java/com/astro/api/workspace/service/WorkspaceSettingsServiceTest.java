@@ -33,7 +33,7 @@ class WorkspaceSettingsServiceTest {
         assertEquals(3L, result.id());
         assertEquals("Nova empresa", result.name());
         assertEquals("12345678000199", result.cnpj());
-        verify(repository).findForUpdate(3L);
+        verify(repository).findWithLockById(3L);
         verify(repository).existsByCnpjAndIdNot("12345678000199", 3L);
     }
 
@@ -65,7 +65,7 @@ class WorkspaceSettingsServiceTest {
         User manager = new User(); manager.setUnit(unit);
         manager.setType(UserType.GESTOR_WORKSPACE); manager.setStatus(UserStatus.ATIVO);
         when(users.findByFirebaseUid("uid")).thenReturn(Optional.of(manager));
-        when(repository.findForUpdate(3L)).thenReturn(Optional.of(workspace));
+        when(repository.findWithLockById(3L)).thenReturn(Optional.of(workspace));
         when(repository.findById(3L)).thenReturn(Optional.of(workspace));
         return workspace;
     }

@@ -34,7 +34,7 @@ public class WorkspaceAccessService {
                 .orElseThrow(() -> new AccessDeniedException("Gestor de workspace ativo necessário"));
         Long workspaceId = workspaceManager.getUnit().workspace.id;
         Optional<Workspace> workspace = forUpdate
-                ? workspaceRepository.findForUpdate(workspaceId)
+                ? workspaceRepository.findWithLockById(workspaceId)
                 : workspaceRepository.findById(workspaceId);
         return workspace.orElseThrow(() -> new AccessDeniedException("Workspace não disponível"));
     }

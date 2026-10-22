@@ -7,12 +7,13 @@ import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.DynamicUpdate;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @Entity
-@org.hibernate.annotations.DynamicUpdate
+@DynamicUpdate
 @Table(name = "usuario")
 public class User extends Account {
 

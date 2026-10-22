@@ -7,13 +7,18 @@ import org.hibernate.validator.constraints.br.CPF;
 
 /** Dados pessoais de uma linha; os vínculos são resolvidos separadamente no workspace. */
 public record CollaboratorImportData(
-        @NotBlank(groups = {Default.class, Registration.class}) @Size(min = 2, max = 255) String name,
-        @NotBlank(groups = {Default.class, Registration.class})
-        @Pattern(regexp = "[0-9]{11}", groups = {Default.class, Registration.class})
-        @CPF(groups = {Default.class, Registration.class}) String cpf,
-        @NotBlank(groups = {Default.class, Registration.class}) @Email @Size(max = 255)
-        @Pattern(regexp = "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$", groups = Registration.class) String email,
-        @NotNull WorkModel workModel) {
+        @NotBlank(message = "{collaborator.name.notBlank}", groups = {Default.class, Registration.class})
+        @Size(min = 2, max = 255, message = "{collaborator.name.size}") String name,
+        @NotBlank(message = "{collaborator.cpf.notBlank}", groups = {Default.class, Registration.class})
+        @Pattern(regexp = "[0-9]{11}", message = "{collaborator.cpf.invalid}",
+                groups = {Default.class, Registration.class})
+        @CPF(message = "{collaborator.cpf.invalid}", groups = {Default.class, Registration.class}) String cpf,
+        @NotBlank(message = "{collaborator.email.notBlank}", groups = {Default.class, Registration.class})
+        @Email(message = "{collaborator.email.invalid}")
+        @Size(max = 255, message = "{collaborator.email.size}")
+        @Pattern(regexp = "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$", message = "{collaborator.email.invalid}",
+                groups = Registration.class) String email,
+        @NotNull(message = "{collaborator.workModel.notNull}") WorkModel workModel) {
     public CollaboratorImportData {
         name = name == null ? null : PersonalDataNormalizer.name(name);
         cpf = cpf == null ? null : PersonalDataNormalizer.cpf(cpf);

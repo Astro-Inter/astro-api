@@ -1,7 +1,7 @@
 package com.astro.api.user.service;
 
 import com.astro.api.common.exception.SpreadsheetImportException;
-import com.astro.api.common.model.SpreadsheetImportError;
+import com.astro.api.common.model.SpreadsheetImportMessage;
 import com.astro.api.common.text.NormalizedText;
 import com.astro.api.common.text.PersonalDataNormalizer;
 import com.astro.api.role.model.Role;
@@ -62,8 +62,8 @@ public class CollaboratorImportService {
             usersByEmail.put(PersonalDataNormalizer.email(user.getEmail()), user);
         }
         List<Change> changes = new ArrayList<>();
-        List<SpreadsheetImportError> errors = new ArrayList<>();
-        List<SpreadsheetImportError> ignored = new ArrayList<>();
+        List<SpreadsheetImportMessage> errors = new ArrayList<>();
+        List<SpreadsheetImportMessage> ignored = new ArrayList<>();
         Map<String, List<String>> rowsByCpf = new HashMap<>();
         Set<String> seenEmails = new HashSet<>();
         int unchanged = 0;
@@ -74,16 +74,16 @@ public class CollaboratorImportService {
             User emailOwner = usersByEmail.get(email);
             User matchedUser = existing != null ? existing : emailOwner;
             if (matchedUser != null && matchedUser.getType() != UserType.COLABORADOR && inWorkspace(matchedUser, workspace)) {
-                ignored.add(new SpreadsheetImportError(row.number(), "tipo", "Gestor mantido sem alterações"));
+                ignored.add(new SpreadsheetImportMessage(row.number(), "tipo", "Gestor mantido sem alterações"));
                 continue;
             }
             CollaboratorImportData data = collaboratorMapper.toImportData(row);
             WorkModel workModel = data.workModel();
             if (row.role() == null || row.role().trim().length() < 2 || row.role().trim().length() > 255) {
-                errors.add(new SpreadsheetImportError(row.number(), "cargo", "O cargo deve ter entre 2 e 255 caracteres"));
+                errors.add(new SpreadsheetImportMessage(row.number(), "cargo", "O cargo deve ter entre 2 e 255 caracteres"));
                 continue;
             }
-            List<SpreadsheetImportError> personalDataErrors = spreadsheetValidator.validate(data, row.number());
+            List<SpreadsheetImportMessage> personalDataErrors = spreadsheetValidator.validate(data, row.number());
             if (!personalDataErrors.isEmpty()) {
                 errors.addAll(personalDataErrors);
                 continue;
@@ -93,37 +93,37 @@ public class CollaboratorImportService {
             List<String> previousRowValues = rowsByCpf.putIfAbsent(cpf, rowValues);
             if (previousRowValues != null) {
                 if (previousRowValues.equals(rowValues)) {
-                    ignored.add(new SpreadsheetImportError(row.number(), "cpf", "Linha idêntica repetida"));
+                    ignored.add(new SpreadsheetImportMessage(row.number(), "cpf", "Linha idêntica repetida"));
                 } else {
-                    errors.add(new SpreadsheetImportError(row.number(), "cpf", "CPF repetido com informações diferentes"));
+                    errors.add(new SpreadsheetImportMessage(row.number(), "cpf", "CPF repetido com informações diferentes"));
                 }
                 continue;
             }
             if (!seenEmails.add(email)) {
-                errors.add(new SpreadsheetImportError(row.number(), "email", "E-mail repetido para pessoas diferentes"));
+                errors.add(new SpreadsheetImportMessage(row.number(), "email", "E-mail repetido para pessoas diferentes"));
                 continue;
             }
             if (existing != null && !inWorkspace(existing, workspace)) {
-                errors.add(new SpreadsheetImportError(row.number(), "cpf", "CPF indisponível para este workspace"));
+                errors.add(new SpreadsheetImportMessage(row.number(), "cpf", "CPF indisponível para este workspace"));
                 continue;
             }
             if (emailOwner != null && (existing == null || !Objects.equals(emailOwner.getId(), existing.getId()))) {
-                errors.add(new SpreadsheetImportError(row.number(), "email", "E-mail vinculado a outra conta"));
+                errors.add(new SpreadsheetImportMessage(row.number(), "email", "E-mail vinculado a outra conta"));
                 continue;
             }
             Unit unit = unitsByName.get(NormalizedText.key(row.unit()));
             Role role = rolesByName.get(NormalizedText.key(row.role()));
             if (unit == null) {
-                errors.add(new SpreadsheetImportError(row.number(), "unidade",
+                errors.add(new SpreadsheetImportMessage(row.number(), "unidade",
                         "Informe o endereço completo da nova unidade: " + row.unit()));
                 continue;
             }
             if (!unit.isActive && hasNewUnit(existing, unit)) {
-                errors.add(new SpreadsheetImportError(row.number(), "unidade", "Unidade inativa para nova vinculação"));
+                errors.add(new SpreadsheetImportMessage(row.number(), "unidade", "Unidade inativa para nova vinculação"));
                 continue;
             }
             if (role == null || (!role.isActive() && hasNewRole(existing, role))) {
-                errors.add(new SpreadsheetImportError(row.number(), "cargo", "Cargo inválido ou inativo para nova vinculação"));
+                errors.add(new SpreadsheetImportMessage(row.number(), "cargo", "Cargo inválido ou inativo para nova vinculação"));
                 continue;
             }
             boolean hasChanges = existing == null || !Objects.equals(existing.getName(), data.name())
@@ -166,16 +166,16 @@ public class CollaboratorImportService {
     }
 
     public void validateNewLinks(CollaboratorImportPlan plan, Workspace workspace) {
-        List<SpreadsheetImportError> errors = new ArrayList<>();
+        List<SpreadsheetImportMessage> errors = new ArrayList<>();
         for (Change change : plan.changes()) {
             User existing = change.existingCollaborator();
             if (hasNewUnit(existing, change.unit())
                     && !Boolean.TRUE.equals(collaboratorRepository.lockUnitActive(change.unit().id, workspace.id))) {
-                errors.add(new SpreadsheetImportError(change.row(), "unidade", "Unidade inativa para nova vinculação"));
+                errors.add(new SpreadsheetImportMessage(change.row(), "unidade", "Unidade inativa para nova vinculação"));
             }
             if (hasNewRole(existing, change.role())
                     && !Boolean.TRUE.equals(collaboratorRepository.lockRoleActive(change.role().getId(), workspace.id))) {
-                errors.add(new SpreadsheetImportError(change.row(), "cargo", "Cargo inativo para nova vinculação"));
+                errors.add(new SpreadsheetImportMessage(change.row(), "cargo", "Cargo inativo para nova vinculação"));
             }
         }
         if (!errors.isEmpty()) throw new SpreadsheetImportException(errors);

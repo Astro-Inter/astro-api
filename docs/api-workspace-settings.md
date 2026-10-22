@@ -158,10 +158,16 @@ manualmente. O bloqueio é mantido até o término da transação.
 de uma atualização concorrente em outra conexão. No CI, ele reutiliza o banco
 PostgreSQL descartável disponível, sempre dentro de um schema próprio.
 
-As respostas usam os campos existentes de `UnitResponse` em português,
-acrescentando `numero`, sem anotações `@JsonProperty`; os componentes do DTO
-usam diretamente os nomes do contrato existente. A listagem `GET /units` também retorna esse campo,
-que pode ser null em registros legados.
+As respostas de criação, edição e listagem usam os campos de `UnitResponse` em
+inglês: `unitId`, `workspaceId`, `name`, `status`, `collaboratorCount`, `postalCode`,
+`street`, `city`, `neighborhood`, `state`, `addressLine2` e `number`.
+Não há anotações `@JsonProperty`; o JSON usa diretamente os nomes do DTO.
+Consumidores que liam os nomes anteriores em português precisam atualizar a
+integração. `number` corresponde à coluna `numero` e pode ser null em registros legados.
+
+Nas respostas de criação e edição, `collaboratorCount` usa o método derivado
+`UserRepository.countByUnit_IdAndType`. O service informa o tipo `COLABORADOR`;
+a contagem mantém todos os status e não exige uma `@Query` escrita manualmente.
 
 ## Sincronização de planilha
 
@@ -328,7 +334,7 @@ as regras de estilo pedidas para esta entrega.
 
 Foi corrigida uma dependência do modelo de importação em DTOs HTTP:
 `CollaboratorImportData` pertence a `user.model`, enquanto
-`SpreadsheetImportError` e `SpreadsheetImportException` são tipos compartilhados
+`SpreadsheetImportMessage` e `SpreadsheetImportException` são tipos compartilhados
 em `common.model` e `common.exception`. O modelo interno não importa DTOs,
 controllers ou services. O JSON dos erros mantém `row`, `field` e `message`.
 

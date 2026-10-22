@@ -13,6 +13,8 @@ import com.astro.api.unit.model.Unit;
 import com.astro.api.unit.model.UnitAddress;
 import com.astro.api.unit.repository.UnitAddressRepository;
 import com.astro.api.unit.repository.UnitRepository;
+import com.astro.api.user.model.UserType;
+import com.astro.api.user.repository.UserRepository;
 import com.astro.api.workspace.model.Workspace;
 import com.astro.api.workspace.service.WorkspaceAccessService;
 import java.util.Collection;
@@ -35,16 +37,19 @@ public class UnitSettingsService {
     private final UnitMapper unitMapper;
     private final UnitResponseMapper unitResponseMapper;
     private final UnitService unitService;
+    private final UserRepository userRepository;
 
     public UnitSettingsService(WorkspaceAccessService workspaceAccessService, UnitRepository unitRepository,
                                UnitAddressRepository unitAddressRepository, UnitMapper unitMapper,
-                               UnitResponseMapper unitResponseMapper, UnitService unitService) {
+                               UnitResponseMapper unitResponseMapper, UnitService unitService,
+                               UserRepository userRepository) {
         this.workspaceAccessService = workspaceAccessService;
         this.unitRepository = unitRepository;
         this.unitAddressRepository = unitAddressRepository;
         this.unitMapper = unitMapper;
         this.unitResponseMapper = unitResponseMapper;
         this.unitService = unitService;
+        this.userRepository = userRepository;
     }
 
     @Transactional
@@ -63,14 +68,14 @@ public class UnitSettingsService {
         ensureNameAvailable(workspace, body.name(), unitId);
         unitMapper.applyUpdate(body, unit);
         unitAddressRepository.save(unit.address);
-        unitRepository.saveAndFlush(unit);
+        unitRepository.save(unit);
         return buildUnitResponse(unit);
     }
 
     @Transactional
     public Unit createInWorkspace(Workspace workspace, UnitRequest body) {
         ensureNameAvailable(workspace, body.name(), null);
-        Unit unit = unitRepository.saveAndFlush(unitMapper.toUnit(body, workspace));
+        Unit unit = unitRepository.save(unitMapper.toUnit(body, workspace));
         UnitAddress address = unitAddressRepository.save(unitMapper.toAddress(body, unit));
         unit.address = address;
         return unit;
@@ -85,7 +90,7 @@ public class UnitSettingsService {
     }
 
     private UnitResponse buildUnitResponse(Unit unit) {
-        long collaboratorCount = unitRepository.countCollaborators(unit.id);
+        long collaboratorCount = userRepository.countByUnit_IdAndType(unit.id, UserType.COLABORADOR);
         return unitResponseMapper.toResponse(unit, collaboratorCount);
     }
 

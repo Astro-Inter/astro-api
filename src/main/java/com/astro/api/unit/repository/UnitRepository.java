@@ -21,9 +21,6 @@ public interface UnitRepository extends JpaRepository<Unit, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Unit> findByIdAndWorkspace_Id(Long unitId, Long workspaceId);
 
-    @Query("select count(u) from User u where u.unit.id = :unitId and u.type = com.astro.api.user.model.UserType.COLABORADOR")
-    long countCollaborators(@Param("unitId") Long unitId);
-
     @Query(value = """
             SELECT listed.id_unidade AS "unitId", listed.id_workspace AS "workspaceId", listed.nome AS "name",
                    listed.status, listed.quantidade_colaboradores AS "collaboratorCount", listed.cep AS "postalCode",

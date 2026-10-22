@@ -29,15 +29,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CollaboratorSecurityTest {
     @Test
     void requiresValidatedFirebaseAuthenticationAndManagerAuthority() throws Exception {
-        try (var context = new AnnotationConfigWebApplicationContext()) {
+        try (AnnotationConfigWebApplicationContext context = new AnnotationConfigWebApplicationContext()) {
             context.setServletContext(new MockServletContext());
             context.register(Config.class);
             context.refresh();
             MockMvc mvc = MockMvcBuilders.webAppContextSetup(context)
                     .addFilters(context.getBean("springSecurityFilterChain", Filter.class)).build();
-            var tokens = context.getBean(FirebaseTokenService.class);
-            var authorization = context.getBean(AuthorizationService.class);
-            var service = context.getBean(CollaboratorService.class);
+            FirebaseTokenService tokens = context.getBean(FirebaseTokenService.class);
+            AuthorizationService authorization = context.getBean(AuthorizationService.class);
+            CollaboratorService service = context.getBean(CollaboratorService.class);
             mvc.perform(get("/collaborators")).andExpect(result -> assertTrue(result.getResponse().getStatus() >= 400));
             mvc.perform(patch("/collaborators/2/status").contentType("application/json").content("{\"status\":\"DESATIVADO\"}"))
                     .andExpect(result -> assertTrue(result.getResponse().getStatus() == 401 || result.getResponse().getStatus() == 403));
@@ -60,7 +60,7 @@ class CollaboratorSecurityTest {
                         .andExpect(status().isForbidden());
                 mvc.perform(put("/collaborators/2").header("Authorization", "Bearer valid")
                                 .contentType("application/json").content(CollaboratorControllerTest.CREATE_JSON
-                                        .replace("\"modalidade\":\"HIBRIDO\"", "\"modalidade\":\"HIBRIDO\",\"status\":\"ATIVO\"")))
+                                        .replace("\"workModel\":\"HIBRIDO\"", "\"workModel\":\"HIBRIDO\",\"status\":\"ATIVO\"")))
                         .andExpect(status().isForbidden());
                 mvc.perform(patch("/collaborators/2/status").header("Authorization", "Bearer valid")
                                 .contentType("application/json").content("{\"status\":\"DESATIVADO\"}"))

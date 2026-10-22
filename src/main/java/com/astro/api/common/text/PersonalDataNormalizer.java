@@ -17,8 +17,8 @@ public final class PersonalDataNormalizer {
         return name(value).toLowerCase(Locale.ROOT);
     }
 
-    // O cadastro inicial já remove todos os caracteres que não são dígitos.
-    public static String registrationCpf(String value) {
+    // Limpeza usada pelos fluxos que já removem todos os caracteres não numéricos.
+    public static String cpfDigits(String value) {
         return value == null ? "" : value.replaceAll("\\D", "");
     }
 }

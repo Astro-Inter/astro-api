@@ -4,13 +4,14 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.security.Role;
 import com.astro.api.common.exception.SpreadsheetImportException;
 import com.astro.api.common.handler.GlobalExceptionHandler;
-import com.astro.api.common.model.SpreadsheetImportError;
+import com.astro.api.common.model.SpreadsheetImportMessage;
 import com.astro.api.unit.controller.UnitSettingsController;
 import com.astro.api.unit.dto.response.UnitResponse;
 import com.astro.api.unit.service.UnitSettingsService;
 import com.astro.api.workspace.dto.response.*;
 import com.astro.api.workspace.service.*;
 import java.util.List;
+import java.util.Collections;
 import java.util.Map;
 import org.junit.jupiter.api.*;
 import org.springframework.core.MethodParameter;
@@ -90,9 +91,9 @@ class WorkspaceSettingsControllerTest {
                 """;
         mvc.perform(post("/units").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated()).andExpect(header().string("Location", "/units/12"))
-                .andExpect(jsonPath("$.data.numero").value("10A"));
+                .andExpect(jsonPath("$.data.number").value("10A"));
         mvc.perform(put("/units/12").contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.id_unidade").value(12));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.unitId").value(12));
         mvc.perform(post("/units").contentType(MediaType.APPLICATION_JSON)
                 .content(body.replace("\"number\":\"10A\"", "\"number\":\"\"")))
                 .andExpect(status().isBadRequest());
@@ -114,18 +115,50 @@ class WorkspaceSettingsControllerTest {
     @Test
     void rejectsMalformedCompanyAndNullUnitBeforeService() throws Exception {
         mvc.perform(put("/workspace").contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\" \",\"cnpj\":\"invalid\"}")).andExpect(status().isBadRequest());
+                .content("{\"name\":\" \",\"cnpj\":\"invalid\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors", org.hamcrest.Matchers.hasItem("name: O nome do workspace é obrigatório")))
+                .andExpect(jsonPath("$.errors", org.hamcrest.Matchers.hasItem("cnpj: O CNPJ deve conter exatamente 14 dígitos")));
+        mvc.perform(put("/workspace").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors", org.hamcrest.Matchers.hasItem("name: O nome do workspace é obrigatório")))
+                .andExpect(jsonPath("$.errors", org.hamcrest.Matchers.hasItem("cnpj: O CNPJ é obrigatório")));
+        for (String invalidName : List.of("A", "A".repeat(256))) {
+            mvc.perform(put("/workspace").contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"name\":\"" + invalidName + "\",\"cnpj\":\"12345678000199\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors", org.hamcrest.Matchers.hasItem(
+                            "name: O nome do workspace deve ter entre 2 e 255 caracteres")));
+        }
         mvc.perform(multipart("/workspace/import")
                 .file(new MockMultipartFile("file", "colaboradores.xlsx", "application/octet-stream", new byte[]{1}))
                 .file(new MockMultipartFile("data", "", "application/json", "{\"units\":[null]}".getBytes())))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors", org.hamcrest.Matchers.hasItem(
+                        org.hamcrest.Matchers.containsString("Os dados de cada unidade devem ser informados"))));
         verifyNoInteractions(settings, imports);
+    }
+
+    @Test
+    void rejectsMoreThanOneHundredImportUnitsWithAnExplicitMessage() throws Exception {
+        String unitJson = """
+                {"name":"Filial","cep":"01234567","state":"SP","city":"São Paulo",
+                 "neighborhood":"Centro","street":"Rua A","number":"10A"}
+                """;
+        String importJson = "{\"units\":[" + String.join(",", Collections.nCopies(101, unitJson)) + "]}";
+        mvc.perform(multipart("/workspace/import")
+                .file(new MockMultipartFile("file", "colaboradores.xlsx", "application/octet-stream", new byte[]{1}))
+                .file(new MockMultipartFile("data", "", "application/json", importJson.getBytes(java.nio.charset.StandardCharsets.UTF_8))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors", org.hamcrest.Matchers.hasItem(
+                        "units: Informe no máximo 100 unidades por importação")));
+        verifyNoInteractions(imports);
     }
 
     @Test
     void supportsFileWithoutAdditionalUnitsAndReturnsStructuredRowErrors() throws Exception {
         when(imports.importFile(any(), any(), eq(principal))).thenThrow(new SpreadsheetImportException(
-                List.of(new SpreadsheetImportError(4, "unidade", "Informe endereço da nova unidade"))));
+                List.of(new SpreadsheetImportMessage(4, "unidade", "Informe endereço da nova unidade"))));
         mvc.perform(multipart("/workspace/import").file(
                 new MockMultipartFile("file", "colaboradores.xlsx", "application/octet-stream", new byte[]{1})))
                 .andExpect(status().isUnprocessableEntity())

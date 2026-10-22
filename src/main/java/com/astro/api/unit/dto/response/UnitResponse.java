@@ -1,23 +1,23 @@
 package com.astro.api.unit.dto.response;
 
 public record UnitResponse(
-        Long id_unidade,
-        Long id_workspace,
-        String nome,
+        Long unitId,
+        Long workspaceId,
+        String name,
         String status,
-        long quantidade_colaboradores,
-        String cep,
-        String rua,
-        String cidade,
-        String bairro,
-        String estado,
-        String complemento,
-        String numero
+        long collaboratorCount,
+        String postalCode,
+        String street,
+        String city,
+        String neighborhood,
+        String state,
+        String addressLine2,
+        String number
 ) {
-    public UnitResponse(Long id_unidade, Long id_workspace, String nome, String status, long quantidade_colaboradores,
-                        String cep, String rua, String cidade, String bairro,
-                        String estado, String complemento) {
-        this(id_unidade, id_workspace, nome, status, quantidade_colaboradores, cep, rua, cidade,
-                bairro, estado, complemento, null);
+    public UnitResponse(Long unitId, Long workspaceId, String name, String status, long collaboratorCount,
+                        String postalCode, String street, String city, String neighborhood,
+                        String state, String addressLine2) {
+        this(unitId, workspaceId, name, status, collaboratorCount, postalCode, street, city,
+                neighborhood, state, addressLine2, null);
     }
 }

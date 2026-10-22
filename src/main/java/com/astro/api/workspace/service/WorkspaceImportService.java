@@ -4,7 +4,7 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.service.FirebaseIdentityService;
 import com.astro.api.common.exception.ConflictException;
 import com.astro.api.common.exception.SpreadsheetImportException;
-import com.astro.api.common.model.SpreadsheetImportError;
+import com.astro.api.common.model.SpreadsheetImportMessage;
 import com.astro.api.role.model.Role;
 import com.astro.api.role.service.RoleService;
 import com.astro.api.unit.model.Unit;
@@ -67,7 +67,7 @@ public class WorkspaceImportService {
                 Workspace workspace = workspaceAccessService.requireWorkspace(principal, true);
                 List<CollaboratorImportRow> rows = collaboratorSpreadsheetReader.read(file, MAX_IMPORT_SIZE_BYTES);
                 if (rows.isEmpty()) {
-                    SpreadsheetImportError error = new SpreadsheetImportError(1, "arquivo", "A planilha não contém colaboradores");
+                    SpreadsheetImportMessage error = new SpreadsheetImportMessage(1, "arquivo", "A planilha não contém colaboradores");
                     throw new SpreadsheetImportException(List.of(error));
                 }
                 return synchronize(workspace, rows, body, emailChanges);

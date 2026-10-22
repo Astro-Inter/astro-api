@@ -43,13 +43,13 @@ class UnitDatabaseOperationsTest {
         when(unit.getCollaboratorCount()).thenReturn(0L);
         when(jpa.findAllByFirebaseUid("manager")).thenReturn(List.of(unit));
         UnitResponse response = service.findAll(user).getFirst();
-        assertEquals(12L, response.id_unidade());
-        assertEquals(3L, response.id_workspace());
-        assertEquals("Matriz", response.nome());
+        assertEquals(12L, response.unitId());
+        assertEquals(3L, response.workspaceId());
+        assertEquals("Matriz", response.name());
         assertEquals("Inativo", response.status());
-        assertEquals(0L, response.quantidade_colaboradores());
-        assertNull(response.cep());
-        assertNull(response.complemento());
+        assertEquals(0L, response.collaboratorCount());
+        assertNull(response.postalCode());
+        assertNull(response.addressLine2());
     }
 
     @Test

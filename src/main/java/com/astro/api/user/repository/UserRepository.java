@@ -16,6 +16,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
+    long countByUnit_IdAndType(Long unitId, UserType type);
+
     long countByUnit_WorkspaceAndType(Workspace workspace, UserType type);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

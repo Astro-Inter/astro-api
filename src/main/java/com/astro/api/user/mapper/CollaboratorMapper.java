@@ -29,7 +29,7 @@ public class CollaboratorMapper {
     }
 
     public CollaboratorImportData toRegistrationData(CollaboratorImportRow row) {
-        String cpf = PersonalDataNormalizer.registrationCpf(row.cpf());
+        String cpf = PersonalDataNormalizer.cpfDigits(row.cpf());
         return new CollaboratorImportData(row.name(), cpf, row.email(), workModel(row.workModel()));
     }
 

@@ -1,7 +1,7 @@
 package com.astro.api.workspace.service;
 
 import com.astro.api.common.exception.BusinessException;
-import com.astro.api.common.model.SpreadsheetImportError;
+import com.astro.api.common.model.SpreadsheetImportMessage;
 import com.astro.api.common.text.NormalizedText;
 import com.astro.api.common.text.PersonalDataNormalizer;
 import com.astro.api.user.mapper.CollaboratorMapper;
@@ -113,7 +113,7 @@ public class SpreadsheetImportService {
         Set<String> emails = collaboratorRows.stream().map(CollaboratorImportRow::email)
                 .filter(this::notBlank).map(PersonalDataNormalizer::email).collect(Collectors.toSet());
         Set<String> cpfs = collaboratorRows.stream().map(CollaboratorImportRow::cpf)
-                .filter(this::notBlank).map(PersonalDataNormalizer::registrationCpf).collect(Collectors.toSet());
+                .filter(this::notBlank).map(PersonalDataNormalizer::cpfDigits).collect(Collectors.toSet());
         Set<String> existingEmails = emails.isEmpty() ? Set.of() : userRepository.findByEmailInIgnoreCase(emails).stream()
                 .map(User::getEmail)
                 .map(PersonalDataNormalizer::email)
@@ -126,15 +126,15 @@ public class SpreadsheetImportService {
         Set<String> emailsInSpreadsheet = new HashSet<>(Set.of(PersonalDataNormalizer.email(managerRow.email())));
         Set<String> cpfsInSpreadsheet = new HashSet<>();
         if (notBlank(managerRow.cpf())) {
-            cpfsInSpreadsheet.add(PersonalDataNormalizer.registrationCpf(managerRow.cpf()));
+            cpfsInSpreadsheet.add(PersonalDataNormalizer.cpfDigits(managerRow.cpf()));
         }
         List<User> validUsers = new ArrayList<>();
-        List<SpreadsheetImportError> errors = new ArrayList<>();
+        List<SpreadsheetImportMessage> errors = new ArrayList<>();
         for (CollaboratorImportRow row : collaboratorRows) {
             CollaboratorImportData data = collaboratorMapper.toRegistrationData(row);
             String normalizedEmail = data.email();
             String normalizedCpf = data.cpf();
-            Optional<SpreadsheetImportError> personalDataError = spreadsheetValidator.validateForRegistration(data, row.number());
+            Optional<SpreadsheetImportMessage> personalDataError = spreadsheetValidator.validateForRegistration(data, row.number());
             if (personalDataError.isPresent()) {
                 errors.add(personalDataError.get());
                 continue;
@@ -155,8 +155,8 @@ public class SpreadsheetImportService {
         return new ImportProcessingResult(validUsers, errors);
     }
 
-    private void error(List<SpreadsheetImportError> errors, CollaboratorImportRow row, String field, String message) { errors.add(new SpreadsheetImportError(row.number(), field, message)); }
+    private void error(List<SpreadsheetImportMessage> errors, CollaboratorImportRow row, String field, String message) { errors.add(new SpreadsheetImportMessage(row.number(), field, message)); }
     private boolean notBlank(String value) { return value != null && !value.trim().isEmpty(); }
 
-    public record ImportProcessingResult(List<User> validUsers, List<SpreadsheetImportError> errors) { }
+    public record ImportProcessingResult(List<User> validUsers, List<SpreadsheetImportMessage> errors) { }
 }

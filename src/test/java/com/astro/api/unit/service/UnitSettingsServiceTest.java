@@ -10,6 +10,8 @@ import com.astro.api.unit.mapper.UnitMapper;
 import com.astro.api.unit.mapper.UnitResponseMapper;
 import com.astro.api.unit.model.*;
 import com.astro.api.unit.repository.*;
+import com.astro.api.user.model.UserType;
+import com.astro.api.user.repository.UserRepository;
 import com.astro.api.workspace.model.Workspace;
 import com.astro.api.workspace.service.WorkspaceAccessService;
 import java.util.*;
@@ -24,7 +26,9 @@ class UnitSettingsServiceTest {
     private final UnitRepository units = mock(UnitRepository.class);
     private final UnitAddressRepository addresses = mock(UnitAddressRepository.class);
     private final UnitService unitService = mock(UnitService.class);
-    private final UnitSettingsService service = new UnitSettingsService(access, units, addresses, new UnitMapper(), new UnitResponseMapper(), unitService);
+    private final UserRepository users = mock(UserRepository.class);
+    private final UnitSettingsService service = new UnitSettingsService(access, units, addresses,
+            new UnitMapper(), new UnitResponseMapper(), unitService, users);
     private final AuthenticatedUser user = new AuthenticatedUser("uid", null, Role.GESTOR_WORKSPACE);
     private final Workspace workspace = new Workspace();
 
@@ -33,7 +37,7 @@ class UnitSettingsServiceTest {
         workspace.id = 3L;
         when(access.requireWorkspace(user, true)).thenReturn(workspace);
         when(units.findByWorkspace(workspace)).thenReturn(List.of());
-        when(units.saveAndFlush(any())).thenAnswer(call -> {
+        when(units.save(any())).thenAnswer(call -> {
             Unit unit = call.getArgument(0);
             if (unit.id == null) unit.id = 12L;
             return unit;
@@ -44,11 +48,13 @@ class UnitSettingsServiceTest {
     @Test
     void persistsAndReturnsNumberAndNormalizedAddress() {
         UnitResponse response = service.create(body(" Matriz ", " Sala 1 "), user);
-        assertEquals("Matriz", response.nome());
-        assertEquals("10A", response.numero());
-        assertEquals("01234567", response.cep());
-        assertEquals("SP", response.estado());
-        assertEquals("Sala 1", response.complemento());
+        assertEquals("Matriz", response.name());
+        assertEquals("10A", response.number());
+        assertEquals("01234567", response.postalCode());
+        assertEquals("SP", response.state());
+        assertEquals("Sala 1", response.addressLine2());
+        assertEquals(0L, response.collaboratorCount());
+        verify(users).countByUnit_IdAndType(12L, UserType.COLABORADOR);
         verify(addresses).save(argThat(address -> "10A".equals(address.number) && address.unit.id == 12L));
     }
 
@@ -72,7 +78,7 @@ class UnitSettingsServiceTest {
         assertSame(firstSavedUnit, persistedUnits.get(resolvedUnits.get("filial norte")));
         assertSame(secondSavedUnit, persistedUnits.get(resolvedUnits.get("filial sul")));
         verify(unitService).createForWorkspace(workspace, requests);
-        verify(units, never()).saveAndFlush(any());
+        verify(units, never()).save(any());
         verifyNoInteractions(addresses);
     }
 
@@ -82,10 +88,13 @@ class UnitSettingsServiceTest {
         unit.address = new UnitMapper().toAddress(body("Matriz", "Antigo"), unit);
         when(units.findByWorkspace(workspace)).thenReturn(List.of(unit));
         when(units.findByIdAndWorkspace_Id(12L, 3L)).thenReturn(Optional.of(unit));
+        when(users.countByUnit_IdAndType(12L, UserType.COLABORADOR)).thenReturn(7L);
         UnitResponse response = service.update(12L, body("Matriz", " "), user);
-        assertEquals(12L, response.id_unidade());
+        assertEquals(12L, response.unitId());
         assertEquals("Inativo", response.status());
-        assertNull(response.complemento());
+        assertNull(response.addressLine2());
+        assertEquals(7L, response.collaboratorCount());
+        verify(users).countByUnit_IdAndType(12L, UserType.COLABORADOR);
         assertSame(workspace, unit.workspace);
         assertSame(unit, unit.address.unit);
     }

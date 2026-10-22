@@ -38,7 +38,7 @@ public class UnitSettingsController {
     public ResponseEntity<ApiResult<UnitResponse>> create(@Valid @RequestBody UnitRequest body,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         UnitResponse response = unitSettingsService.create(body, user);
-        URI location = URI.create("/units/" + response.id_unidade());
+        URI location = URI.create("/units/" + response.unitId());
         ApiResult<UnitResponse> result = ApiResult.success(
                 "Unidade cadastrada com sucesso", response, request.getRequestURI());
         return ResponseEntity.created(location).body(result);

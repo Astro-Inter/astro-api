@@ -50,7 +50,7 @@ class WorkspaceImportServiceTest {
     private final UnitService unitService = mock(UnitService.class);
     private final UserBatchService userBatchService = mock(UserBatchService.class);
     private final UnitSettingsService settings = new UnitSettingsService(access, units,
-            mock(UnitAddressRepository.class), new UnitMapper(), new UnitResponseMapper(), unitService);
+            mock(UnitAddressRepository.class), new UnitMapper(), new UnitResponseMapper(), unitService, users);
     private final RoleService roleService = new RoleService(roles, mock(RoleManagementRepository.class),
             mock(NrDocumentRepository.class), JsonMapper.builder().build());
     private final FirebaseIdentityService firebase = mock(FirebaseIdentityService.class);
