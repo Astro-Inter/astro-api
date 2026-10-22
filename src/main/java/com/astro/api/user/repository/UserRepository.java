@@ -17,6 +17,20 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByFirebaseUid(String firebaseUid);
+
+    @Query("""
+            select u.id as id, u.name as name, u.type as role, workspace.id as workspaceId
+            from User u join u.unit unit join unit.workspace workspace
+            where u.firebaseUid = :firebaseUid
+            """)
+    Optional<UserChatProjection> findChatUserByFirebaseUid(@Param("firebaseUid") String firebaseUid);
+
+    @Query("""
+            select u.id as id, u.name as name, u.type as role, workspace.id as workspaceId
+            from User u join u.unit unit join unit.workspace workspace
+            where u.id in :ids
+            """)
+    List<UserChatProjection> findChatUsersByIds(@Param("ids") Collection<Long> ids);
     @Query("""
             select recipient.id as id, recipient.name as name, recipientUnit.name as unitName
             from User recipient
