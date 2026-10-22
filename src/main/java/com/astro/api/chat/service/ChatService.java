@@ -9,7 +9,9 @@ import com.astro.api.chat.repository.ChatMongoRepository;
 import com.astro.api.chat.repository.LastMessageProjection;
 import com.astro.api.user.repository.UserChatProjection;
 import com.astro.api.common.exception.ResourceNotFoundException;
+import com.astro.api.user.mapper.UserAvatarMapper;
 import com.astro.api.user.repository.UserRepository;
+import com.astro.api.user.service.UserAvatarService;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -29,12 +31,14 @@ public class ChatService {
     private final UserRepository userRepository;
     private final ChatMongoRepository chatMongoRepository;
     private final StringRedisTemplate redisTemplate;
+    private final UserAvatarService userAvatarService;
 
     public ChatService(UserRepository userRepository, ChatMongoRepository chatMongoRepository,
-                       StringRedisTemplate redisTemplate) {
+                       StringRedisTemplate redisTemplate, UserAvatarService userAvatarService) {
         this.userRepository = userRepository;
         this.chatMongoRepository = chatMongoRepository;
         this.redisTemplate = redisTemplate;
+        this.userAvatarService = userAvatarService;
     }
 
     @Transactional(readOnly = true)
@@ -101,6 +105,12 @@ public class ChatService {
             return List.of();
         }
 
+        Set<Long> includedParticipantIds = includedMessages.stream()
+                .map(message -> otherParticipantByConversation.get(message.conversationId()))
+                .filter(id -> id != null && participants.containsKey(id))
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        Map<Long, String> profilePhotoUrls = userAvatarService.findUrls(includedParticipantIds);
+
         List<String> keys = includedMessages.stream()
                 .map(message -> unreadKey(message.conversationId(), currentUser.getId())).toList();
         List<String> counts = redisTemplate.opsForValue().multiGet(keys);
@@ -116,7 +126,8 @@ public class ChatService {
                     otherParticipantByConversation.get(message.conversationId()));
             if (participant == null) continue;
             response.add(new ChatResponse(message.conversationId(),
-                    new ChatParticipantResponse(participant.getId(), participant.getName(), participant.getRole()),
+                    new ChatParticipantResponse(participant.getId(), participant.getName(), participant.getRole(),
+                            profilePhotoUrls.get(participant.getId()), UserAvatarMapper.initials(participant.getName())),
                     new ChatLastMessageResponse(message.senderId(), message.content()),
                     unreadByConversation.getOrDefault(message.conversationId(), 0)));
         }

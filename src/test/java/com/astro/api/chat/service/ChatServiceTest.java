@@ -9,6 +9,7 @@ import com.astro.api.chat.repository.LastMessageProjection;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.UserChatProjection;
 import com.astro.api.user.repository.UserRepository;
+import com.astro.api.user.service.UserAvatarService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -31,6 +32,7 @@ class ChatServiceTest {
     private ChatMongoRepository mongo;
     private StringRedisTemplate redis;
     private ValueOperations<String, String> values;
+    private UserAvatarService avatars;
     private ChatService service;
     private UserChatProjection current;
 
@@ -40,11 +42,12 @@ class ChatServiceTest {
         users = mock(UserRepository.class);
         mongo = mock(ChatMongoRepository.class);
         redis = mock(StringRedisTemplate.class);
+        avatars = mock(UserAvatarService.class);
         values = mock(ValueOperations.class);
         when(redis.opsForValue()).thenReturn(values);
         current = user(1L, "João", UserType.COLABORADOR, 10L);
         when(users.findChatUserByFirebaseUid("uid")).thenReturn(Optional.of(current));
-        service = new ChatService(users, mongo, redis);
+        service = new ChatService(users, mongo, redis, avatars);
     }
 
     @Test
@@ -70,6 +73,7 @@ class ChatServiceTest {
                         Instant.parse("2026-10-21T10:00:00Z"))));
         when(values.multiGet(List.of("chat:unread:conv-new:1", "chat:unread:conv-old:1")))
                 .thenReturn(java.util.Arrays.asList("3", null));
+        when(avatars.findUrls(anyCollection())).thenReturn(java.util.Map.of(2L, "https://cdn.example/ana.jpg"));
 
         List<ChatResponse> result = service.findChats(authenticatedUser());
 
@@ -78,6 +82,8 @@ class ChatServiceTest {
         assertEquals(0, result.get(1).unreadCount());
         assertEquals(3L, result.getFirst().participant().id());
         assertEquals(UserType.COLABORADOR, result.getFirst().participant().role());
+        assertEquals("https://cdn.example/ana.jpg", result.get(1).participant().profilePhotoUrl());
+        assertEquals("CS", result.getFirst().participant().avatarInitials());
         assertEquals("Concluí", result.getFirst().lastMessage().content());
         assertEquals(1L, result.get(1).lastMessage().senderId());
         verify(users).findChatUsersByIds(anyCollection());
@@ -89,9 +95,9 @@ class ChatServiceTest {
         when(mongo.findConversationsFor(1L)).thenReturn(List.of(
                 new ConversationDocument("foreign", List.of(1L, 2L)),
                 new ConversationDocument("no-message", List.of(1L, 3L))));
-        when(users.findChatUsersByIds(anyCollection())).thenReturn(List.of(
-                user(2L, "Outra workspace", UserType.GESTOR, 20L),
-                user(3L, "Sem mensagem", UserType.COLABORADOR, 10L)));
+        UserChatProjection foreignParticipant = user(2L, "Outra workspace", UserType.GESTOR, 20L);
+        UserChatProjection localParticipant = user(3L, "Sem mensagem", UserType.COLABORADOR, 10L);
+        when(users.findChatUsersByIds(anyCollection())).thenReturn(List.of(foreignParticipant, localParticipant));
         when(mongo.findLatestMessages(anyCollection())).thenReturn(List.of());
 
         assertEquals(List.of(), service.findChats(authenticatedUser()));
@@ -102,11 +108,11 @@ class ChatServiceTest {
     void propagatesRedisFailuresInsteadOfReturningZero() {
         when(mongo.findConversationsFor(1L)).thenReturn(List.of(
                 new ConversationDocument("conv", List.of(1L, 2L))));
-        when(users.findChatUsersByIds(List.of(2L))).thenReturn(List.of(
-                user(2L, "Ana Lima", UserType.GESTOR, 10L)));
-        when(mongo.findLatestMessages(List.of("conv"))).thenReturn(List.of(
+        UserChatProjection ana = user(2L, "Ana Lima", UserType.GESTOR, 10L);
+        when(users.findChatUsersByIds(anyCollection())).thenReturn(List.of(ana));
+        when(mongo.findLatestMessages(anyCollection())).thenReturn(List.of(
                 new LastMessageProjection("conv", 2L, "Oi", Instant.parse("2026-10-21T10:00:00Z"))));
-        when(values.multiGet(List.of("chat:unread:conv:1"))).thenThrow(new IllegalStateException("Redis indisponível"));
+        when(values.multiGet(anyCollection())).thenThrow(new IllegalStateException("Redis indisponível"));
 
         assertThrows(IllegalStateException.class, () -> service.findChats(authenticatedUser()));
     }
