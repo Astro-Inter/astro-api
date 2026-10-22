@@ -20,7 +20,7 @@ public interface EventClassParticipantRepository extends JpaRepository<EventClas
     @Query(value = "select exists (select 1 from conclusao_evento where turma_colaborador_id in (:ids))", nativeQuery = true)
     boolean hasConclusions(@Param("ids") Collection<Long> ids);
 
-    List<EventClassParticipant> findByUser_IdOrderByEventClass_StartDateAsc(Long userId);
+    List<EventClassParticipant> findByUser_IdOrderByEventClass_EndDateAsc(Long userId);
 
     Optional<EventClassParticipant> findFirstByEventClass_Event_IdAndUser_Id(Long eventId, Long userId);
 
