@@ -30,7 +30,7 @@ public class EventCompletion {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "turma_funcionario_id", nullable = false, unique = true)
+    @JoinColumn(name = "turma_colaborador_id", nullable = false, unique = true)
     private EventClassParticipant participation;
 
     @Enumerated(EnumType.STRING)
