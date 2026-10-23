@@ -8,6 +8,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 import org.springframework.data.convert.ValueConverter;
 import com.astro.api.form.mapper.FormStatusConverter;
+import com.astro.api.form.mapper.FormNumberConverter;
 
 import java.time.Instant;
 import java.util.List;
@@ -21,12 +22,15 @@ public class Form {
     private String id;
 
     @Field("id_workspace")
+    @ValueConverter(FormNumberConverter.class)
     private Long workspaceId;
 
     @Field("id_gestor")
+    @ValueConverter(FormNumberConverter.class)
     private Long managerId;
 
     @Field("id_gestor_remetente")
+    @ValueConverter(FormNumberConverter.class)
     private Long senderManagerId;
 
     @Field("titulo")
@@ -54,9 +58,11 @@ public class Form {
     private Integer nrCode;
 
     @Field("id_unidade")
+    @ValueConverter(FormNumberConverter.class)
     private Long unitId;
 
     @Field("versao")
+    @ValueConverter(FormNumberConverter.class)
     private Long version;
 
     @Field("perguntas")
@@ -67,6 +73,7 @@ public class Form {
     @NoArgsConstructor
     public static class FormQuestion {
         @Field("id_pergunta")
+        @ValueConverter(FormNumberConverter.class)
         private Long id;
 
         @Field("tipo")
@@ -99,6 +106,7 @@ public class Form {
     @NoArgsConstructor
     public static class FormOption {
         @Field("id_opcao")
+        @ValueConverter(FormNumberConverter.class)
         private Long id;
 
         @Field("texto")

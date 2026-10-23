@@ -20,6 +20,8 @@ import com.astro.api.form.model.FormScope;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.repository.support.MongoRepositoryFactory;
@@ -121,22 +123,79 @@ class FormRepositoryMongoTest {
         form.setId(UUID.randomUUID().toString());
         new com.astro.api.form.mapper.FormMapper().applyContent(FormTestFixtures.content(FormStatus.PENDING), form);
         form.setStatus(FormStatus.PENDING); form.setWorkspaceId(1L); form.setSenderManagerId(10L);
+        form.setUnitId(3L); form.setVersion(0L);
         repository.insert(form);
         Document raw = mongo.getCollection("forms").find().first();
         assertNotNull(raw);
         assertInstanceOf(String.class, raw.get("_id"));
         assertEquals(form.getId(), raw.getString("_id"));
-        assertEquals(1L, raw.get("id_workspace"));
+        assertEquals(1, raw.getInteger("id_workspace"));
+        assertEquals(10, raw.getInteger("id_gestor_remetente"));
+        assertEquals(20, raw.getInteger("id_gestor"));
+        assertEquals(3, raw.getInteger("id_unidade"));
+        assertEquals(0, raw.getInteger("versao"));
         assertEquals("PENDENTE", raw.getString("status"));
         assertEquals(FormStatus.PENDING, repository.findById(form.getId()).orElseThrow().getStatus());
         List<Document> questions = raw.getList("perguntas", org.bson.Document.class);
         assertEquals(4, questions.size()); assertEquals(List.of(), questions.getFirst().get("resposta"));
-        assertEquals(1L, questions.getFirst().getLong("id_pergunta"));
-        assertEquals(1L, questions.get(1).getList("opcoes", org.bson.Document.class).getFirst().getLong("id_opcao"));
+        assertEquals(1, questions.getFirst().getInteger("id_pergunta"));
+        assertEquals(1, questions.get(1).getList("opcoes", org.bson.Document.class).getFirst().getInteger("id_opcao"));
         assertEquals("alternativa", questions.get(1).getString("tipo"));
         assertTrue(questions.get(1).getList("opcoes", org.bson.Document.class).get(1).getBoolean("outra"));
         assertEquals(java.util.Date.from(Instant.parse("2026-10-30T03:00:00Z")), raw.get("data_limite"));
         assertEquals(4, repository.findById(form.getId(), formAccessService.readFilter(new FormScope(10L, 1L, false))).orElseThrow().getQuestions().size());
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = {-2147483648L, 2147483647L, -2147483649L, 2147483648L, Long.MIN_VALUE, Long.MAX_VALUE})
+    void storesSmallIntegersWithoutLongWrappersAndPreservesLargeIdentifiers(long value) {
+        Form form = form(1, value, value, value, FormStatus.DRAFT);
+        form.setUnitId(value); form.setVersion(value);
+        Form.FormQuestion question = form.getQuestions().getFirst(); question.setId(value);
+        Form.FormOption option = new Form.FormOption(); option.setId(value);
+        question.setOptions(List.of(option));
+        repository.insert(form);
+        Document raw = mongo.getCollection("forms").find().first(); assertNotNull(raw);
+        Class<? extends Number> expectedType = value >= Integer.MIN_VALUE && value <= Integer.MAX_VALUE
+                ? Integer.class : Long.class;
+        for (String field : List.of("id_workspace", "id_gestor", "id_gestor_remetente", "id_unidade", "versao")) {
+            Number storedNumber = assertInstanceOf(expectedType, raw.get(field));
+            assertEquals(value, storedNumber.longValue());
+        }
+        Document storedQuestion = raw.getList("perguntas", Document.class).getFirst();
+        Number questionId = assertInstanceOf(expectedType, storedQuestion.get("id_pergunta"));
+        Number optionId = assertInstanceOf(expectedType, storedQuestion.getList("opcoes", Document.class).getFirst().get("id_opcao"));
+        assertEquals(value, questionId.longValue()); assertEquals(value, optionId.longValue());
+        Form restored = repository.findById(form.getId()).orElseThrow();
+        assertEquals(value, restored.getWorkspaceId()); assertEquals(value, restored.getManagerId());
+        assertEquals(value, restored.getSenderManagerId()); assertEquals(value, restored.getUnitId());
+        assertEquals(value, restored.getVersion());
+        assertEquals(value, restored.getQuestions().getFirst().getId());
+        assertEquals(value, restored.getQuestions().getFirst().getOptions().getFirst().getId());
+    }
+
+    @Test void readsLegacyLongsAndWritesPlainNumbersDuringConditionalEditingAndPublication() {
+        Document legacy = new Document("_id", formId(1)).append("id_workspace", 1L)
+                .append("id_gestor_remetente", 10L).append("id_gestor", 20L).append("id_unidade", 3L)
+                .append("status", "RASCUNHO").append("versao", 0L)
+                .append("perguntas", List.of(new Document("id_pergunta", 1L).append("tipo", "alternativa")
+                        .append("resposta", List.of()).append("opcoes", List.of(new Document("id_opcao", 1L)))));
+        mongo.getCollection("forms").insertOne(legacy);
+        FormScope scope = new FormScope(10L, 1L, false);
+        Form saved = repository.findById(formId(1), formAccessService.readFilter(scope)).orElseThrow();
+        assertEquals(1L, saved.getQuestions().getFirst().getId());
+        assertEquals(1L, saved.getQuestions().getFirst().getOptions().getFirst().getId());
+        Form updated = repository.update(saved, formAccessService.writeCondition(saved, scope)).orElseThrow();
+        Document raw = mongo.getCollection("forms").find().first(); assertNotNull(raw);
+        assertEquals(20, raw.getInteger("id_gestor")); assertEquals(3, raw.getInteger("id_unidade"));
+        assertEquals(1, raw.getInteger("versao"));
+        assertEquals(1, raw.getList("perguntas", Document.class).getFirst().getInteger("id_pergunta"));
+        assertEquals(1, raw.getList("perguntas", Document.class).getFirst().getList("opcoes", Document.class).getFirst().getInteger("id_opcao"));
+        Form published = repository.updateStatus(formAccessService.writeCondition(updated, scope), FormStatus.PENDING, Instant.now()).orElseThrow();
+        assertEquals(2L, published.getVersion());
+        Document publishedRaw = mongo.getCollection("forms").find().first(); assertNotNull(publishedRaw);
+        assertEquals(2, publishedRaw.getInteger("versao"));
+        assertTrue(repository.deleteIfUnanswered(formAccessService.writeCondition(published, scope)));
     }
 
     @Test void updateAtomicallyChecksVersionPermissionsAndResponseState() throws Exception {
