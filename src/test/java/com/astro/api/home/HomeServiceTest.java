@@ -4,6 +4,7 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.security.Role;
 import com.astro.api.home.repository.HomeRepository;
 import com.astro.api.home.service.HomeService;
+import com.astro.api.user.service.UserAvatarService;
 import com.astro.api.common.service.ViewedService;
 import com.astro.api.notification.service.NotificationService;
 import com.astro.api.form.service.FormService;
@@ -19,7 +20,7 @@ import static org.mockito.Mockito.*;
 class HomeServiceTest {
     private final HomeRepository repository = mock(HomeRepository.class);
     private final HomeService service = new HomeService(repository, JsonMapper.builder().build(),
-            mock(NotificationService.class), mock(ViewedService.class), mock(FormService.class));
+            mock(NotificationService.class), mock(ViewedService.class), mock(FormService.class), mock(UserAvatarService.class));
 
     @Test
     void rejectsMissingIdentityBeforeQueryingTheDatabase() {

@@ -6,6 +6,7 @@ import com.astro.api.home.repository.HomeRepository;
 import com.astro.api.notification.model.Notification;
 import com.astro.api.notification.service.NotificationService;
 import com.astro.api.form.service.FormService;
+import com.astro.api.user.service.UserAvatarService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -25,6 +27,7 @@ class HomeServiceTest {
     private HomeRepository homeRepository;
     private NotificationService notificationService;
     private ViewedService viewedService;
+    private UserAvatarService userAvatarService;
     private HomeService service;
 
     @BeforeEach
@@ -32,8 +35,9 @@ class HomeServiceTest {
         homeRepository = mock(HomeRepository.class);
         notificationService = mock(NotificationService.class);
         viewedService = mock(ViewedService.class);
+        userAvatarService = mock(UserAvatarService.class);
         service = new HomeService(homeRepository, JsonMapper.builder().build(), notificationService, viewedService,
-                mock(FormService.class));
+                mock(FormService.class), userAvatarService);
         HomeRepository.UserIdProjection identity = mock(HomeRepository.UserIdProjection.class);
         when(identity.getUserId()).thenReturn(42L);
         when(homeRepository.findUserIdByFirebaseUid("uid")).thenReturn(Optional.of(identity));
@@ -45,12 +49,14 @@ class HomeServiceTest {
         Notification notification = notification(6L);
         when(notificationService.findLatestForUser(42L)).thenReturn(List.of(notification));
         when(notificationService.elapsedWholeHours(notification.getCreatedAt())).thenReturn(2L);
+        when(userAvatarService.findUrl(42L)).thenReturn("https://example.com/collaborator.jpg");
         when(viewedService.findViewed(42L, "events", List.of(101L))).thenReturn(java.util.Set.of("101"));
         when(viewedService.findViewed(42L, "notifications", List.of(6L))).thenReturn(java.util.Set.of());
 
         CollaboratorHomeResponse response = service.getCollaboratorHome("uid");
 
         assertEquals("URGENT", response.statusMessage());
+        assertEquals("https://example.com/collaborator.jpg", response.profilePhotoUrl());
         assertEquals(true, response.pendingEvents().getFirst().viewed());
         assertEquals("Lembrete", response.lastNotifications().getFirst().title());
         assertEquals(2L, response.lastNotifications().getFirst().sentAtInHours());
@@ -64,6 +70,7 @@ class HomeServiceTest {
             when(viewedService.findViewed(eq(42L), any(), eq(List.of()))).thenReturn(java.util.Set.of());
             CollaboratorHomeResponse response = service.getCollaboratorHome("uid");
             assertEquals(status, response.statusMessage());
+            assertNull(response.profilePhotoUrl());
             assertEquals(List.of(), response.pendingEvents());
             assertEquals(List.of(), response.lastNotifications());
         }

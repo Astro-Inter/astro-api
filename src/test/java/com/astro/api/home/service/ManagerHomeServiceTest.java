@@ -10,6 +10,7 @@ import com.astro.api.home.dto.response.ManagerHomeResponse;
 import com.astro.api.home.repository.HomeRepository;
 import com.astro.api.home.repository.HomeUserIdProjection;
 import com.astro.api.notification.service.NotificationService;
+import com.astro.api.user.service.UserAvatarService;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -28,7 +29,7 @@ class ManagerHomeServiceTest {
     private final FormService formService = mock(FormService.class);
     private final ViewedService viewedService = mock(ViewedService.class);
     private final HomeService service = new HomeService(homeRepository, JsonMapper.builder().build(),
-            mock(NotificationService.class), viewedService, formService);
+            mock(NotificationService.class), viewedService, formService, mock(UserAvatarService.class));
     private final AuthenticatedUser manager = new AuthenticatedUser("manager", "manager@astro.com", Role.GESTOR);
 
     @Test

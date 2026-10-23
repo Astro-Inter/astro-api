@@ -6,6 +6,7 @@ import com.astro.api.common.handler.GlobalExceptionHandler;
 import com.astro.api.home.controller.HomeController;
 import com.astro.api.home.repository.HomeRepository;
 import com.astro.api.home.service.HomeService;
+import com.astro.api.user.service.UserAvatarService;
 import com.astro.api.common.service.ViewedService;
 import com.astro.api.form.service.FormService;
 import com.astro.api.notification.service.NotificationService;
@@ -33,7 +34,7 @@ class HomeControllerTest {
     @BeforeEach
     void setUp() {
         var service = new HomeService(repository, JsonMapper.builder().build(),
-                mock(NotificationService.class), mock(ViewedService.class), mock(FormService.class));
+                mock(NotificationService.class), mock(ViewedService.class), mock(FormService.class), mock(UserAvatarService.class));
         mvc = MockMvcBuilders.standaloneSetup(new HomeController(service))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {

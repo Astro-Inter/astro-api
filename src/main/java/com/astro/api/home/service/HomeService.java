@@ -9,6 +9,7 @@ import com.astro.api.home.dto.response.*;
 import com.astro.api.home.repository.HomeRepository;
 import com.astro.api.notification.model.Notification;
 import com.astro.api.notification.service.NotificationService;
+import com.astro.api.user.service.UserAvatarService;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,14 +35,16 @@ public class HomeService {
     private final NotificationService notificationService;
     private final ViewedService viewedService;
     private final FormService formService;
+    private final UserAvatarService userAvatarService;
 
     public HomeService(HomeRepository homeRepository, JsonMapper objectMapper, NotificationService notificationService,
-                       ViewedService viewedService, FormService formService) {
+                       ViewedService viewedService, FormService formService, UserAvatarService userAvatarService) {
         this.homeRepository = homeRepository;
         this.objectMapper = objectMapper;
         this.notificationService = notificationService;
         this.viewedService = viewedService;
         this.formService = formService;
+        this.userAvatarService = userAvatarService;
     }
 
     @Transactional(readOnly = true)
@@ -85,7 +88,7 @@ public class HomeService {
             throw new IllegalStateException("A função da Home retornou métricas inválidas");
         }
         return new CollaboratorHomeResponse(
-                databaseHome.username(), databaseHome.workspaceName(),
+                databaseHome.username(), userAvatarService.findUrl(userId), databaseHome.workspaceName(),
                 new CollaboratorHomeResponse.EventsMetricsResponse(metrics.pending(), metrics.underAnalysis(), metrics.done()),
                 databaseHome.statusMessage(),
                 events.stream().map(event -> new CollaboratorHomeResponse.PendingEventResponse(
