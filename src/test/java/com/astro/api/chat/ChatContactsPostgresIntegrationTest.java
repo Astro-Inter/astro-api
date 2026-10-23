@@ -71,7 +71,7 @@ class ChatContactsPostgresIntegrationTest {
         }
         UserRepository userRepository = context.getBean(UserRepository.class);
         ChatContactService service = new ChatContactService(userRepository, new ChatContactMapper());
-        mockMvc = MockMvcBuilders.standaloneSetup(new ChatController(service))
+        mockMvc = MockMvcBuilders.standaloneSetup(new ChatController(null, service))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
     }

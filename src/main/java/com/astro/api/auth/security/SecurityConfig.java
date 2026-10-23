@@ -1,5 +1,6 @@
 package com.astro.api.auth.security;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -48,16 +49,19 @@ public class SecurityConfig {
                  .anyRequest().authenticated()
             )
             .exceptionHandling(errors -> errors.authenticationEntryPoint((request, response, exception) ->
-                    response.sendError(request.getRequestURI().equals("/events")
-                            || request.getRequestURI().startsWith("/events/")
-                            || request.getRequestURI().equals("/workspace")
-                            || request.getRequestURI().startsWith("/workspace/")
-                            || request.getRequestURI().equals("/units")
-                            || request.getRequestURI().startsWith("/units/") ? 401 : 403)))
+                    response.sendError(isUnauthorizedRoute(request.getRequestURI())
+                            ? HttpServletResponse.SC_UNAUTHORIZED : HttpServletResponse.SC_FORBIDDEN)))
             .addFilterBefore(
                 firebaseAuthenticationFilter,
                 UsernamePasswordAuthenticationFilter.class
             )
             .build();
+    }
+
+    private static boolean isUnauthorizedRoute(String requestUri) {
+        return requestUri.equals("/events") || requestUri.startsWith("/events/")
+                || requestUri.equals("/workspace") || requestUri.startsWith("/workspace/")
+                || requestUri.equals("/units") || requestUri.startsWith("/units/")
+                || requestUri.equals("/chats") || requestUri.startsWith("/chats/");
     }
 }

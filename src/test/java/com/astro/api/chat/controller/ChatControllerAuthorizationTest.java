@@ -4,6 +4,7 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.security.Role;
 import com.astro.api.chat.mapper.ChatContactMapper;
 import com.astro.api.chat.service.ChatContactService;
+import com.astro.api.chat.service.ChatService;
 import com.astro.api.user.repository.UserRepository;
 import java.lang.reflect.Proxy;
 import java.util.List;
@@ -20,6 +21,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
 
 class ChatControllerAuthorizationTest {
     @Test
@@ -56,6 +58,9 @@ class ChatControllerAuthorizationTest {
                     (proxy, method, args) -> { throw new UnsupportedOperationException(method.getName()); });
             return new ChatContactService(unusedRepository, new ChatContactMapper());
         }
-        @Bean ChatController chatController(ChatContactService service) { return new ChatController(service); }
+        @Bean ChatService chatService() { return mock(ChatService.class); }
+        @Bean ChatController chatController(ChatService chatService, ChatContactService service) {
+            return new ChatController(chatService, service);
+        }
     }
 }
