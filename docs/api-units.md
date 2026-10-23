@@ -25,9 +25,17 @@ Java em inglês. As respostas seguem `ApiResult`, com o resultado em `data`.
 
 A listagem retorna `unitId`, `workspaceId`, `name`, `status`, `collaboratorCount`,
 `postalCode`, `street`, `city`, `neighborhood`, `state`, `addressLine2` e `number`.
-O mapper converte os dados do banco para os campos em inglês do `UnitResponse`,
-sem `@JsonProperty`. Consumidores que usavam os nomes anteriores em português
-precisam atualizar a leitura dessas respostas. O endereço pode ser nulo.
+O mapper converte os dados do banco para os campos em inglês do `UnitResponse`.
+A resposta também inclui `id_unidade`, `id_workspace`, `nome` e
+`quantidade_colaboradores`, com os mesmos valores de `unitId`, `workspaceId`,
+`name` e `collaboratorCount`. Getters JavaBean expõem esses nomes por descoberta
+automática do Jackson, sem `@JsonProperty` e sem duplicar estado no DTO.
+
+Esses campos preservam a validação de `listUnits` do web publicado e o carregamento
+de opções do editor de formulários, que usa a mesma listagem. Os campos em inglês
+e de endereço continuam disponíveis para as configurações do workspace. Como o
+DTO é compartilhado, as respostas de criação e edição também incluem os quatro
+campos de compatibilidade. O endereço pode ser nulo.
 O PATCH não exige body e retorna
 `data: true` para ativa e `data: false` para inativa. Os triggers PostgreSQL executam
 as regras de desativação dos usuários vinculados.

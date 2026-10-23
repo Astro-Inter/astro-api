@@ -28,6 +28,7 @@ import com.astro.api.event.model.EventCompletion;
 import com.astro.api.event.model.EventCompletionStatus;
 import com.astro.api.event.model.EventEvidence;
 import com.astro.api.event.model.EventStatus;
+import com.astro.api.event.model.ParticipationStatus;
 import com.astro.api.event.repository.EventCandidateRepository;
 import com.astro.api.event.repository.EventClassParticipantRepository;
 import com.astro.api.event.repository.EventClassRepository;
@@ -164,7 +165,7 @@ public class EventService {
     public List<CollaboratorEventResponse> findForCollaborator(String firebaseUid) {
         User user = findAuthenticatedUser(firebaseUid);
         List<EventClassParticipant> participations = eventClassParticipantRepository
-                .findByUser_IdOrderByEventClass_StartDateAsc(user.getId());
+                .findByUser_IdOrderByEventClass_EndDateAsc(user.getId());
         if (participations.isEmpty()) {
             return List.of();
         }
@@ -172,12 +173,19 @@ public class EventService {
                 participations.stream()
                         .map(participation -> participation.getEventClass().getEvent().getId())
                         .toList());
-        LocalDateTime now = LocalDateTime.now();
+        Map<Long, ParticipationStatus> participationStatuses = eventCompletionRepository
+                .findByParticipation_IdIn(participations.stream()
+                        .map(EventClassParticipant::getId)
+                        .toList())
+                .stream()
+                .collect(Collectors.toMap(
+                        completion -> completion.getParticipation().getId(),
+                        completion -> toParticipationStatus(completion.getStatus())));
         return participations.stream()
                 .map(participation -> eventMapper.toCollaboratorEventResponse(
                         participation,
                         viewedEvents.contains(participation.getEventClass().getEvent().getId().toString()),
-                        classStatus(participation.getEventClass(), now)))
+                        participationStatuses.getOrDefault(participation.getId(), ParticipationStatus.PENDENTE)))
                 .toList();
     }
 
@@ -211,6 +219,10 @@ public class EventService {
                 event.getId(),
                 event.getTitle(),
                 eventClass.getEndDate(),
+                conclusion == null
+                        ? ParticipationStatus.PENDENTE
+                        : toParticipationStatus(conclusion.getStatus()),
+                event.getStatus(),
                 classStatus(eventClass, LocalDateTime.now()),
                 event.getDescription(),
                 validity,
@@ -832,6 +844,14 @@ public class EventService {
             return "CANCELADO";
         }
         return eventClass.getEndDate().isBefore(now) ? "CONCLUIDO" : "PENDENTE";
+    }
+
+    private ParticipationStatus toParticipationStatus(EventCompletionStatus status) {
+        return switch (status) {
+            case PENDENTE -> ParticipationStatus.EM_ANALISE;
+            case CONCLUIDO -> ParticipationStatus.CONCLUIDO;
+            case REJEITADO -> ParticipationStatus.REJEITADO;
+        };
     }
 
     private EventResponse toResponse(Event event, List<EventClass> eventClasses, User manager) {

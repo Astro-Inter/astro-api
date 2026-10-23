@@ -11,6 +11,7 @@ import com.astro.api.event.model.Event;
 import com.astro.api.event.model.EventClass;
 import com.astro.api.event.model.EventClassParticipant;
 import com.astro.api.event.model.EventEvidence;
+import com.astro.api.event.model.ParticipationStatus;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.WorkModel;
 import com.astro.api.event.repository.EventCandidateProjection;
@@ -79,7 +80,7 @@ public class EventMapper {
     public CollaboratorEventResponse toCollaboratorEventResponse(
             EventClassParticipant participation,
             boolean viewed,
-            String classStatus) {
+            ParticipationStatus participationStatus) {
         EventClass eventClass = participation.getEventClass();
         Event event = eventClass.getEvent();
         return new CollaboratorEventResponse(
@@ -87,7 +88,7 @@ public class EventMapper {
                 event.getTitle(),
                 eventClass.getEndDate(),
                 viewed,
-                classStatus,
+                participationStatus,
                 eventClass.getName(),
                 event.getStatus());
     }

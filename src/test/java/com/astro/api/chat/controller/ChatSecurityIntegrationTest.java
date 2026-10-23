@@ -6,6 +6,7 @@ import com.astro.api.auth.security.SecurityConfig;
 import com.astro.api.auth.service.AuthorizationService;
 import com.astro.api.auth.service.FirebaseTokenService;
 import com.astro.api.chat.service.ChatService;
+import com.astro.api.chat.service.ChatContactService;
 import com.astro.api.common.handler.GlobalExceptionHandler;
 import com.astro.api.config.CorsConfig;
 import com.google.firebase.auth.FirebaseAuthException;
@@ -99,6 +100,7 @@ class ChatSecurityIntegrationTest {
             ChatController.class, GlobalExceptionHandler.class})
     static class Config {
         @Bean ChatService chatService() { return mock(ChatService.class); }
+        @Bean ChatContactService chatContactService() { return mock(ChatContactService.class); }
         @Bean FirebaseTokenService tokens() { return mock(FirebaseTokenService.class); }
         @Bean AuthorizationService authorization() { return mock(AuthorizationService.class); }
     }

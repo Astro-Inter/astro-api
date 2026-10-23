@@ -29,6 +29,7 @@ import com.astro.api.event.model.EventCompletion;
 import com.astro.api.event.model.EventCompletionStatus;
 import com.astro.api.event.model.EventEvidence;
 import com.astro.api.event.model.EventStatus;
+import com.astro.api.event.model.ParticipationStatus;
 import com.astro.api.event.repository.EventCalendarProjection;
 import com.astro.api.event.repository.EventCandidateProjection;
 import com.astro.api.event.repository.EventCandidateRepository;
@@ -461,17 +462,17 @@ class EventServiceTest {
         futureParticipation.setEventClass(futureClass);
         futureParticipation.setUser(collaborator);
         when(userRepository.findByFirebaseUid("collaborator")).thenReturn(Optional.of(collaborator));
-        when(eventClassParticipantRepository.findByUser_IdOrderByEventClass_StartDateAsc(2L))
+        when(eventClassParticipantRepository.findByUser_IdOrderByEventClass_EndDateAsc(2L))
                 .thenReturn(List.of(pastParticipation, futureParticipation));
         when(viewedService.findViewed(2L, "events", List.of(31L, 32L))).thenReturn(Set.of("31"));
 
         List<CollaboratorEventResponse> response = service.findForCollaborator("collaborator");
 
         assertEquals(2, response.size());
-        assertEquals("CANCELADO", response.getFirst().classStatus());
+        assertEquals(ParticipationStatus.PENDENTE, response.getFirst().participationStatus());
         assertEquals(EventStatus.CANCELADO, response.getFirst().eventStatus());
         assertEquals(true, response.getFirst().viewed());
-        assertEquals("PENDENTE", response.get(1).classStatus());
+        assertEquals(ParticipationStatus.PENDENTE, response.get(1).participationStatus());
         assertEquals(false, response.get(1).viewed());
     }
 

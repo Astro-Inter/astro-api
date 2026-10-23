@@ -45,6 +45,23 @@ public interface UserRepository extends JpaRepository<User, Long> {
             where u.id in :ids
             """)
     List<UserChatProjection> findChatUsersByIds(@Param("ids") Collection<Long> ids);
+
+
+    @Query("""
+            select contact.id as id, contact.name as name, contact.type as role
+            from User contact
+            join contact.unit contactUnit
+            where contactUnit.workspace.id = :workspaceId
+              and contact.id <> :currentUserId
+              and (contact.status is null or contact.status <> :deactivatedStatus)
+              and contact.type in :allowedTypes
+            order by contact.name asc, contact.id asc
+            """)
+    List<ChatContactProjection> findChatContacts(@Param("workspaceId") Long workspaceId,
+                                                 @Param("currentUserId") Long currentUserId,
+                                                 @Param("deactivatedStatus") UserStatus deactivatedStatus,
+                                                 @Param("allowedTypes") Collection<UserType> allowedTypes);
+
     @Query("""
             select recipient.id as id, recipient.name as name, recipientUnit.name as unitName
             from User recipient
