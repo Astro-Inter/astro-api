@@ -25,7 +25,7 @@ class ManagerHomeControllerTest {
     void returnsTheManagerHomeAtTheSpecifiedRoute() throws Exception {
         HomeService service = mock(HomeService.class);
         AuthenticatedUser user = new AuthenticatedUser("manager", "manager@astro.com", Role.GESTOR);
-        when(service.loadManagerHome(user)).thenReturn(new ManagerHomeResponse("Ana", "Workspace", List.of(), List.of(), null));
+        when(service.loadManagerHome(user)).thenReturn(new ManagerHomeResponse("Ana", "https://example.com/manager.jpg", "Workspace", List.of(), List.of(), null));
 
         var mvc = MockMvcBuilders.standaloneSetup(new HomeController(service))
                 .setControllerAdvice(new GlobalExceptionHandler())
@@ -45,6 +45,7 @@ class ManagerHomeControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.path").value("/home/manager"))
                 .andExpect(jsonPath("$.data.username").value("Ana"))
+                .andExpect(jsonPath("$.data.profilePhotoUrl").value("https://example.com/manager.jpg"))
                 .andExpect(jsonPath("$.data.pending_validations").isArray())
                 .andExpect(jsonPath("$.data.pending_forms").isArray());
         verify(service).loadManagerHome(user);

@@ -130,7 +130,7 @@ public class HomeService {
                 forms.stream().map(Form::getId).toList());
 
         return new ManagerHomeResponse(
-                databaseHome.username(), databaseHome.workspaceName(),
+                databaseHome.username(), userAvatarService.findUrl(managerId), databaseHome.workspaceName(),
                 validations.stream().map(validation -> new PendingValidationResponse(
                         validation.id(), validation.collaboratorName(), validation.eventTitle(),
                         viewedValidations.contains(String.valueOf(validation.id())))).toList(),
