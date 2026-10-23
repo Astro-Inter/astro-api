@@ -1,8 +1,10 @@
 package com.astro.api.chat.controller;
 
 import com.astro.api.auth.security.AuthenticatedUser;
+import com.astro.api.common.response.ApiResult;
 import com.astro.api.chat.dto.response.ChatContactResponse;
 import com.astro.api.chat.service.ChatContactService;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,8 +24,9 @@ public class ChatController {
 
     @GetMapping("/contacts")
     @PreAuthorize("hasAnyRole('COLABORADOR', 'GESTOR', 'GESTOR_WORKSPACE')")
-    public ResponseEntity<List<ChatContactResponse>> findContacts(
-            @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
-        return ResponseEntity.ok(chatContactService.findContacts(authenticatedUser));
+    public ResponseEntity<ApiResult<List<ChatContactResponse>>> findContacts(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser, HttpServletRequest request) {
+        return ResponseEntity.ok(ApiResult.success("Contatos retornados com sucesso",
+                chatContactService.findContacts(authenticatedUser), request.getRequestURI()));
     }
 }
