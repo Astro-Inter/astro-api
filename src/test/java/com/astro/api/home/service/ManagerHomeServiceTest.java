@@ -10,6 +10,7 @@ import com.astro.api.home.dto.response.ManagerHomeResponse;
 import com.astro.api.home.repository.HomeRepository;
 import com.astro.api.home.repository.HomeUserIdProjection;
 import com.astro.api.notification.service.NotificationService;
+import com.astro.api.user.service.UserAvatarService;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -27,8 +28,9 @@ class ManagerHomeServiceTest {
     private final HomeRepository homeRepository = mock(HomeRepository.class);
     private final FormService formService = mock(FormService.class);
     private final ViewedService viewedService = mock(ViewedService.class);
+    private final UserAvatarService userAvatarService = mock(UserAvatarService.class);
     private final HomeService service = new HomeService(homeRepository, JsonMapper.builder().build(),
-            mock(NotificationService.class), viewedService, formService);
+            mock(NotificationService.class), viewedService, formService, userAvatarService);
     private final AuthenticatedUser manager = new AuthenticatedUser("manager", "manager@astro.com", Role.GESTOR);
 
     @Test
@@ -41,6 +43,7 @@ class ManagerHomeServiceTest {
                    {"id":202,"collaborator_name":"Maria Silva","event_title":"NR-12"}]}
                 """);
         when(homeRepository.findByFirebaseUid("manager")).thenReturn(Optional.of(userId(2L)));
+        when(userAvatarService.findUrl(2L)).thenReturn("https://example.com/manager.jpg");
         when(formService.findTop3PendingForManager(2L)).thenReturn(List.of(form("00000000-0000-0000-0000-00000000012d", "Checklist",
                 Instant.parse("2026-10-15T12:00:00Z")), form("00000000-0000-0000-0000-00000000012e", "Pesquisa", null)));
         when(viewedService.findViewed(2L, "validations", List.of(201L, 202L))).thenReturn(Set.of("202"));
@@ -49,6 +52,7 @@ class ManagerHomeServiceTest {
         ManagerHomeResponse response = service.loadManagerHome(manager);
 
         assertEquals("Ana Dias", response.username());
+        assertEquals("https://example.com/manager.jpg", response.profilePhotoUrl());
         assertEquals(15, response.indicators().pendingValidations());
         assertEquals(2, response.pendingValidations().size());
         assertFalse(response.pendingValidations().getFirst().viewed());
@@ -76,6 +80,7 @@ class ManagerHomeServiceTest {
         ManagerHomeResponse response = service.loadManagerHome(manager);
 
         assertTrue(response.pendingValidations().isEmpty());
+        assertNull(response.profilePhotoUrl());
         assertTrue(response.pendingForms().isEmpty());
     }
 

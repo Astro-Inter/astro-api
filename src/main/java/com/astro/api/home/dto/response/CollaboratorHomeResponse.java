@@ -7,6 +7,7 @@ import java.util.List;
 
 public record CollaboratorHomeResponse(
         String username,
+        String profilePhotoUrl,
         @JsonProperty("workspace_name") String workspaceName,
         @JsonProperty("events_metrics") EventsMetricsResponse eventsMetrics,
         @JsonProperty("status_message") String statusMessage,
