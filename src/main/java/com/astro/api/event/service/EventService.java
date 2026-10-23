@@ -219,6 +219,10 @@ public class EventService {
                 event.getId(),
                 event.getTitle(),
                 eventClass.getEndDate(),
+                conclusion == null
+                        ? ParticipationStatus.PENDENTE
+                        : toParticipationStatus(conclusion.getStatus()),
+                event.getStatus(),
                 classStatus(eventClass, LocalDateTime.now()),
                 event.getDescription(),
                 validity,
