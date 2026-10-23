@@ -27,9 +27,9 @@ public class FormRepositoryCustomImpl implements FormRepositoryCustom {
     @Override
     public Optional<Form> update(Form form, FormWriteCondition writeCondition) {
         Update update = new Update().set("titulo", form.getTitle()).set("descricao", form.getDescription())
-                .set("id_gestor", form.getManagerId()).set("nr", form.getNrCode()).set("id_unidade", form.getUnitId())
+                .set("managerId", form.getManagerId()).set("nr", form.getNrCode()).set("unitId", form.getUnitId())
                 .set("data_limite", form.getDueDate()).set("perguntas", form.getQuestions())
-                .set("atualizado_em", form.getUpdatedAt()).set("versao", nextVersion(writeCondition));
+                .set("atualizado_em", form.getUpdatedAt()).set("version", nextVersion(writeCondition));
         return Optional.ofNullable(mongoTemplate.findAndModify(unansweredQuery(writeCondition), update,
                 FindAndModifyOptions.options().returnNew(true), Form.class));
     }
@@ -42,7 +42,7 @@ public class FormRepositoryCustomImpl implements FormRepositoryCustom {
     @Override
     public Optional<Form> updateStatus(FormWriteCondition writeCondition, FormStatus targetStatus, Instant updatedAt) {
         Update update = new Update().set("status", targetStatus).set("atualizado_em", updatedAt)
-                .set("versao", nextVersion(writeCondition));
+                .set("version", nextVersion(writeCondition));
         return Optional.ofNullable(mongoTemplate.findAndModify(unansweredQuery(writeCondition), update,
                 FindAndModifyOptions.options().returnNew(true), Form.class));
     }
