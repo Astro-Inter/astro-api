@@ -17,6 +17,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.mock.web.MockHttpServletRequest;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -26,11 +27,12 @@ class ChatControllerAuthorizationTest {
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(Config.class)) {
             ChatController controller = context.getBean(ChatController.class);
             SecurityContextHolder.getContext().setAuthentication(authentication("ADMIN"));
-            assertThrows(AccessDeniedException.class, () -> controller.findContacts(principal(Role.ADMIN)));
+            assertThrows(AccessDeniedException.class,
+                    () -> controller.findContacts(principal(Role.ADMIN), new MockHttpServletRequest()));
 
             SecurityContextHolder.clearContext();
             assertThrows(AuthenticationCredentialsNotFoundException.class,
-                    () -> controller.findContacts(principal(Role.COLABORADOR)));
+                    () -> controller.findContacts(principal(Role.COLABORADOR), new MockHttpServletRequest()));
         } finally {
             SecurityContextHolder.clearContext();
         }

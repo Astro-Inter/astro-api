@@ -157,10 +157,13 @@ class ChatContactsPostgresIntegrationTest {
 
             performAs(current, Role.valueOf(managerType.name()))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$[*].id").value(List.of(
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.message").value("Contatos retornados com sucesso"))
+                    .andExpect(jsonPath("$.path").value("/chats/contacts"))
+                    .andExpect(jsonPath("$.data[*].id").value(List.of(
                             collaborator.getId().intValue(), peerManager.getId().intValue(), workspaceManager.getId().intValue())))
-                    .andExpect(jsonPath("$[*].name").value(List.of("Colaborador", "Outro gestor", "Gestor workspace")))
-                    .andExpect(jsonPath("$[*].name").value(org.hamcrest.Matchers.not(
+                    .andExpect(jsonPath("$.data[*].name").value(List.of("Colaborador", "Outro gestor", "Gestor workspace")))
+                    .andExpect(jsonPath("$.data[*].name").value(org.hamcrest.Matchers.not(
                             org.hamcrest.Matchers.hasItem("Admin técnico"))));
         });
     }
