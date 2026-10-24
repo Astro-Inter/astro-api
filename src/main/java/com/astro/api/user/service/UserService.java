@@ -1,5 +1,6 @@
 package com.astro.api.user.service;
 
+import com.astro.api.auth.security.Role;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.storage.R2StorageService;
 import com.astro.api.common.text.PersonalDataNormalizer;
@@ -16,6 +17,7 @@ import com.astro.api.user.model.UserProfilePhoto;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.UserRepository;
+import com.astro.api.user.repository.AdminRepository;
 import com.astro.api.user.repository.UserNrValidityProjection;
 import com.astro.api.user.repository.UserProfilePhotoRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,6 +40,7 @@ public class UserService {
     private String collaboratorAccessTokenPrefix;
 
     private final UserRepository userRepository;
+    private final AdminRepository adminRepository;
     private final StringRedisTemplate redisTemplate;
     private final NrDocumentRepository nrDocumentRepository;
     private final UserProfilePhotoRepository userProfilePhotoRepository;
@@ -47,6 +50,7 @@ public class UserService {
 
     public UserService(
             UserRepository userRepository,
+            AdminRepository adminRepository,
             StringRedisTemplate redisTemplate,
             NrDocumentRepository nrDocumentRepository,
             UserProfilePhotoRepository userProfilePhotoRepository,
@@ -54,6 +58,7 @@ public class UserService {
             R2StorageService r2StorageService,
             UserAvatarService avatars) {
         this.userRepository = userRepository;
+        this.adminRepository = adminRepository;
         this.redisTemplate = redisTemplate;
         this.nrDocumentRepository = nrDocumentRepository;
         this.userProfilePhotoRepository = userProfilePhotoRepository;
@@ -67,11 +72,15 @@ public class UserService {
     }
 
     public IdentificatedUserResponseDto findTypeAndStatusByEmail(EmailVerificationRequestDto dto) {
+        if (adminRepository.existsByEmail(dto.email())) {
+            return new IdentificatedUserResponseDto(Role.ADMIN, null);
+        }
+
         User user = userRepository.findByEmail(dto.email())
                                   .orElseThrow(() -> new ResourceNotFoundException("Este e-mail não está cadastrado no Astro."));
 
         return new IdentificatedUserResponseDto(
-                user.getType(),
+                Role.valueOf(user.getType().name()),
                 user.getStatus()
         );
     }

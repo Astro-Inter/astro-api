@@ -1,5 +1,6 @@
 package com.astro.api.service;
 
+import com.astro.api.auth.security.Role;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.storage.R2StorageService;
 import com.astro.api.conformity.repository.NrDocumentRepository;
@@ -12,6 +13,7 @@ import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.UserRepository;
+import com.astro.api.user.repository.AdminRepository;
 import com.astro.api.user.repository.UserProfilePhotoRepository;
 import com.astro.api.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +40,7 @@ import static org.mockito.Mockito.when;
 class UserServiceTest {
 
     private UserRepository userRepository;
+    private AdminRepository adminRepository;
     private StringRedisTemplate redisTemplate;
     private ValueOperations<String, String> valueOperations;
     private NrDocumentRepository nrDocumentRepository;
@@ -48,12 +51,13 @@ class UserServiceTest {
     @BeforeEach
     void setUp() {
         userRepository = mock(UserRepository.class);
+        adminRepository = mock(AdminRepository.class);
         redisTemplate = mock(StringRedisTemplate.class);
         valueOperations = mock(ValueOperations.class);
         nrDocumentRepository = mock(NrDocumentRepository.class);
         userProfilePhotoRepository = mock(UserProfilePhotoRepository.class);
         userMapper = mock(UserMapper.class);
-        userService = new UserService(userRepository, redisTemplate, nrDocumentRepository, userProfilePhotoRepository, userMapper,
+        userService = new UserService(userRepository, adminRepository, redisTemplate, nrDocumentRepository, userProfilePhotoRepository, userMapper,
                 mock(R2StorageService.class), mock(com.astro.api.user.service.UserAvatarService.class));
         ReflectionTestUtils.setField(userService, "workspaceAccessTokenPrefix", "workspace:");
         ReflectionTestUtils.setField(userService, "collaboratorAccessTokenPrefix", "collaborator:");
@@ -96,8 +100,47 @@ class UserServiceTest {
 
         IdentificatedUserResponseDto response = userService.findTypeAndStatusByEmail(dto);
 
-        assertEquals(new IdentificatedUserResponseDto(UserType.COLABORADOR, UserStatus.PRE_CADASTRADO), response);
+        assertEquals(new IdentificatedUserResponseDto(Role.COLABORADOR, UserStatus.PRE_CADASTRADO), response);
+        verify(adminRepository).existsByEmail(dto.email());
         verify(userRepository).findByEmail(dto.email());
+    }
+
+    @Test
+    void shouldReturnAdminWithoutRequiringAWorkspaceUser() {
+        EmailVerificationRequestDto dto = new EmailVerificationRequestDto("admin@astro.com");
+        when(adminRepository.existsByEmail(dto.email())).thenReturn(true);
+
+        assertEquals(new IdentificatedUserResponseDto(Role.ADMIN, null),
+                userService.findTypeAndStatusByEmail(dto));
+
+        verify(adminRepository).existsByEmail(dto.email());
+        verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    void shouldPrioritizeAdminWhenEmailAlsoBelongsToAWorkspaceUser() {
+        EmailVerificationRequestDto dto = new EmailVerificationRequestDto("admin@astro.com");
+        User user = new User();
+        user.setType(UserType.GESTOR);
+        user.setStatus(UserStatus.DESATIVADO);
+        when(adminRepository.existsByEmail(dto.email())).thenReturn(true);
+        when(userRepository.findByEmail(dto.email())).thenReturn(Optional.of(user));
+
+        assertEquals(new IdentificatedUserResponseDto(Role.ADMIN, null),
+                userService.findTypeAndStatusByEmail(dto));
+    }
+
+    @ParameterizedTest
+    @EnumSource(UserType.class)
+    void shouldPreserveEachWorkspaceUserTypeAndStatus(UserType type) {
+        EmailVerificationRequestDto dto = new EmailVerificationRequestDto("user@astro.com");
+        User user = new User();
+        user.setType(type);
+        user.setStatus(UserStatus.DESATIVADO);
+        when(userRepository.findByEmail(dto.email())).thenReturn(Optional.of(user));
+
+        assertEquals(new IdentificatedUserResponseDto(Role.valueOf(type.name()), UserStatus.DESATIVADO),
+                userService.findTypeAndStatusByEmail(dto));
     }
 
     @Test
