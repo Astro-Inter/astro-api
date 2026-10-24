@@ -302,12 +302,6 @@ Para uma rota específica, acrescente `| http_route="/verify-email"`; para erros
 
 Consulte **`Responsabilidades Astro`** para a divisão completa das áreas e responsáveis pelo projeto.
 
-### Identificação por e-mail
-
-`POST /verify-email` retorna `data.userType: "ADMIN"` e `data.userStatus: null` para
-contas da tabela `admin`, com prioridade sobre `usuario`. Os demais perfis mantêm
-o tipo e o status cadastrados. Consulte o [contrato completo](docs/api-verify-email.md).
-
 ### Verificação de código por e-mail
 
 `POST /verify-key` mantém o JSON com `email` e `accessKey` (seis dígitos).
