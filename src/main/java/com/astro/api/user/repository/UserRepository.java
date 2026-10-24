@@ -80,9 +80,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByEmail(String email);
 
-    @Query(value = "SELECT EXISTS (SELECT 1 FROM admin WHERE email = :email)", nativeQuery = true)
-    boolean existsAdminByEmail(@Param("email") String email);
-
     Optional<User> findByEmailIgnoreCase(String email);
 
     List<User> findByEmailInIgnoreCase(Collection<String> emails);
