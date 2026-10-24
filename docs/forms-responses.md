@@ -2,9 +2,9 @@
 
 Complementa [forms.md](forms.md). Subtarefas da SCRUM-548: SCRUM-611 a SCRUM-616.
 Referências funcionais: SCRUM-272, SCRUM-273, SCRUM-275, SCRUM-276, SCRUM-278,
-SCRUM-342 e SCRUM-610. Após o refinamento, formulários com unidade definida exigem
-posição atual dentro de 100 metros da geolocalização cadastrada da unidade.
-Formulários sem unidade continuam registrando GPS sem bloquear por distância.
+SCRUM-342 e SCRUM-610. Os detalhes incluem as coordenadas da unidade vinculada
+para comparação no front. O envio das respostas registra GPS sem bloquear por distância,
+com ou sem unidade definida.
 
 ## Autenticação e escopo
 
@@ -65,6 +65,8 @@ e segue a visibilidade dos participantes. Ambos retornam o mesmo formato em `dat
     "senderManagerId": 10,
     "managerId": 20,
     "title": "Inspeção de segurança",
+    "unitId": 3,
+    "unitLocation": {"latitude": -23.5, "longitude": -46.6},
     "status": "CONCLUIDO",
     "questions": [
       {"id": 1, "type": "texto", "question": "Descreva o local", "required": true, "answer": ["Condição segura"]}
@@ -73,7 +75,7 @@ e segue a visibilidade dos participantes. Ambos retornam o mesmo formato em `dat
   "senderName": "Gestor remetente",
   "recipientName": "Gestor destinatário",
   "unitName": "Sede",
-  "locationPolicy": {"captureRequired": true, "enforceUnitRadius": false, "radiusMeters": null, "maxReadingAgeSeconds": null},
+  "locationPolicy": {"captureRequired": true, "enforceUnitRadius": false, "radiusMeters": 100, "maxReadingAgeSeconds": null},
   "locations": [{"latitude": -23.5, "longitude": -46.6, "accuracyMeters": 5, "recordedAt": "2026-10-24T12:00:00Z"}],
   "review": {"status": "awaiting_review"},
   "canReview": true
@@ -126,13 +128,8 @@ Regras:
 - Apenas JPEG e PNG decodificáveis, até 32 milhões de pixels. O servidor verifica os bytes; MIME/extensão declarados não bastam. A câmera mobile atual gera JPEG.
 - `locationConsent` precisa ser `true`; de 1 a 1440 leituras com latitude ±90, longitude ±180 e precisão entre 0 e 10000 metros.
 - Cada leitura precisa estar após a criação do formulário e no máximo 5 minutos no futuro, para tolerar diferença de relógio.
-- Sem unidade vinculada: registra as leituras e não aplica raio.
-- Com unidade vinculada: carrega `unidade_endereco.geolocalizacao` (`POINT` WGS 84, longitude/latitude) do mesmo workspace e exige unidade ativa e coordenadas válidas.
-- A leitura de maior `recordedAt` representa a posição atual e precisa ter no máximo 120 segundos de idade. A tolerância geral de relógio de até 5 minutos no futuro continua sendo validada antes desta etapa.
-- Se houver posições diferentes no mesmo timestamp mais recente, usa a mais distante. Reordenar a lista ou incluir uma posição antiga próxima não permite contornar a validação.
-- Distância geográfica calculada em metros por Haversine, com raio terrestre médio de 6.371.008,8 m. Até 100 m é permitido; acima de 100 m retorna 400. A precisão informada não aumenta o raio.
-- Unidade sem coordenadas, coordenadas inválidas ou leitura desatualizada também retorna 400, sem upload de imagens nem gravação das respostas.
-- O servidor recebe as coordenadas do mobile; não consegue consultar diretamente o GPS do aparelho. A verificação usa os dados enviados pelo dispositivo.
+- O envio registra GPS com ou sem unidade vinculada. A API não compara a posição com a unidade, não calcula distância nem exige uma leitura dos últimos 120 segundos.
+- A comparação de presença fica no front, usando as coordenadas retornadas pelos detalhes. Unidade sem coordenadas não impede o envio das respostas.
 
 O servidor preserva perguntas/opções, grava respostas e GPS no mesmo documento,
 define `respondido_em`, incrementa a versão e muda o status para `CONCLUIDO` em
@@ -187,48 +184,58 @@ registra os IDs para reconciliação, evitando apagar anexos de uma resposta pos
 
 ## Geolocalização da unidade
 
-Para formulários com `unitId`, os detalhes retornam:
+`GET /forms/{id}` retorna `data.unitLocation`. Nos detalhes usados pelo mobile,
+`GET /forms/received/{id}`, e na consulta das respostas, `GET /forms/{id}/responses`,
+o mesmo campo fica em `data.form.unitLocation`:
+
+```json
+"unitLocation": {
+  "latitude": -23.5,
+  "longitude": -46.6
+}
+```
+
+As coordenadas são obtidas de `unidade_endereco.geolocalizacao` da unidade vinculada
+ao formulário salvo, dentro do workspace autorizado. Parâmetros adicionais ou
+coordenadas enviados pelo cliente não substituem essa referência. Sem unidade,
+sem coordenadas válidas ou sem vínculo nesse workspace, `unitLocation` é `null`.
+O front decide como tratar a ausência e como comparar a posição atual com a unidade.
+
+Os detalhes de recebidos/respostas também mantêm o campo de política:
 
 ```json
 "locationPolicy": {
   "captureRequired": true,
-  "enforceUnitRadius": true,
+  "enforceUnitRadius": false,
   "radiusMeters": 100,
-  "maxReadingAgeSeconds": 120
+  "maxReadingAgeSeconds": null
 }
 ```
 
-A comparação é obrigatória em `POST /forms/{id}/responses`, antes de gravar qualquer
-resposta ou fazer upload. A unidade vem do formulário salvo e o workspace vem da
-identidade autenticada; IDs e coordenadas da unidade enviados pelo cliente não
-substituem a referência do banco. Não há alteração no body de envio existente.
+`radiusMeters` é uma referência de 100 metros para o front quando há unidade;
+sem unidade, é `null`. `enforceUnitRadius: false` e `maxReadingAgeSeconds: null`
+indicam que o servidor não bloqueia por distância nem aplica o limite de 120 segundos.
+A captura, o consentimento e a validação do formato das leituras continuam no contrato
+de envio. O servidor não comprova presença física no local.
 
 A consulta reutiliza `UnitRepository`, com `@Query` nativa e parâmetros nomeados,
 retornando `UnitLocationProjection`. Ela extrai X como longitude e Y como latitude;
-o cálculo da regra fica em `FormLocationService`. Não exige PostGIS nem calcula
-distância cartesiana diretamente sobre graus. O modelo `UnitAddress` e os endpoints
-de cadastro/edição de unidades permanecem com os contratos existentes.
-
+`FormLocationService` coordena a consulta e o mapper monta o DTO. Não exige PostGIS.
 A coluna `unidade_endereco.geolocalizacao POINT` precisa existir no banco de execução,
-conforme o [schema oficial](https://github.com/Astro-Inter/banco-de-dados/blob/main/database/scripts/1_create_table.sql),
-e a unidade precisa ter suas coordenadas cadastradas. Esta entrega não executa
-migração nem preenche coordenadas automaticamente em produção.
+conforme o [schema oficial](https://github.com/Astro-Inter/banco-de-dados/blob/main/database/scripts/1_create_table.sql).
+Não há migração ou preenchimento automático de coordenadas.
 
-Após um envio aceito, `data.locationCheck` apresenta `unitId`, `unitLatitude`,
-`unitLongitude`, `radiusMeters`, `distanceMeters` e `reading` (a leitura usada).
-Esse resultado é uma fotografia da comparação realizada, preservada mesmo se o
-cadastro da unidade mudar depois. Sem unidade ou em respostas antigas sem a
-validação, `locationCheck` é null; a consulta e a análise dessas respostas são preservadas.
+Novos envios não calculam nem gravam `validacao_localizacao`; `locationCheck` é `null`.
+Registros históricos que já possuírem essa comparação continuam legíveis e preservados.
+As coordenadas de `unitLocation` refletem o cadastro atual, não o GPS informado pelo gestor.
 
 ## MongoDB e camadas
 
 Continua existindo apenas a collection `forms`; não são criadas collections de
 sequência, respostas, análises ou anexos. Campos novos: `id_envio` (UUID interno
-para recuperação), `consentimento_localizacao`, `localizacoes`, `validacao_localizacao` e `analise`.
+para recuperação), `consentimento_localizacao`, `localizacoes` e `analise`.
 Leituras usam `latitude`, `longitude`, `precisao_metros`, `registrado_em`.
-Quando há unidade, `validacao_localizacao` é gravada atomicamente com as respostas:
-`id_unidade`, `latitude_unidade`, `longitude_unidade`, `raio_metros`, `distancia_metros`
-e `leitura`. Sem unidade, esse campo não é criado.
+O campo histórico `validacao_localizacao` é preservado na leitura, mas não é criado nos novos envios.
 Análise usa `status: APROVADO|REPROVADO`, `id_gestor_revisor`, `analisado_em`.
 **`analise.descricao` só existe em reprovação**; antes da análise, `analise` é ausente.
 Fotos ficam em `perguntas[].resposta[]` com `id_imagem`, `chave_objeto`, `nome`,
@@ -253,8 +260,9 @@ tabelas, consultas SQL manuais ou alterações do cadastro da unidade.
 `FORM_TEST_MONGODB_URI=mongodb://127.0.0.1:27029`, executa também os testes Mongo,
 que usam e removem exclusivamente uma base `forms_test_<uuid>`.
 
-Os testes cobrem Strategies, obrigatoriedade, GPS com/sem unidade, limites de 100 m,
-posição mais recente, leitura antiga, coordenadas ausentes, referências de arquivos,
+Os testes cobrem Strategies, obrigatoriedade, registro de GPS com/sem unidade,
+envio distante e com leitura acima de 120 segundos, coordenadas nos detalhes,
+coordenadas ausentes, isolamento do workspace, referências de arquivos,
 formato real das imagens, bucket configurado, assinatura local, Firebase/perfis,
 rotas literais, escopos, concorrência, imutabilidade e omissão da descrição aprovada.
 O fluxo HTTP completo usa Mongo local e um armazenamento R2 simulado; não envia

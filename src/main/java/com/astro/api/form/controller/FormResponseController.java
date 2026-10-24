@@ -45,7 +45,7 @@ public class FormResponseController {
     }
 
     @GetMapping("/received/{id}")
-    @Operation(summary = "Consulta o formulário destinado ao gestor autenticado e a política de captura de GPS")
+    @Operation(summary = "Consulta o formulário destinado ao gestor autenticado e as coordenadas da unidade para o mobile")
     public ResponseEntity<ApiResult<FormResponseDetailsResponse>> receivedById(@PathVariable("id") String id,
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Formulário recebido retornado com sucesso",
@@ -53,7 +53,7 @@ public class FormResponseController {
     }
 
     @PostMapping(value = "/{id}/responses", consumes = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "Envia resposta única com GPS e valida raio de 100 m quando houver unidade; sem imagens")
+    @Operation(summary = "Envia resposta única com registro de GPS, sem validação de distância; sem imagens")
     public ResponseEntity<ApiResult<FormResponseDetailsResponse>> submitJson(@PathVariable("id") String id,
             @Valid @RequestBody FormResponseRequest response, @AuthenticationPrincipal AuthenticatedUser principal,
             HttpServletRequest request) {
@@ -61,7 +61,7 @@ public class FormResponseController {
     }
 
     @PostMapping(value = "/{id}/responses", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Envia respostas e imagens JPEG/PNG; valida GPS em 100 m da unidade; partes response (JSON) e files")
+    @Operation(summary = "Envia respostas e imagens JPEG/PNG com registro de GPS, sem validação de distância; partes response (JSON) e files")
     public ResponseEntity<ApiResult<FormResponseDetailsResponse>> submitMultipart(@PathVariable("id") String id,
             @Valid @RequestPart("response") FormResponseRequest response,
             @RequestPart(value = "files", required = false) List<MultipartFile> files,

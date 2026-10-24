@@ -5,6 +5,7 @@ import com.astro.api.common.storage.R2StorageService.PresignedDownload;
 import com.astro.api.form.model.*;
 import org.springframework.stereotype.Component;
 import java.util.*;
+import com.astro.api.unit.repository.UnitLocationProjection;
 
 @Component
 public class FormResponseMapper {
@@ -20,9 +21,9 @@ public class FormResponseMapper {
     }
 
     public FormResponseDetailsResponse toDetails(Form form, String senderName, String recipientName,
-                                                 String unitName, String reviewerName, boolean canReview, FormLocationPolicy locationPolicy) {
+                                                 String unitName, String reviewerName, boolean canReview, FormLocationPolicy locationPolicy, UnitLocationProjection unitLocation) {
         FormReview review = form.getReview();
-        return new FormResponseDetailsResponse(formMapper.toDetails(form), senderName, recipientName, unitName,
+        return new FormResponseDetailsResponse(formMapper.toDetails(form, unitLocation), senderName, recipientName, unitName,
                 new FormResponseDetailsResponse.LocationPolicyResponse(locationPolicy.captureRequired(),
                         locationPolicy.enforceUnitRadius(), locationPolicy.radiusMeters(), locationPolicy.maxReadingAgeSeconds()),
                 form.getLocations() == null ? List.of() : form.getLocations().stream().map(location ->

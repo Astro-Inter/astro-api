@@ -138,30 +138,59 @@ class FormResponseServiceTest {
                 List.of(new MockMultipartFile("files", new byte[]{1})), recipient));
         verify(storage, never()).delete(any());
     }
-    @Test void checksTheBoundUnitBeforeAnyUploadOrMongoWrite() {
+    @Test void submissionRecordsDistantAndOlderGpsWithoutDistanceValidation() {
         form.setUnitId(3L);
         UnitLocationProjection unitLocation = mock(UnitLocationProjection.class);
         when(unitRepository.findLocationByIdAndWorkspaceId(3L, 1L)).thenReturn(Optional.of(unitLocation));
-        when(unitLocation.getActive()).thenReturn(true); when(unitLocation.getUnitId()).thenReturn(3L);
         when(unitLocation.getLatitude()).thenReturn(0.0); when(unitLocation.getLongitude()).thenReturn(0.0);
-        assertThrows(BusinessException.class, () -> service.submit(form.getId(), answer(), List.of(), recipient));
-        verify(repository, never()).submitResponse(any(), any()); verifyNoInteractions(storage);
-        assertEquals(FormStatus.PENDING, form.getStatus()); assertTrue(form.getQuestions().getFirst().getAnswer().isEmpty());
-        FormResponseRequest nearResponse = new FormResponseRequest(true,
-                List.of(new FormLocationReadingRequest(0.0, 0.0, 5.0, Instant.now())), answer().answers());
+        FormResponseRequest response = new FormResponseRequest(true,
+                List.of(new FormLocationReadingRequest(80.0, 170.0, 5.0, Instant.now().minusSeconds(600))), answer().answers());
         when(repository.submitResponse(any(), any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
-        FormResponseDetailsResponse result = service.submit(form.getId(), nearResponse, List.of(), recipient);
-        assertTrue(result.locationPolicy().enforceUnitRadius()); assertEquals(100, result.locationPolicy().radiusMeters());
-        assertEquals(0.0, result.locationCheck().distanceMeters()); assertEquals(3L, form.getLocationCheck().unitId());
+        FormResponseDetailsResponse result = service.submit(form.getId(), response, List.of(), recipient);
+        verify(repository).submitResponse(any(), any());
+        assertEquals(FormStatus.COMPLETED, form.getStatus());
+        assertEquals(80.0, form.getLocations().getFirst().latitude());
+        assertFalse(result.locationPolicy().enforceUnitRadius());
+        assertNull(result.locationPolicy().maxReadingAgeSeconds());
+        assertEquals(0.0, result.form().unitLocation().latitude());
+        assertNull(result.locationCheck()); assertNull(form.getLocationCheck());
     }
 
-    @Test void missingUnitCoordinatesCannotSilentlyDisableTheRadius() {
+    @Test void photoSubmissionAlsoAcceptsDistantGpsWithALinkedUnit() {
+        form.setUnitId(3L); form.getQuestions().getFirst().setType("foto");
+        UnitLocationProjection unitLocation = mock(UnitLocationProjection.class);
+        when(unitRepository.findLocationByIdAndWorkspaceId(3L, 1L)).thenReturn(Optional.of(unitLocation));
+        when(unitLocation.getLatitude()).thenReturn(0.0); when(unitLocation.getLongitude()).thenReturn(0.0);
+        FormImage image = new FormImage("image-id", "private-key", "photo.jpg", "image/jpeg", 100);
+        when(storage.upload(any(), any(), any())).thenReturn(image);
+        when(repository.submitResponse(any(), any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
+        FormResponseRequest response = new FormResponseRequest(true, answer().locations(),
+                List.of(new FormQuestionAnswerRequest(1L, null, null, null, null, List.of(0))));
+        FormResponseDetailsResponse result = service.submit(form.getId(), response,
+                List.of(new MockMultipartFile("files", new byte[]{1})), recipient);
+        verify(storage).upload(eq(form.getId()), eq(1L), any()); verify(storage, never()).delete(any());
+        assertEquals(FormStatus.COMPLETED, result.form().status()); assertNull(form.getLocationCheck());
+    }
+
+    @Test void missingUnitCoordinatesDoNotBlockSubmission() {
+        form.setUnitId(3L);
+        when(repository.submitResponse(any(), any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
+        FormResponseDetailsResponse result = service.submit(form.getId(), answer(), List.of(), recipient);
+        assertEquals(FormStatus.COMPLETED, form.getStatus());
+        assertNull(result.form().unitLocation()); assertNull(form.getLocationCheck());
+        verify(repository).submitResponse(any(), any());
+    }
+
+    @Test void mobileDetailsExposeUnitCoordinatesBeforeAnswering() {
         form.setUnitId(3L);
         UnitLocationProjection unitLocation = mock(UnitLocationProjection.class);
         when(unitRepository.findLocationByIdAndWorkspaceId(3L, 1L)).thenReturn(Optional.of(unitLocation));
-        when(unitLocation.getActive()).thenReturn(true);
-        assertThrows(BusinessException.class, () -> service.submit(form.getId(), answer(), List.of(), recipient));
-        verify(repository, never()).submitResponse(any(), any()); verifyNoInteractions(storage);
+        when(unitLocation.getLatitude()).thenReturn(-23.5); when(unitLocation.getLongitude()).thenReturn(-46.6);
+        FormResponseDetailsResponse result = service.findReceivedById(form.getId(), recipient);
+        assertEquals(-23.5, result.form().unitLocation().latitude());
+        assertEquals(-46.6, result.form().unitLocation().longitude());
+        assertFalse(result.locationPolicy().enforceUnitRadius());
+        verify(repository, never()).submitResponse(any(), any());
     }
 
     @Test void imageMustBelongToTheAuthorizedForm() {

@@ -66,6 +66,10 @@ Identificador inválido retorna 400; inexistente ou fora do escopo retorna 404.
 O prazo é apresentado como `YYYY-MM-DD`, usando `America/Sao_Paulo`; no MongoDB
 é armazenado como data BSON. As opções têm `id`, `text` e `other`.
 As perguntas de foto têm `maxFiles` e `maxFileSizeMb`.
+Os detalhes também incluem `unitLocation: {"latitude": -23.5, "longitude": -46.6}`,
+obtido da unidade vinculada no mesmo workspace. Sem unidade ou coordenadas válidas,
+`unitLocation` é `null`. O front usa esses dados para verificar a presença;
+o envio das respostas não bloqueia por distância. Consulte [respostas e análise](forms-responses.md).
 
 ## Criação e rascunhos
 
@@ -102,8 +106,8 @@ Exemplo de corpo (não é o documento completo do MongoDB):
 `{"status":"RASCUNHO"}`. Não é permitido criar como `CONCLUIDO`.
 Gestor e título podem faltar no rascunho; se gestor, unidade ou NR forem informados,
 os vínculos precisam existir e estar elegíveis. A unidade opcional não define quem responde: somente `managerId` é o destinatário.
-Quando definida, o envio das respostas exige GPS dentro de 100 metros da localização
-cadastrada nessa unidade, conforme [forms-responses.md](forms-responses.md).
+Quando definida, suas coordenadas são retornadas nos detalhes para comparação no front;
+o envio não aplica validação de distância, conforme [forms-responses.md](forms-responses.md).
 
 Na publicação são obrigatórios título não vazio, gestor ativo e 1 a 100 perguntas
 com enunciados preenchidos. Descrição, NR, unidade e prazo são opcionais.

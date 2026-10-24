@@ -140,7 +140,7 @@ class FormRepositoryMongoTest {
         when(access.requireManager(any())).thenReturn(new FormScope(10L, 1L, false));
         FormService service = new FormService(repository, access,
                 new FormMapper(), FormTestFixtures.validator(),
-                mock(FormReferenceService.class), mock(UserRepository.class));
+                mock(FormReferenceService.class), mock(UserRepository.class), mock(FormLocationService.class));
         try (ExecutorService executor = Executors.newFixedThreadPool(8)) {
             List<Callable<String>> calls = IntStream.range(0, 32)
                     .<Callable<String>>mapToObj(index -> () ->
@@ -329,7 +329,7 @@ class FormRepositoryMongoTest {
         when(users.findByFirebaseUid("outsider")).thenReturn(Optional.of(manager(30, 2, UserType.GESTOR_WORKSPACE)));
         when(users.findById(20L)).thenReturn(Optional.of(manager(20, 1, UserType.GESTOR)));
         FormService service = new FormService(repository, new FormAccessService(users), new FormMapper(),
-                FormTestFixtures.validator(), new FormReferenceService(users, units, nrs), users);
+                FormTestFixtures.validator(), new FormReferenceService(users, units, nrs), users, new FormLocationService(units));
         MockMvc mvc = MockMvcBuilders
                 .standaloneSetup(new FormController(service))
                 .setControllerAdvice(new GlobalExceptionHandler())
@@ -404,7 +404,7 @@ class FormRepositoryMongoTest {
         }
     }
 
-    @Test void storesUnitDistanceAndCoordinateSnapshotWithTheAnswers() {
+    @Test void preservesLegacyUnitDistanceAndCoordinateSnapshots() {
         Instant respondedAt = Instant.now();
         Form form = form(1, 1, 10, 20, FormStatus.PENDING); form.setVersion(0L); form.setUnitId(3L); repository.insert(form);
         FormLocationReading reading = new FormLocationReading(-23.5, -46.6, 5.0, respondedAt);
@@ -587,22 +587,25 @@ class FormRepositoryMongoTest {
             when(unitLocation.getLatitude()).thenReturn(0.0); when(unitLocation.getLongitude()).thenReturn(0.0);
             authenticate("recipient", Role.GESTOR);
             String boundUrl = "/forms/" + bound.getId();
-            mvc.perform(get("/forms/received/" + bound.getId())).andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.locationPolicy.enforceUnitRadius").value(true))
+            mvc.perform(get("/forms/received/" + bound.getId()).param("unitId", "999").param("workspaceId", "999"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.form.unitLocation.latitude").value(0.0))
+                    .andExpect(jsonPath("$.data.form.unitLocation.longitude").value(0.0))
+                    .andExpect(jsonPath("$.data.locationPolicy.enforceUnitRadius").value(false))
+                    .andExpect(jsonPath("$.data.locationPolicy.maxReadingAgeSeconds").isEmpty())
                     .andExpect(jsonPath("$.data.locationPolicy.radiusMeters").value(100));
-            String positionBody = "{\"locationConsent\":true,\"unitId\":999,\"workspaceId\":999,\"locations\":[{\"latitude\":%s,\"longitude\":%s,\"accuracyMeters\":5,\"recordedAt\":\"%s\"}],\"answers\":[{\"questionId\":1,\"text\":\"No local\"}]}";
+            String positionBody = "{\"locationConsent\":true,\"unitId\":999,\"workspaceId\":999,\"locations\":[{\"latitude\":80,\"longitude\":170,\"accuracyMeters\":5,\"recordedAt\":\"%s\"}],\"answers\":[{\"questionId\":1,\"text\":\"Fora do local\"}]}";
             mvc.perform(post(boundUrl + "/responses").contentType("application/json")
-                    .content(positionBody.formatted("80", "170", Instant.now())))
-                    .andExpect(status().isBadRequest());
-            assertEquals(FormStatus.PENDING, repository.findById(bound.getId()).orElseThrow().getStatus());
-            assertNull(repository.findById(bound.getId()).orElseThrow().getRespondedAt());
-            mvc.perform(post(boundUrl + "/responses").contentType("application/json")
-                    .content(positionBody.formatted("0", "0", Instant.now())))
-                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.locationCheck.unitId").value(3))
-                    .andExpect(jsonPath("$.data.locationCheck.distanceMeters").value(0));
+                    .content(positionBody.formatted(Instant.now().minusSeconds(600))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.form.status").value("CONCLUIDO"))
+                    .andExpect(jsonPath("$.data.locations[0].latitude").value(80.0))
+                    .andExpect(jsonPath("$.data.locationCheck").isEmpty());
             verify(units, times(2)).findLocationByIdAndWorkspaceId(3L, 1L);
             verify(units, never()).findLocationByIdAndWorkspaceId(999L, 999L);
-            assertNotNull(repository.findById(bound.getId()).orElseThrow().getLocationCheck());
+            assertNull(repository.findById(bound.getId()).orElseThrow().getLocationCheck());
+            Document boundRaw = mongo.getCollection("forms").find(new Document("_id", bound.getId())).first();
+            assertNotNull(boundRaw); assertFalse(boundRaw.containsKey("validacao_localizacao"));
             verify(storage, times(1)).upload(any(), any(), any()); verify(storage, never()).delete(any());
         } finally { SecurityContextHolder.clearContext(); }
     }

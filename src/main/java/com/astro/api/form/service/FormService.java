@@ -12,6 +12,7 @@ import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.exception.ConflictException;
 import com.astro.api.form.dto.request.FormRequest;
 import com.astro.api.form.dto.response.FormRecipientsResponse;
+import com.astro.api.unit.repository.UnitLocationProjection;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.FormRecipientProjection;
@@ -37,19 +38,22 @@ public class FormService {
     private final FormValidationService formValidationService;
     private final FormReferenceService formReferenceService;
     private final UserRepository userRepository;
+    private final FormLocationService formLocationService;
 
     public FormService(FormRepository formRepository,
                        FormAccessService formAccessService,
                        FormMapper formMapper,
                        FormValidationService formValidationService,
                        FormReferenceService formReferenceService,
-                       UserRepository userRepository) {
+                       UserRepository userRepository,
+                       FormLocationService formLocationService) {
         this.formRepository = formRepository;
         this.formAccessService = formAccessService;
         this.formMapper = formMapper;
         this.formValidationService = formValidationService;
         this.formReferenceService = formReferenceService;
         this.userRepository = userRepository;
+        this.formLocationService = formLocationService;
     }
 
     @Transactional(readOnly = true)
@@ -79,7 +83,7 @@ public class FormService {
         form.setCreatedAt(now());
         form.setUpdatedAt(form.getCreatedAt());
         form.setVersion(0L);
-        return formMapper.toDetails(formRepository.insert(form));
+        return toDetails(formRepository.insert(form));
     }
 
     public FormDetailsResponse update(String formId, FormRequest formRequest, AuthenticatedUser authenticatedUser) {
@@ -96,7 +100,7 @@ public class FormService {
         FormWriteCondition writeCondition = formAccessService.writeCondition(form, formScope);
         formMapper.applyContent(formRequest, form);
         form.setUpdatedAt(now());
-        return formMapper.toDetails(formRepository.update(form, writeCondition)
+        return toDetails(formRepository.update(form, writeCondition)
                 .orElseThrow(() -> new ConflictException("O formulário foi alterado; consulte novamente antes de salvar")));
     }
 
@@ -127,7 +131,7 @@ public class FormService {
         formValidationService.validate(savedDraftRequest, FormValidationMode.PUBLISH);
         formReferenceService.validate(savedDraftRequest, formScope);
         FormWriteCondition writeCondition = formAccessService.writeCondition(form, formScope);
-        return formMapper.toDetails(formRepository.updateStatus(writeCondition, FormStatus.PENDING, now())
+        return toDetails(formRepository.updateStatus(writeCondition, FormStatus.PENDING, now())
                 .orElseThrow(() -> new ConflictException("O formulário foi alterado; consulte novamente antes de publicar")));
     }
 
@@ -156,7 +160,12 @@ public class FormService {
     public FormDetailsResponse findById(String formId, AuthenticatedUser authenticatedUser) {
         FormScope formScope = formAccessService.requireManager(authenticatedUser);
         Form form = requireForm(formId, formScope);
-        return formMapper.toDetails(form);
+        return toDetails(form);
+    }
+
+    private FormDetailsResponse toDetails(Form form) {
+        UnitLocationProjection unitLocation = formLocationService.findUnitLocation(form);
+        return formMapper.toDetails(form, unitLocation);
     }
 
     private Form requireForm(String formId, FormScope formScope) {

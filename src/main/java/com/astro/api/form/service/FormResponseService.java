@@ -10,6 +10,7 @@ import com.astro.api.form.mapper.*;
 import com.astro.api.form.model.*;
 import com.astro.api.form.repository.*;
 import com.astro.api.unit.repository.UnitRepository;
+import com.astro.api.unit.repository.UnitLocationProjection;
 import com.astro.api.user.model.User;
 import com.astro.api.user.repository.UserRepository;
 import jakarta.validation.Validator;
@@ -80,7 +81,6 @@ public class FormResponseService {
         List<MultipartFile> submittedFiles = files == null ? List.of() : files;
         Instant respondedAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
         Map<Long, List<Object>> answers = formAnswerValidationService.validate(form, request, submittedFiles, respondedAt);
-        FormLocationCheck locationCheck = formLocationService.validate(form, scope, request.locations(), respondedAt);
         FormResponseCondition responseCondition = new FormResponseCondition(form.getId(), scope.workspaceId(),
                 scope.managerId(), form.getVersion(), form.getStatus());
         Map<Integer, FormImage> uploadedImages = new LinkedHashMap<>();
@@ -97,7 +97,6 @@ public class FormResponseService {
                 }
             }
             formAnswerMapper.applyAnswers(form, request, answers, uploadedImages);
-            form.setLocationCheck(locationCheck);
             form.setRespondedAt(respondedAt);
             form.setSubmissionId(submissionId);
             form.setStatus(FormStatus.COMPLETED);
@@ -192,7 +191,8 @@ public class FormResponseService {
         String recipientName = userName(form.getManagerId());
         String reviewerName = form.getReview() == null ? null : userName(form.getReview().reviewerManagerId());
         FormLocationPolicy locationPolicy = formLocationService.policy(form);
-        return formResponseMapper.toDetails(form, senderName, recipientName, unitName, reviewerName, canReview, locationPolicy);
+        UnitLocationProjection unitLocation = formLocationService.findUnitLocation(form);
+        return formResponseMapper.toDetails(form, senderName, recipientName, unitName, reviewerName, canReview, locationPolicy, unitLocation);
     }
 
     private String userName(Long userId) {

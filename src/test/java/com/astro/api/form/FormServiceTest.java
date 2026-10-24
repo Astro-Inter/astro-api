@@ -21,6 +21,8 @@ import com.astro.api.form.repository.FormRepositoryCustom;
 import com.astro.api.form.service.FormAccessService;
 import com.astro.api.form.service.FormReferenceService;
 import com.astro.api.form.service.FormService;
+import com.astro.api.form.service.FormLocationService;
+import com.astro.api.unit.repository.UnitLocationProjection;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.unit.repository.UnitRepository;
 import com.astro.api.user.model.*;
@@ -46,7 +48,7 @@ class FormServiceTest {
     final UnitRepository units = mock(UnitRepository.class);
     final NrCatalogRepository nrs = mock(NrCatalogRepository.class);
     final FormService service = new FormService(repository, access, new FormMapper(),
-            FormTestFixtures.validator(), new FormReferenceService(users, units, nrs), users);
+            FormTestFixtures.validator(), new FormReferenceService(users, units, nrs), users, new FormLocationService(units));
     final AuthenticatedUser principal = new AuthenticatedUser("sender", "sender@astro.com", Role.GESTOR);
     User sender;
 
@@ -85,6 +87,20 @@ class FormServiceTest {
         assertEquals(3, result.totalPages()); assertEquals(9, result.totalElements());
         assertEquals(2, result.items().getFirst().questionCount());
         assertEquals(FormStatus.PENDING, result.items().getFirst().status());
+    }
+
+    @Test void generalDetailsIncludeUnitCoordinatesUsingTheSavedWorkspace() {
+        Form form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.PENDING);
+        form.setUnitId(3L);
+        UnitLocationProjection unitLocation = mock(UnitLocationProjection.class);
+        when(units.findLocationByIdAndWorkspaceId(3L, 1L)).thenReturn(Optional.of(unitLocation));
+        when(unitLocation.getLatitude()).thenReturn(-23.5); when(unitLocation.getLongitude()).thenReturn(-46.6);
+        when(repository.findById(eq(form.getId()), any())).thenReturn(Optional.of(form));
+        FormDetailsResponse result = service.findById(form.getId(), principal);
+        assertEquals(-23.5, result.unitLocation().latitude()); assertEquals(-46.6, result.unitLocation().longitude());
+        verify(units).findLocationByIdAndWorkspaceId(3L, 1L);
+        when(units.findLocationByIdAndWorkspaceId(3L, 1L)).thenReturn(Optional.empty());
+        assertNull(service.findById(form.getId(), principal).unitLocation());
     }
 
     @Test void detailsRequireAnAccessibleFormAndValidUuid() {
