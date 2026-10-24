@@ -1,5 +1,6 @@
 package com.astro.api.controller;
 
+import com.astro.api.auth.security.Role;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.handler.GlobalExceptionHandler;
@@ -50,7 +51,7 @@ class AuthControllerTest {
         EmailVerificationRequestDto requestDto = new EmailVerificationRequestDto("gestor@astro.com");
 
         when(userService.findTypeAndStatusByEmail(requestDto))
-                .thenReturn(new IdentificatedUserResponseDto(UserType.GESTOR, UserStatus.ATIVO));
+                .thenReturn(new IdentificatedUserResponseDto(Role.GESTOR, UserStatus.ATIVO));
 
         mockMvc.perform(post("/verify-email")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -64,6 +65,23 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.path").value("/verify-email"));
 
         verify(userService).findTypeAndStatusByEmail(requestDto);
+    }
+
+    @Test
+    void shouldReturnAdminWithExplicitNullStatus() throws Exception {
+        EmailVerificationRequestDto dto = new EmailVerificationRequestDto("admin@astro.com");
+        when(userService.findTypeAndStatusByEmail(dto))
+                .thenReturn(new IdentificatedUserResponseDto(Role.ADMIN, null));
+
+        mockMvc.perform(post("/verify-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"admin@astro.com\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.userType").value("ADMIN"))
+                .andExpect(jsonPath("$.data", org.hamcrest.Matchers.hasKey("userStatus")))
+                .andExpect(jsonPath("$.data.userStatus").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.path").value("/verify-email"));
     }
 
     @Test

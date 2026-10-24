@@ -10,6 +10,7 @@ import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserProfilePhoto;
 import com.astro.api.user.repository.UserProfilePhotoRepository;
 import com.astro.api.user.repository.UserRepository;
+import com.astro.api.user.repository.AdminRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -46,6 +47,7 @@ class UserProfilePhotoServiceTest {
         when(storage.uploadProfilePhoto(20L, file)).thenReturn("usuarios/20/foto-nova.jpg");
         userService = new UserService(
                 userRepository,
+                mock(AdminRepository.class),
                 mock(StringRedisTemplate.class),
                 mock(NrDocumentRepository.class),
                 userProfilePhotoRepository,

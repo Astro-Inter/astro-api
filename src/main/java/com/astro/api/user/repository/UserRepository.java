@@ -79,6 +79,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
                                                      @Param("managerTypes") Collection<UserType> managerTypes);
 
     Optional<User> findByEmail(String email);
+
     Optional<User> findByEmailIgnoreCase(String email);
 
     List<User> findByEmailInIgnoreCase(Collection<String> emails);
