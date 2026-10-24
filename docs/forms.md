@@ -233,7 +233,8 @@ O CI fornece uma instância MongoDB para esses testes.
 
 A integração cobre persistência BSON, escopo de consultas, geração concorrente de UUIDs,
 gravações condicionais e um fluxo HTTP completo de criação do rascunho até publicação.
-Os endpoints de resposta e upload do mobile continuam fora deste módulo de entrega.
+A continuação do fluxo mobile, com envio de respostas/imagens e análise web, está em
+[forms-responses.md](forms-responses.md).
 
 ## DTOs de criação e edição
 
