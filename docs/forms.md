@@ -101,8 +101,9 @@ Exemplo de corpo (não é o documento completo do MongoDB):
 `status` omitido cria `PENDENTE`. Para um rascunho vazio, envie
 `{"status":"RASCUNHO"}`. Não é permitido criar como `CONCLUIDO`.
 Gestor e título podem faltar no rascunho; se gestor, unidade ou NR forem informados,
-os vínculos precisam existir e estar elegíveis. A unidade opcional é um vínculo
-contextual e não define quem responde: somente `managerId` é o destinatário.
+os vínculos precisam existir e estar elegíveis. A unidade opcional não define quem responde: somente `managerId` é o destinatário.
+Quando definida, o envio das respostas exige GPS dentro de 100 metros da localização
+cadastrada nessa unidade, conforme [forms-responses.md](forms-responses.md).
 
 Na publicação são obrigatórios título não vazio, gestor ativo e 1 a 100 perguntas
 com enunciados preenchidos. Descrição, NR, unidade e prazo são opcionais.

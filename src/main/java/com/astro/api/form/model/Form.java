@@ -74,6 +74,9 @@ public class Form {
     @Field("localizacoes")
     private List<FormLocationReading> locations;
 
+    @Field("validacao_localizacao")
+    private FormLocationCheck locationCheck;
+
     @Field("analise")
     private FormReview review;
 

@@ -9,6 +9,8 @@ import com.astro.api.form.repository.*;
 import com.astro.api.form.service.*;
 import com.astro.api.form.strategy.answer.*;
 import com.astro.api.unit.repository.UnitRepository;
+import com.astro.api.unit.repository.UnitLocationProjection;
+import com.astro.api.form.dto.response.FormResponseDetailsResponse;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.UserRepository;
 import jakarta.validation.*;
@@ -26,6 +28,7 @@ class FormResponseServiceTest {
     FormRepository repository;
     FormImageStorageService storage;
     UserRepository users;
+    UnitRepository unitRepository;
     FormResponseService service;
     Form form;
     final AuthenticatedUser recipient = new AuthenticatedUser("recipient", "recipient@example.test", Role.GESTOR);
@@ -34,6 +37,7 @@ class FormResponseServiceTest {
     @BeforeAll static void validatorFactory() { factory = Validation.buildDefaultValidatorFactory(); }
     @AfterAll static void closeFactory() { factory.close(); }
     @BeforeEach void setUp() {
+        unitRepository = mock(UnitRepository.class);
         repository = mock(FormRepository.class); storage = mock(FormImageStorageService.class); users = mock(UserRepository.class);
         when(users.findByFirebaseUid("recipient")).thenReturn(Optional.of(FormTestFixtures.manager(20, 1, UserType.GESTOR)));
         when(users.findByFirebaseUid("sender")).thenReturn(Optional.of(FormTestFixtures.manager(10, 1, UserType.GESTOR)));
@@ -41,7 +45,7 @@ class FormResponseServiceTest {
         service = new FormResponseService(repository, new FormAccessService(users),
                 new FormAnswerValidationService(List.of(new TextAnswerStrategy(), new DateAnswerStrategy(),
                         new OptionAnswerStrategy(), new PhotoAnswerStrategy()), factory.getValidator()),
-                new FormAnswerMapper(), new FormResponseMapper(new FormMapper()), storage, users, mock(UnitRepository.class), factory.getValidator());
+                new FormAnswerMapper(), new FormResponseMapper(new FormMapper()), storage, users, unitRepository, factory.getValidator(), new FormLocationService(unitRepository));
         form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.PENDING); form.setVersion(0L);
         form.getQuestions().getFirst().setType("texto"); form.getQuestions().getFirst().setRequired(true);
         when(repository.findById(eq(form.getId()), any(FormReadFilter.class))).thenReturn(Optional.of(form));
@@ -132,6 +136,32 @@ class FormResponseServiceTest {
                 List.of(new MockMultipartFile("files", new byte[]{1})), recipient));
         verify(storage, never()).delete(any());
     }
+    @Test void checksTheBoundUnitBeforeAnyUploadOrMongoWrite() {
+        form.setUnitId(3L);
+        UnitLocationProjection unitLocation = mock(UnitLocationProjection.class);
+        when(unitRepository.findLocationByIdAndWorkspaceId(3L, 1L)).thenReturn(Optional.of(unitLocation));
+        when(unitLocation.getActive()).thenReturn(true); when(unitLocation.getUnitId()).thenReturn(3L);
+        when(unitLocation.getLatitude()).thenReturn(0.0); when(unitLocation.getLongitude()).thenReturn(0.0);
+        assertThrows(BusinessException.class, () -> service.submit(form.getId(), answer(), List.of(), recipient));
+        verify(repository, never()).submitResponse(any(), any()); verifyNoInteractions(storage);
+        assertEquals(FormStatus.PENDING, form.getStatus()); assertTrue(form.getQuestions().getFirst().getAnswer().isEmpty());
+        FormResponseRequest nearResponse = new FormResponseRequest(true,
+                List.of(new FormLocationReadingRequest(0.0, 0.0, 5.0, Instant.now())), answer().answers());
+        when(repository.submitResponse(any(), any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
+        FormResponseDetailsResponse result = service.submit(form.getId(), nearResponse, List.of(), recipient);
+        assertTrue(result.locationPolicy().enforceUnitRadius()); assertEquals(100, result.locationPolicy().radiusMeters());
+        assertEquals(0.0, result.locationCheck().distanceMeters()); assertEquals(3L, form.getLocationCheck().unitId());
+    }
+
+    @Test void missingUnitCoordinatesCannotSilentlyDisableTheRadius() {
+        form.setUnitId(3L);
+        UnitLocationProjection unitLocation = mock(UnitLocationProjection.class);
+        when(unitRepository.findLocationByIdAndWorkspaceId(3L, 1L)).thenReturn(Optional.of(unitLocation));
+        when(unitLocation.getActive()).thenReturn(true);
+        assertThrows(BusinessException.class, () -> service.submit(form.getId(), answer(), List.of(), recipient));
+        verify(repository, never()).submitResponse(any(), any()); verifyNoInteractions(storage);
+    }
+
     @Test void imageMustBelongToTheAuthorizedForm() {
         assertThrows(ResourceNotFoundException.class, () -> service.image(form.getId(), "forged-image", sender));
         verifyNoInteractions(storage);

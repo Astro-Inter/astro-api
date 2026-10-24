@@ -19,16 +19,26 @@ public class FormResponseMapper {
     }
 
     public FormResponseDetailsResponse toDetails(Form form, String senderName, String recipientName,
-                                                 String unitName, String reviewerName, boolean canReview) {
+                                                 String unitName, String reviewerName, boolean canReview, FormLocationPolicy locationPolicy) {
         FormReview review = form.getReview();
         return new FormResponseDetailsResponse(formMapper.toDetails(form), senderName, recipientName, unitName,
-                new FormResponseDetailsResponse.LocationPolicyResponse(true, false),
+                new FormResponseDetailsResponse.LocationPolicyResponse(locationPolicy.captureRequired(),
+                        locationPolicy.enforceUnitRadius(), locationPolicy.radiusMeters(), locationPolicy.maxReadingAgeSeconds()),
                 form.getLocations() == null ? List.of() : form.getLocations().stream().map(location ->
                         new FormResponseDetailsResponse.LocationReadingResponse(location.latitude(), location.longitude(),
                                 location.accuracyMeters(), location.recordedAt())).toList(),
                 new FormResponseDetailsResponse.ReviewResponse(reviewStatus(form),
                         review == null ? null : review.reviewerManagerId(), reviewerName,
-                        review == null ? null : review.reviewedAt(), review == null ? null : review.description()), canReview);
+                        review == null ? null : review.reviewedAt(), review == null ? null : review.description()), canReview, toLocationCheck(form.getLocationCheck()));
+    }
+
+    private FormResponseDetailsResponse.LocationCheckResponse toLocationCheck(FormLocationCheck locationCheck) {
+        if (locationCheck == null) return null;
+        FormLocationReading reading = locationCheck.reading();
+        FormResponseDetailsResponse.LocationReadingResponse readingResponse = new FormResponseDetailsResponse.LocationReadingResponse(
+                reading.latitude(), reading.longitude(), reading.accuracyMeters(), reading.recordedAt());
+        return new FormResponseDetailsResponse.LocationCheckResponse(locationCheck.unitId(), locationCheck.unitLatitude(),
+                locationCheck.unitLongitude(), locationCheck.radiusMeters(), locationCheck.distanceMeters(), readingResponse);
     }
 
     public String reviewStatus(Form form) {

@@ -7,12 +7,14 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.MockMvc;
 import com.astro.api.conformity.repository.NrCatalogRepository;
 import com.astro.api.unit.repository.UnitRepository;
+import com.astro.api.unit.repository.UnitLocationProjection;
 import com.astro.api.user.repository.UserRepository;
 import org.bson.Document;
 import java.util.concurrent.Future;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import com.astro.api.form.service.FormService;
+import com.astro.api.form.service.FormLocationService;
 import com.astro.api.form.service.FormAccessService;
 import com.astro.api.form.model.*;
 import com.astro.api.form.repository.*;
@@ -365,6 +367,24 @@ class FormRepositoryMongoTest {
         }
     }
 
+    @Test void storesUnitDistanceAndCoordinateSnapshotWithTheAnswers() {
+        Instant respondedAt = Instant.now();
+        Form form = form(1, 1, 10, 20, FormStatus.PENDING); form.setVersion(0L); form.setUnitId(3L); repository.insert(form);
+        FormLocationReading reading = new FormLocationReading(-23.5, -46.6, 5.0, respondedAt);
+        form.setLocationCheck(new FormLocationCheck(3L, -23.5, -46.6, 100, 0.0, reading));
+        form.setLocations(List.of(reading)); form.setRespondedAt(respondedAt); form.setStatus(FormStatus.COMPLETED);
+        form.getQuestions().getFirst().setAnswer(List.of("No local"));
+        Form saved = repository.submitResponse(form, new FormResponseCondition(form.getId(), 1L, 20L, 0L, FormStatus.PENDING)).orElseThrow();
+        assertEquals(0.0, saved.getLocationCheck().distanceMeters()); assertEquals(3L, saved.getLocationCheck().unitId());
+        Document raw = mongo.getCollection("forms").find(new Document("_id", form.getId())).first(); assertNotNull(raw);
+        Document check = raw.get("validacao_localizacao", Document.class);
+        assertEquals(3, check.getInteger("id_unidade")); assertEquals(100, check.getInteger("raio_metros"));
+        assertEquals(-46.6, check.getDouble("longitude_unidade")); assertEquals(-23.5, check.getDouble("latitude_unidade"));
+        assertEquals(0.0, check.getDouble("distancia_metros")); assertFalse(check.containsKey("distanceMeters"));
+        assertEquals(java.util.Date.from(respondedAt.truncatedTo(java.time.temporal.ChronoUnit.MILLIS)),
+                check.get("leitura", Document.class).getDate("registrado_em"));
+    }
+
     @Test void recipientListingExcludesDraftsOtherRecipientsAndWorkspaces() {
         Form pending = form(1, 1, 10, 20, FormStatus.PENDING); pending.setNrCode(6); mongo.insert(pending);
         Form completed = form(2, 1, 10, 20, FormStatus.COMPLETED); completed.setNrCode(6); mongo.insert(completed);
@@ -460,7 +480,7 @@ class FormRepositoryMongoTest {
                             new com.astro.api.form.strategy.answer.OptionAnswerStrategy(), new com.astro.api.form.strategy.answer.PhotoAnswerStrategy()), factory.getValidator());
             com.astro.api.form.service.FormResponseService service = new com.astro.api.form.service.FormResponseService(repository,
                     new FormAccessService(users), validation, new com.astro.api.form.mapper.FormAnswerMapper(),
-                    new com.astro.api.form.mapper.FormResponseMapper(new com.astro.api.form.mapper.FormMapper()), storage, users, units, factory.getValidator());
+                    new com.astro.api.form.mapper.FormResponseMapper(new com.astro.api.form.mapper.FormMapper()), storage, users, units, factory.getValidator(), new FormLocationService(units));
             MockMvc mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders
                     .standaloneSetup(new com.astro.api.form.controller.FormResponseController(service))
                     .setControllerAdvice(new com.astro.api.common.handler.GlobalExceptionHandler())
@@ -518,6 +538,31 @@ class FormRepositoryMongoTest {
             assertEquals(1, raw.getList("localizacoes", Document.class).size());
             assertEquals("formularios/private/image.png", raw.getList("perguntas", Document.class).get(2)
                     .getList("resposta", Document.class).getFirst().getString("chave_objeto"));
+            Form bound = form(2, 1, 10, 20, FormStatus.PENDING); bound.setUnitId(3L); bound.setVersion(0L);
+            bound.getQuestions().getFirst().setType("texto"); bound.getQuestions().getFirst().setRequired(true);
+            repository.insert(bound);
+            UnitLocationProjection unitLocation = mock(UnitLocationProjection.class);
+            when(units.findLocationByIdAndWorkspaceId(3L, 1L)).thenReturn(Optional.of(unitLocation));
+            when(unitLocation.getUnitId()).thenReturn(3L); when(unitLocation.getActive()).thenReturn(true);
+            when(unitLocation.getLatitude()).thenReturn(0.0); when(unitLocation.getLongitude()).thenReturn(0.0);
+            authenticate("recipient", com.astro.api.auth.security.Role.GESTOR);
+            String boundUrl = "/forms/" + bound.getId();
+            mvc.perform(get("/forms/received/" + bound.getId())).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.locationPolicy.enforceUnitRadius").value(true))
+                    .andExpect(jsonPath("$.data.locationPolicy.radiusMeters").value(100));
+            String positionBody = "{\"locationConsent\":true,\"unitId\":999,\"workspaceId\":999,\"locations\":[{\"latitude\":%s,\"longitude\":%s,\"accuracyMeters\":5,\"recordedAt\":\"%s\"}],\"answers\":[{\"questionId\":1,\"text\":\"No local\"}]}";
+            mvc.perform(post(boundUrl + "/responses").contentType("application/json")
+                    .content(positionBody.formatted("80", "170", Instant.now())))
+                    .andExpect(status().isBadRequest());
+            assertEquals(FormStatus.PENDING, repository.findById(bound.getId()).orElseThrow().getStatus());
+            assertNull(repository.findById(bound.getId()).orElseThrow().getRespondedAt());
+            mvc.perform(post(boundUrl + "/responses").contentType("application/json")
+                    .content(positionBody.formatted("0", "0", Instant.now())))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.locationCheck.unitId").value(3))
+                    .andExpect(jsonPath("$.data.locationCheck.distanceMeters").value(0));
+            verify(units, times(2)).findLocationByIdAndWorkspaceId(3L, 1L);
+            verify(units, never()).findLocationByIdAndWorkspaceId(999L, 999L);
+            assertNotNull(repository.findById(bound.getId()).orElseThrow().getLocationCheck());
             verify(storage, times(1)).upload(any(), any(), any()); verify(storage, never()).delete(any());
         } finally { org.springframework.security.core.context.SecurityContextHolder.clearContext(); }
     }

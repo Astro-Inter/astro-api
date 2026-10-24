@@ -53,7 +53,7 @@ public class FormResponseController {
     }
 
     @PostMapping(value = "/{id}/responses", consumes = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "Envia uma única resposta final com GPS, quando não houver imagens")
+    @Operation(summary = "Envia resposta única com GPS e valida raio de 100 m quando houver unidade; sem imagens")
     public ResponseEntity<ApiResult<FormResponseDetailsResponse>> submitJson(@PathVariable("id") String id,
             @Valid @RequestBody FormResponseRequest response, @AuthenticationPrincipal AuthenticatedUser principal,
             HttpServletRequest request) {
@@ -61,7 +61,7 @@ public class FormResponseController {
     }
 
     @PostMapping(value = "/{id}/responses", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Envia respostas e imagens JPEG/PNG: parte response (application/json) e partes files")
+    @Operation(summary = "Envia respostas e imagens JPEG/PNG; valida GPS em 100 m da unidade; partes response (JSON) e files")
     public ResponseEntity<ApiResult<FormResponseDetailsResponse>> submitMultipart(@PathVariable("id") String id,
             @Valid @RequestPart("response") FormResponseRequest response,
             @RequestPart(value = "files", required = false) List<MultipartFile> files,

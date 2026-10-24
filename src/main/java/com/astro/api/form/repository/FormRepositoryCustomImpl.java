@@ -126,6 +126,7 @@ public class FormRepositoryCustomImpl implements FormRepositoryCustom {
                 .set("respondedAt", form.getRespondedAt()).set("updatedAt", form.getRespondedAt())
                 .set("status", form.getStatus())
                 .set("version", condition.expectedVersion() == null ? 1L : condition.expectedVersion() + 1);
+        if (form.getLocationCheck() != null) update.set("locationCheck", form.getLocationCheck());
         return Optional.ofNullable(mongoTemplate.findAndModify(query, update,
                 FindAndModifyOptions.options().returnNew(true), Form.class));
     }
