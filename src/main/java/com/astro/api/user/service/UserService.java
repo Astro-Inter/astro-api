@@ -1,5 +1,6 @@
 package com.astro.api.user.service;
 
+import com.astro.api.auth.security.Role;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.storage.R2StorageService;
 import com.astro.api.common.text.PersonalDataNormalizer;
@@ -67,11 +68,15 @@ public class UserService {
     }
 
     public IdentificatedUserResponseDto findTypeAndStatusByEmail(EmailVerificationRequestDto dto) {
+        if (userRepository.existsAdminByEmail(dto.email())) {
+            return new IdentificatedUserResponseDto(Role.ADMIN, null);
+        }
+
         User user = userRepository.findByEmail(dto.email())
                                   .orElseThrow(() -> new ResourceNotFoundException("Este e-mail não está cadastrado no Astro."));
 
         return new IdentificatedUserResponseDto(
-                user.getType(),
+                Role.valueOf(user.getType().name()),
                 user.getStatus()
         );
     }

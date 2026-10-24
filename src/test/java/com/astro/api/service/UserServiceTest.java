@@ -1,5 +1,6 @@
 package com.astro.api.service;
 
+import com.astro.api.auth.security.Role;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.storage.R2StorageService;
 import com.astro.api.conformity.repository.NrDocumentRepository;
@@ -96,8 +97,47 @@ class UserServiceTest {
 
         IdentificatedUserResponseDto response = userService.findTypeAndStatusByEmail(dto);
 
-        assertEquals(new IdentificatedUserResponseDto(UserType.COLABORADOR, UserStatus.PRE_CADASTRADO), response);
+        assertEquals(new IdentificatedUserResponseDto(Role.COLABORADOR, UserStatus.PRE_CADASTRADO), response);
+        verify(userRepository).existsAdminByEmail(dto.email());
         verify(userRepository).findByEmail(dto.email());
+    }
+
+    @Test
+    void shouldReturnAdminWithoutRequiringAWorkspaceUser() {
+        EmailVerificationRequestDto dto = new EmailVerificationRequestDto("admin@astro.com");
+        when(userRepository.existsAdminByEmail(dto.email())).thenReturn(true);
+
+        assertEquals(new IdentificatedUserResponseDto(Role.ADMIN, null),
+                userService.findTypeAndStatusByEmail(dto));
+
+        verify(userRepository).existsAdminByEmail(dto.email());
+        verifyNoMoreInteractions(userRepository);
+    }
+
+    @Test
+    void shouldPrioritizeAdminWhenEmailAlsoBelongsToAWorkspaceUser() {
+        EmailVerificationRequestDto dto = new EmailVerificationRequestDto("admin@astro.com");
+        User user = new User();
+        user.setType(UserType.GESTOR);
+        user.setStatus(UserStatus.DESATIVADO);
+        when(userRepository.existsAdminByEmail(dto.email())).thenReturn(true);
+        when(userRepository.findByEmail(dto.email())).thenReturn(Optional.of(user));
+
+        assertEquals(new IdentificatedUserResponseDto(Role.ADMIN, null),
+                userService.findTypeAndStatusByEmail(dto));
+    }
+
+    @ParameterizedTest
+    @EnumSource(UserType.class)
+    void shouldPreserveEachWorkspaceUserTypeAndStatus(UserType type) {
+        EmailVerificationRequestDto dto = new EmailVerificationRequestDto("user@astro.com");
+        User user = new User();
+        user.setType(type);
+        user.setStatus(UserStatus.DESATIVADO);
+        when(userRepository.findByEmail(dto.email())).thenReturn(Optional.of(user));
+
+        assertEquals(new IdentificatedUserResponseDto(Role.valueOf(type.name()), UserStatus.DESATIVADO),
+                userService.findTypeAndStatusByEmail(dto));
     }
 
     @Test
