@@ -1,13 +1,11 @@
 package com.astro.api.form.dto.request;
 
 import com.astro.api.form.model.FormQuestionType;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 
 import java.util.List;
 
-@JsonIgnoreProperties(ignoreUnknown = true)
 public record FormQuestionDefinitionRequest(
         @Positive(message = "{form.question.id.positive}") Long id,
         @NotNull(message = "{form.question.type.notNull}") FormQuestionType type,

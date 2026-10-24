@@ -1,11 +1,9 @@
 package com.astro.api.form.dto.request;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.util.List;
 
-@JsonIgnoreProperties(ignoreUnknown = true)
 public record FormResponseRequest(
         @NotNull(message = "{form.location.consent.required}") @AssertTrue(message = "{form.location.consent.required}") Boolean locationConsent,
         @NotEmpty(message = "{form.location.readings.required}") @Size(max = 1440, message = "{form.location.readings.size}") List<@NotNull(message = "{form.location.reading.required}") @Valid FormLocationReadingRequest> locations,
