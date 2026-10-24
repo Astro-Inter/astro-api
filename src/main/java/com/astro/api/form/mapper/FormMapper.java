@@ -1,6 +1,7 @@
 package com.astro.api.form.mapper;
 
 import java.util.Map;
+import com.astro.api.unit.repository.UnitLocationProjection;
 import com.astro.api.form.dto.response.FormRecipientsResponse;
 import com.astro.api.user.repository.FormRecipientProjection;
 import com.astro.api.form.dto.response.FormSummaryResponse;
@@ -99,11 +100,17 @@ public class FormMapper {
     }
 
     public FormDetailsResponse toDetails(Form form) {
+        return toDetails(form, null);
+    }
+
+    public FormDetailsResponse toDetails(Form form, UnitLocationProjection unitLocation) {
         return new FormDetailsResponse(form.getId(), form.getWorkspaceId(), form.getSenderManagerId(), form.getManagerId(),
                 form.getTitle(), form.getDescription(), form.getNrCode(), form.getUnitId(),
                 form.getDueDate() == null ? null : form.getDueDate().atZone(FORM_ZONE).toLocalDate(),
                 form.getStatus(), form.getCreatedAt(), form.getUpdatedAt(), form.getRespondedAt(),
-                form.getQuestions() == null ? List.of() : form.getQuestions().stream().map(this::toQuestion).toList());
+                form.getQuestions() == null ? List.of() : form.getQuestions().stream().map(this::toQuestion).toList(),
+                unitLocation == null ? null : new FormDetailsResponse.UnitLocationResponse(
+                        unitLocation.getLatitude(), unitLocation.getLongitude()));
     }
 
     private QuestionResponse toQuestion(Form.FormQuestion question) {
@@ -112,6 +119,6 @@ public class FormMapper {
                 question.getOptions() == null ? List.of() : question.getOptions().stream()
                         .map(option -> new OptionResponse(option.getId(), option.getText(), Boolean.TRUE.equals(option.getOther()))).toList(),
                 question.getMaxFiles(), question.getMaxFileSizeMb(),
-                question.getAnswer() == null ? List.of() : List.copyOf(question.getAnswer()));
+                FormAnswerMapper.toPublicAnswers(question));
     }
 }
