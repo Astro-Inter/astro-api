@@ -112,6 +112,6 @@ public class FormMapper {
                 question.getOptions() == null ? List.of() : question.getOptions().stream()
                         .map(option -> new OptionResponse(option.getId(), option.getText(), Boolean.TRUE.equals(option.getOther()))).toList(),
                 question.getMaxFiles(), question.getMaxFileSizeMb(),
-                question.getAnswer() == null ? List.of() : List.copyOf(question.getAnswer()));
+                FormAnswerMapper.toPublicAnswers(question));
     }
 }

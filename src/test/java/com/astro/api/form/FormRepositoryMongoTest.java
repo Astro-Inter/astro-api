@@ -365,6 +365,163 @@ class FormRepositoryMongoTest {
         }
     }
 
+    @Test void recipientListingExcludesDraftsOtherRecipientsAndWorkspaces() {
+        Form pending = form(1, 1, 10, 20, FormStatus.PENDING); pending.setNrCode(6); mongo.insert(pending);
+        Form completed = form(2, 1, 10, 20, FormStatus.COMPLETED); completed.setNrCode(6); mongo.insert(completed);
+        mongo.insert(form(3, 1, 10, 20, FormStatus.DRAFT));
+        mongo.insert(form(4, 1, 20, 10, FormStatus.PENDING));
+        mongo.insert(form(5, 2, 10, 20, FormStatus.PENDING));
+        assertEquals(2, repository.findReceived(formAccessService.recipientFilter(new FormScope(20L, 1L, false)), "Clima", 6, null, 0, 20).total());
+        assertEquals(1, repository.findReceived(formAccessService.recipientFilter(new FormScope(20L, 1L, false)), null, 6, FormStatus.PENDING, 0, 20).total());
+        assertTrue(repository.findReceived(formAccessService.recipientFilter(new FormScope(99L, 1L, true)), null, null, null, 0, 20).forms().isEmpty());
+        assertEquals(0, repository.findReceived(formAccessService.recipientFilter(new FormScope(20L, 1L, false)), ".*", null, null, 0, 20).total());
+    }
+
+    @Test void submissionAndReviewAreAtomicAndPreservePortugueseMongoFields() throws Exception {
+        Form pending = form(1, 1, 10, 20, FormStatus.PENDING); pending.setVersion(0L); mongo.insert(pending);
+        pending.getQuestions().getFirst().setAnswer(List.of("Resposta única"));
+        pending.setLocationConsent(true);
+        pending.setLocations(List.of(new FormLocationReading(-23.0, -46.0, 4.0, Instant.now())));
+        pending.setRespondedAt(Instant.now());
+        pending.setStatus(FormStatus.COMPLETED);
+        FormResponseCondition condition = new FormResponseCondition(pending.getId(), 1L, 20L, 0L, FormStatus.PENDING);
+        assertTrue(repository.submitResponse(pending, new FormResponseCondition(pending.getId(), 1L, 99L, 0L, FormStatus.PENDING)).isEmpty());
+        assertTrue(repository.submitResponse(pending, new FormResponseCondition(pending.getId(), 2L, 20L, 0L, FormStatus.PENDING)).isEmpty());
+        try (ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            List<Future<Boolean>> results = executor.invokeAll(List.of(
+                    () -> repository.submitResponse(pending, condition).isPresent(),
+                    () -> repository.submitResponse(pending, condition).isPresent()));
+            int successes = 0;
+            for (Future<Boolean> result : results) if (result.get()) successes++;
+            assertEquals(1, successes);
+        }
+        Form completed = repository.findById(pending.getId()).orElseThrow();
+        assertEquals(FormStatus.COMPLETED, completed.getStatus()); assertEquals(1L, completed.getVersion());
+        assertEquals(List.of("Resposta única"), completed.getQuestions().getFirst().getAnswer());
+        Document raw = mongo.getCollection("forms").find(new Document("_id", pending.getId())).first(); assertNotNull(raw);
+        assertEquals("CONCLUIDO", raw.getString("status")); assertEquals(1, raw.getInteger("versao"));
+        assertTrue(raw.getBoolean("consentimento_localizacao")); assertFalse(raw.containsKey("analise"));
+        assertTrue(raw.getList("localizacoes", Document.class).getFirst().containsKey("registrado_em"));
+        assertFalse(repository.deleteIfUnanswered(formAccessService.writeCondition(completed, new FormScope(10L, 1L, false))));
+        FormReview approved = new FormReview(FormReviewStatus.APPROVED, 10L, Instant.now(), null);
+        assertTrue(repository.review(formAccessService.writeCondition(completed, new FormScope(20L, 1L, false)), approved).isEmpty());
+        assertTrue(repository.review(formAccessService.writeCondition(completed, new FormScope(99L, 2L, true)), approved).isEmpty());
+        FormWriteCondition reviewCondition = formAccessService.writeCondition(completed, new FormScope(10L, 1L, false));
+        try (ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            List<Future<Boolean>> results = executor.invokeAll(List.of(
+                    () -> repository.review(reviewCondition, approved).isPresent(),
+                    () -> repository.review(reviewCondition, new FormReview(FormReviewStatus.REJECTED, 10L, Instant.now(), "Foto ilegível")).isPresent()));
+            int successes = 0;
+            for (Future<Boolean> result : results) if (result.get()) successes++;
+            assertEquals(1, successes);
+        }
+        Form reviewed = repository.findById(pending.getId()).orElseThrow(); assertEquals(2L, reviewed.getVersion());
+        assertEquals(FormStatus.COMPLETED, reviewed.getStatus());
+        Document storedReview = mongo.getCollection("forms").find(new Document("_id", pending.getId())).first().get("analise", Document.class);
+        assertEquals(reviewed.getReview().status() == FormReviewStatus.REJECTED, storedReview.containsKey("descricao"));
+        assertInstanceOf(Integer.class, storedReview.get("id_gestor_revisor"));
+        assertFalse(storedReview.containsKey("description"));
+        assertTrue(repository.review(formAccessService.writeCondition(reviewed, new FormScope(99L, 1L, true)), approved).isEmpty());
+    }
+
+    @Test void approvedReviewOmitsDescriptionAndRejectedReviewStoresItInSameDocument() {
+        for (FormReviewStatus decision : FormReviewStatus.values()) {
+            Form value = form(decision.ordinal() + 1, 1, 10, 20, FormStatus.COMPLETED);
+            value.setVersion(1L); value.setRespondedAt(Instant.now());
+            value.setReview(new FormReview(decision, 10L, Instant.now(), decision == FormReviewStatus.REJECTED ? "Foto ilegível" : null));
+            repository.insert(value);
+            Document raw = mongo.getCollection("forms").find(new Document("_id", value.getId())).first(); assertNotNull(raw);
+            Document review = raw.get("analise", Document.class);
+            assertEquals(decision.storedValue(), review.getString("status"));
+            assertEquals(decision == FormReviewStatus.REJECTED, review.containsKey("descricao"));
+            assertEquals(decision, repository.findById(value.getId()).orElseThrow().getReview().status());
+        }
+        assertEquals(2, mongo.getCollection("forms").countDocuments());
+    }
+
+    @Test void httpResponseAndReviewWorkflowUsesMongoAndTheExistingAccessRules() throws Exception {
+        UserRepository users = mock(UserRepository.class);
+        UnitRepository units = mock(UnitRepository.class);
+        when(users.findByFirebaseUid("sender")).thenReturn(Optional.of(manager(10, 1, com.astro.api.user.model.UserType.GESTOR)));
+        when(users.findByFirebaseUid("recipient")).thenReturn(Optional.of(manager(20, 1, com.astro.api.user.model.UserType.GESTOR)));
+        when(users.findByFirebaseUid("owner")).thenReturn(Optional.of(manager(99, 1, com.astro.api.user.model.UserType.GESTOR_WORKSPACE)));
+        when(users.findByFirebaseUid("outsider")).thenReturn(Optional.of(manager(30, 2, com.astro.api.user.model.UserType.GESTOR_WORKSPACE)));
+        com.astro.api.form.service.FormImageStorageService storage = mock(com.astro.api.form.service.FormImageStorageService.class);
+        FormImage image = new FormImage("test-image", "formularios/private/image.png", "camera.png", "image/png", 80);
+        when(storage.upload(any(), any(), any())).thenReturn(image);
+        when(storage.download(image)).thenReturn(new com.astro.api.form.dto.response.FormImageDownloadResponse(
+                image.id(), "https://example.test/signed-image", Instant.now().plusSeconds(900)));
+        Form pending = form(1, 1, 10, 20, FormStatus.PENDING); pending.setQuestions(List.of()); pending.setVersion(0L);
+        new com.astro.api.form.mapper.FormMapper().applyContent(FormTestFixtures.content(FormStatus.PENDING), pending);
+        repository.insert(pending);
+        try (jakarta.validation.ValidatorFactory factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+            com.astro.api.form.service.FormAnswerValidationService validation = new com.astro.api.form.service.FormAnswerValidationService(
+                    List.of(new com.astro.api.form.strategy.answer.TextAnswerStrategy(), new com.astro.api.form.strategy.answer.DateAnswerStrategy(),
+                            new com.astro.api.form.strategy.answer.OptionAnswerStrategy(), new com.astro.api.form.strategy.answer.PhotoAnswerStrategy()), factory.getValidator());
+            com.astro.api.form.service.FormResponseService service = new com.astro.api.form.service.FormResponseService(repository,
+                    new FormAccessService(users), validation, new com.astro.api.form.mapper.FormAnswerMapper(),
+                    new com.astro.api.form.mapper.FormResponseMapper(new com.astro.api.form.mapper.FormMapper()), storage, users, units, factory.getValidator());
+            MockMvc mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders
+                    .standaloneSetup(new com.astro.api.form.controller.FormResponseController(service))
+                    .setControllerAdvice(new com.astro.api.common.handler.GlobalExceptionHandler())
+                    .setCustomArgumentResolvers(new org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver()).build();
+            String url = "/forms/" + pending.getId();
+            authenticate("sender", com.astro.api.auth.security.Role.GESTOR);
+            mvc.perform(get("/forms/received")).andExpect(status().isOk()).andExpect(jsonPath("$.data.items.length()").value(0));
+            authenticate("owner", com.astro.api.auth.security.Role.GESTOR_WORKSPACE);
+            mvc.perform(get("/forms/received/" + pending.getId())).andExpect(status().isNotFound());
+            authenticate("recipient", com.astro.api.auth.security.Role.GESTOR);
+            mvc.perform(get("/forms/received").param("workspaceId", "999").param("managerId", "999"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].id").value(pending.getId()));
+            mvc.perform(get("/forms/received/" + pending.getId())).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.locationPolicy.enforceUnitRadius").value(false));
+            mvc.perform(get(url + "/responses")).andExpect(status().isConflict());
+            com.astro.api.form.dto.request.FormResponseRequest request = new com.astro.api.form.dto.request.FormResponseRequest(true,
+                    List.of(new com.astro.api.form.dto.request.FormLocationReadingRequest(80.0, 170.0, 5.0, Instant.now())),
+                    List.of(new com.astro.api.form.dto.request.FormQuestionAnswerRequest(1L, "Condição segura", null, null, null, null),
+                            new com.astro.api.form.dto.request.FormQuestionAnswerRequest(2L, null, List.of(1L), null, null, null),
+                            new com.astro.api.form.dto.request.FormQuestionAnswerRequest(3L, null, null, null, null, List.of(0)),
+                            new com.astro.api.form.dto.request.FormQuestionAnswerRequest(4L, null, null, null, java.time.LocalDate.of(2026, 10, 24), null)));
+            byte[] body = JsonMapper.builder().build().writeValueAsBytes(request);
+            org.springframework.mock.web.MockMultipartFile responsePart = new org.springframework.mock.web.MockMultipartFile(
+                    "response", "response.json", "application/json", body);
+            org.springframework.mock.web.MockMultipartFile photo = new org.springframework.mock.web.MockMultipartFile(
+                    "files", "camera.png", "image/png", new byte[]{1});
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(url + "/responses").file(responsePart).file(photo))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.form.status").value("CONCLUIDO"))
+                    .andExpect(jsonPath("$.data.review.status").value("awaiting_review"))
+                    .andExpect(jsonPath("$.data.canReview").value(false))
+                    .andExpect(jsonPath("$.data.form.questions[2].answer[0].id").value("test-image"))
+                    .andExpect(jsonPath("$.data.form.questions[2].answer[0].chave_objeto").doesNotExist());
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(url + "/responses").file(responsePart).file(photo))
+                    .andExpect(status().isConflict());
+            mvc.perform(post(url + "/review").contentType("application/json").content("{\"status\":\"approved\"}"))
+                    .andExpect(status().isForbidden());
+            authenticate("outsider", com.astro.api.auth.security.Role.GESTOR_WORKSPACE);
+            mvc.perform(get(url + "/responses")).andExpect(status().isNotFound());
+            mvc.perform(get(url + "/images/test-image")).andExpect(status().isNotFound());
+            authenticate("sender", com.astro.api.auth.security.Role.GESTOR);
+            mvc.perform(get(url + "/responses")).andExpect(status().isOk()).andExpect(jsonPath("$.data.canReview").value(true));
+            mvc.perform(get(url + "/images/test-image")).andExpect(status().isOk())
+                    .andExpect(header().string("Cache-Control", "no-store"));
+            mvc.perform(post(url + "/review").contentType("application/json").content("{\"status\":\"rejected\",\"description\":\" \"}"))
+                    .andExpect(status().isBadRequest());
+            mvc.perform(post(url + "/review").contentType("application/json").content("{\"status\":\"rejected\",\"description\":\"Foto ilegível\"}"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.review.status").value("rejected"))
+                    .andExpect(jsonPath("$.data.review.description").value("Foto ilegível"));
+            authenticate("owner", com.astro.api.auth.security.Role.GESTOR_WORKSPACE);
+            mvc.perform(post(url + "/review").contentType("application/json").content("{\"status\":\"approved\"}"))
+                    .andExpect(status().isConflict());
+            Document raw = mongo.getCollection("forms").find(new Document("_id", pending.getId())).first(); assertNotNull(raw);
+            assertEquals("REPROVADO", raw.get("analise", Document.class).getString("status"));
+            assertEquals("Foto ilegível", raw.get("analise", Document.class).getString("descricao"));
+            assertEquals(1, raw.getList("localizacoes", Document.class).size());
+            assertEquals("formularios/private/image.png", raw.getList("perguntas", Document.class).get(2)
+                    .getList("resposta", Document.class).getFirst().getString("chave_objeto"));
+            verify(storage, times(1)).upload(any(), any(), any()); verify(storage, never()).delete(any());
+        } finally { org.springframework.security.core.context.SecurityContextHolder.clearContext(); }
+    }
+
     @org.springframework.context.annotation.Configuration(proxyBeanMethods = false)
     @org.springframework.data.mongodb.repository.config.EnableMongoRepositories(basePackageClasses = FormRepository.class)
     static class RepositoryConfiguration {

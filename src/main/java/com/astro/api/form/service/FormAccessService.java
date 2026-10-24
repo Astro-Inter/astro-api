@@ -47,6 +47,11 @@ public class FormAccessService {
                 List.of(FormStatus.PENDING, FormStatus.COMPLETED));
     }
 
+    public FormReadFilter recipientFilter(FormScope formScope) {
+        return new FormReadFilter(formScope.workspaceId(), null, formScope.managerId(),
+                List.of(FormStatus.PENDING, FormStatus.COMPLETED));
+    }
+
     public FormWriteCondition writeCondition(Form form, FormScope formScope) {
         Long senderManagerId = formScope.workspaceManager() ? null : formScope.managerId();
         return new FormWriteCondition(form.getId(), formScope.workspaceId(), senderManagerId,
