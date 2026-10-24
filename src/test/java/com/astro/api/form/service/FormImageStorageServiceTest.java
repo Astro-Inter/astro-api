@@ -1,22 +1,25 @@
 package com.astro.api.form.service;
 
 import com.astro.api.common.exception.BusinessException;
+import com.astro.api.common.storage.R2StorageService.PresignedDownload;
 import com.astro.api.config.R2Properties;
 import com.astro.api.form.model.FormImage;
-import org.junit.jupiter.api.*;
-import org.mockito.ArgumentCaptor;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.mock.web.MockMultipartFile;
-import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.*;
-import software.amazon.awssdk.services.s3.presigner.S3Presigner;
-import software.amazon.awssdk.auth.credentials.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.time.*;
 import javax.imageio.ImageIO;
+import org.junit.jupiter.api.*;
+import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.mock.web.MockMultipartFile;
+import software.amazon.awssdk.auth.credentials.*;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.*;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -60,12 +63,12 @@ class FormImageStorageServiceTest {
     }
     @Test void signsPrivateUrlsLocallyWithExpirationCappedAtFifteenMinutes() {
         try (S3Presigner presigner = S3Presigner.builder().endpointOverride(URI.create(properties.endpoint()))
-                .region(software.amazon.awssdk.regions.Region.of("auto"))
+                .region(Region.of("auto"))
                 .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("test", "test"))).build()) {
             when(presigners.getObject()).thenReturn(presigner);
             FormImage image = new FormImage("image-id", "formularios/id/image.jpg", "camera.jpg", "image/jpeg", 10);
-            com.astro.api.form.dto.response.FormImageDownloadResponse download = service.download(image);
-            assertEquals("image-id", download.id()); assertTrue(download.url().contains("X-Amz-Expires=900"));
+            PresignedDownload download = service.download(image);
+            assertTrue(download.url().contains("X-Amz-Expires=900"));
             assertTrue(download.expiresAt().isBefore(Instant.now().plusSeconds(901)));
             verifyNoInteractions(client);
         }

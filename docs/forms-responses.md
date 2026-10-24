@@ -239,6 +239,11 @@ int32 quando couberem, preservando int64 para valores maiores. Não há migraç�
 As Strategies de resposta validam cada tipo. `FormAnswerMapper` e
 `FormResponseMapper` convertem os dados. O fragmento de `FormRepository` apenas
 executa consultas e gravações condicionais com os filtros/estados definidos no service.
+`FormImageStorageService` retorna o valor interno `PresignedDownload` já existente;
+`FormResponseMapper` monta `FormImageDownloadResponse`. A validação e normalização
+do UUID são compartilhadas por `FormIdentifierValidator`, usado pelos serviços de
+gestão e de resposta. Nomes de participantes são obtidos antes da chamada ao mapper.
+
 Os vínculos e nomes reutilizam `UserRepository` e `UnitRepository`, sem novas
 tabelas, consultas SQL manuais ou alterações do cadastro da unidade.
 

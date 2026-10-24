@@ -3,23 +3,25 @@ package com.astro.api.form;
 import com.astro.api.auth.security.*;
 import com.astro.api.common.exception.*;
 import com.astro.api.form.dto.request.*;
+import com.astro.api.form.dto.response.FormResponseDetailsResponse;
 import com.astro.api.form.mapper.*;
 import com.astro.api.form.model.*;
 import com.astro.api.form.repository.*;
 import com.astro.api.form.service.*;
 import com.astro.api.form.strategy.answer.*;
-import com.astro.api.unit.repository.UnitRepository;
 import com.astro.api.unit.repository.UnitLocationProjection;
-import com.astro.api.form.dto.response.FormResponseDetailsResponse;
+import com.astro.api.unit.repository.UnitRepository;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.UserRepository;
 import jakarta.validation.*;
-import org.junit.jupiter.api.*;
-import org.mockito.ArgumentCaptor;
-import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.security.access.AccessDeniedException;
 import java.time.Instant;
 import java.util.*;
+import org.junit.jupiter.api.*;
+import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.access.AccessDeniedException;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -118,7 +120,7 @@ class FormResponseServiceTest {
     @Test void recoversACommittedResponseAfterLosingTheMongoAcknowledgement() {
         when(repository.submitResponse(any(), any())).thenAnswer(invocation -> {
             form.setStatus(FormStatus.COMPLETED);
-            throw new org.springframework.dao.DataAccessResourceFailureException("Lost acknowledgement");
+            throw new DataAccessResourceFailureException("Lost acknowledgement");
         });
         assertEquals("awaiting_review", service.submit(form.getId(), answer(), List.of(), recipient).review().status());
         assertNotNull(form.getSubmissionId()); verifyNoInteractions(storage);
@@ -127,12 +129,12 @@ class FormResponseServiceTest {
         form.getQuestions().getFirst().setType("foto");
         FormImage image = new FormImage("id", "key", "photo.jpg", "image/jpeg", 100);
         when(storage.upload(any(), any(), any())).thenReturn(image);
-        when(repository.submitResponse(any(), any())).thenThrow(new org.springframework.dao.DataAccessResourceFailureException("Mongo unavailable"));
+        when(repository.submitResponse(any(), any())).thenThrow(new DataAccessResourceFailureException("Mongo unavailable"));
         when(repository.findById(eq(form.getId()), any(FormReadFilter.class)))
-                .thenReturn(Optional.of(form)).thenThrow(new org.springframework.dao.DataAccessResourceFailureException("Mongo unavailable"));
+                .thenReturn(Optional.of(form)).thenThrow(new DataAccessResourceFailureException("Mongo unavailable"));
         FormResponseRequest response = new FormResponseRequest(true, answer().locations(),
                 List.of(new FormQuestionAnswerRequest(1L, null, null, null, null, List.of(0))));
-        assertThrows(org.springframework.dao.DataAccessResourceFailureException.class, () -> service.submit(form.getId(), response,
+        assertThrows(DataAccessResourceFailureException.class, () -> service.submit(form.getId(), response,
                 List.of(new MockMultipartFile("files", new byte[]{1})), recipient));
         verify(storage, never()).delete(any());
     }

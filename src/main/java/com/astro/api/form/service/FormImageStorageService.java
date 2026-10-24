@@ -2,7 +2,7 @@ package com.astro.api.form.service;
 
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.config.R2Properties;
-import com.astro.api.form.dto.response.FormImageDownloadResponse;
+import com.astro.api.common.storage.R2StorageService.PresignedDownload;
 import com.astro.api.form.model.FormImage;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -103,7 +103,7 @@ public class FormImageStorageService {
         s3Client.getObject().deleteObject(DeleteObjectRequest.builder().bucket(bucketName).key(image.objectKey()).build());
     }
 
-    public FormImageDownloadResponse download(FormImage image) {
+    public PresignedDownload download(FormImage image) {
         requireConfiguration();
         Duration duration = r2Properties.presignedUrlDuration().compareTo(Duration.ofMinutes(15)) > 0
                 ? Duration.ofMinutes(15) : r2Properties.presignedUrlDuration();
@@ -112,7 +112,7 @@ public class FormImageStorageService {
                 .getObjectRequest(request -> request.bucket(bucketName).key(image.objectKey())
                         .responseContentType(image.contentType()).responseContentDisposition("inline"))
                 .build());
-        return new FormImageDownloadResponse(image.id(), signedRequest.url().toExternalForm(),
+        return new PresignedDownload(signedRequest.url().toExternalForm(),
                 signedRequest.expiration().truncatedTo(ChronoUnit.SECONDS));
     }
 

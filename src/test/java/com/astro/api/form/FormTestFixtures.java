@@ -7,10 +7,10 @@ import com.astro.api.form.strategy.*;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.user.model.*;
 import com.astro.api.workspace.model.Workspace;
-
-import java.time.LocalDate;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 final class FormTestFixtures {
     private FormTestFixtures() {}
@@ -22,7 +22,7 @@ final class FormTestFixtures {
         return user;
     }
 
-    static String formId(long value) { return new java.util.UUID(0, value).toString(); }
+    static String formId(long value) { return new UUID(0, value).toString(); }
 
     static Form form(long id, long workspace, long sender, long recipient, FormStatus status) {
         Form form = new Form(); form.setId(formId(id)); form.setWorkspaceId(workspace); form.setSenderManagerId(sender);

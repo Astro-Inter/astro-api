@@ -7,17 +7,22 @@ import com.astro.api.common.handler.GlobalExceptionHandler;
 import com.astro.api.config.CorsConfig;
 import com.astro.api.form.controller.*;
 import com.astro.api.form.service.*;
+import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
 import jakarta.servlet.Filter;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.*;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.mock.web.MockServletContext;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
-import java.util.*;
+import org.springframework.web.servlet.config.annotation.EnableWebMvc;
+
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -35,7 +40,7 @@ class FormResponseSecurityTest {
             String id = FormTestFixtures.formId(1);
             FirebaseToken token = mock(FirebaseToken.class); when(token.getUid()).thenReturn("manager");
             when(tokens.verify("valid")).thenReturn(token);
-            when(tokens.verify("invalid")).thenThrow(mock(com.google.firebase.auth.FirebaseAuthException.class));
+            when(tokens.verify("invalid")).thenThrow(mock(FirebaseAuthException.class));
             for (String bearer : List.of("", "invalid", "valid")) {
                 for (Role role : List.of(Role.COLABORADOR, Role.ADMIN)) {
                     when(authorization.getRole("manager")).thenReturn(Optional.of(role));
@@ -66,8 +71,8 @@ class FormResponseSecurityTest {
 
     List<AbstractMockHttpServletRequestBuilder<?>> requests(String id) {
         String response = "{\"locationConsent\":true,\"locations\":[{\"latitude\":-23.0,\"longitude\":-46.0,\"accuracyMeters\":4,\"recordedAt\":\"2026-10-24T10:00:00Z\"}],\"answers\":[]}";
-        org.springframework.mock.web.MockMultipartFile part = new org.springframework.mock.web.MockMultipartFile(
-                "response", "response.json", "application/json", response.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        MockMultipartFile part = new MockMultipartFile(
+                "response", "response.json", "application/json", response.getBytes(StandardCharsets.UTF_8));
         return List.of(get("/forms/received"), get("/forms/received/" + id), get("/forms/" + id + "/responses"),
                 post("/forms/" + id + "/responses").contentType("application/json").content(response),
                 multipart("/forms/" + id + "/responses").file(part),
@@ -77,7 +82,7 @@ class FormResponseSecurityTest {
 
     @Configuration
     @EnableWebSecurity
-    @org.springframework.web.servlet.config.annotation.EnableWebMvc
+    @EnableWebMvc
     @Import({SecurityConfig.class, CorsConfig.class, FormController.class, FormResponseController.class, GlobalExceptionHandler.class})
     static class Config {
         @Bean FirebaseTokenService firebaseTokenService() { return mock(FirebaseTokenService.class); }

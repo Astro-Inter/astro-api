@@ -1,6 +1,8 @@
 package com.astro.api.form.service;
 
 import com.astro.api.auth.security.AuthenticatedUser;
+import com.astro.api.common.storage.R2StorageService.PresignedDownload;
+import com.astro.api.form.validation.FormIdentifierValidator;
 import com.astro.api.common.exception.*;
 import com.astro.api.form.dto.request.*;
 import com.astro.api.form.dto.response.*;
@@ -63,7 +65,8 @@ public class FormResponseService {
 
     public FormResponseDetailsResponse findReceivedById(String formId, AuthenticatedUser principal) {
         FormScope scope = formAccessService.requireManager(principal);
-        return details(requireForm(formId, formAccessService.recipientFilter(scope)), scope);
+        Form form = requireForm(formId, formAccessService.recipientFilter(scope));
+        return details(form, scope);
     }
 
     public FormResponseDetailsResponse submit(String formId, FormResponseRequest request, List<MultipartFile> files,
@@ -163,7 +166,8 @@ public class FormResponseService {
         Form form = requireForm(formId, formAccessService.readFilter(scope));
         FormImage image = formAnswerMapper.images(form).stream().filter(value -> value.id().equals(imageId)).findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Imagem não encontrada neste formulário"));
-        return formImageStorageService.download(image);
+        PresignedDownload imageDownload = formImageStorageService.download(image);
+        return formResponseMapper.toImageDownload(image, imageDownload);
     }
 
     private void requireCompleted(Form form) {
@@ -173,11 +177,9 @@ public class FormResponseService {
     }
 
     private Form requireForm(String formId, FormReadFilter filter) {
-        try {
-            if (formId == null || formId.length() != 36) throw new IllegalArgumentException();
-            formId = UUID.fromString(formId).toString();
-        } catch (IllegalArgumentException exception) { throw new BusinessException("O identificador do formulário deve ser um UUID válido"); }
-        return formRepository.findById(formId, filter).orElseThrow(() -> new ResourceNotFoundException("Formulário não encontrado"));
+        String normalizedFormId = FormIdentifierValidator.normalize(formId);
+        return formRepository.findById(normalizedFormId, filter)
+                .orElseThrow(() -> new ResourceNotFoundException("Formulário não encontrado"));
     }
 
     private FormResponseDetailsResponse details(Form form, FormScope scope) {

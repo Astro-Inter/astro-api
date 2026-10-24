@@ -1,6 +1,7 @@
 package com.astro.api.form.mapper;
 
 import com.astro.api.form.dto.response.*;
+import com.astro.api.common.storage.R2StorageService.PresignedDownload;
 import com.astro.api.form.model.*;
 import org.springframework.stereotype.Component;
 import java.util.*;
@@ -39,6 +40,10 @@ public class FormResponseMapper {
                 reading.latitude(), reading.longitude(), reading.accuracyMeters(), reading.recordedAt());
         return new FormResponseDetailsResponse.LocationCheckResponse(locationCheck.unitId(), locationCheck.unitLatitude(),
                 locationCheck.unitLongitude(), locationCheck.radiusMeters(), locationCheck.distanceMeters(), readingResponse);
+    }
+
+    public FormImageDownloadResponse toImageDownload(FormImage image, PresignedDownload imageDownload) {
+        return new FormImageDownloadResponse(image.id(), imageDownload.url(), imageDownload.expiresAt());
     }
 
     public String reviewStatus(Form form) {

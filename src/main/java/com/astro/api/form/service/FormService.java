@@ -1,6 +1,7 @@
 package com.astro.api.form.service;
 
 import com.astro.api.form.repository.FormRepositoryCustom;
+import com.astro.api.form.validation.FormIdentifierValidator;
 import com.astro.api.form.model.Form;
 import com.astro.api.form.repository.FormRepository;
 import com.astro.api.auth.security.AuthenticatedUser;
@@ -153,19 +154,14 @@ public class FormService {
     }
 
     public FormDetailsResponse findById(String formId, AuthenticatedUser authenticatedUser) {
-        return formMapper.toDetails(requireForm(formId, formAccessService.requireManager(authenticatedUser)));
+        FormScope formScope = formAccessService.requireManager(authenticatedUser);
+        Form form = requireForm(formId, formScope);
+        return formMapper.toDetails(form);
     }
 
     private Form requireForm(String formId, FormScope formScope) {
-        if (formId == null || formId.length() != 36) {
-            throw new BusinessException("O identificador do formulário deve ser um UUID válido");
-        }
-        try {
-            formId = UUID.fromString(formId).toString();
-        } catch (IllegalArgumentException exception) {
-            throw new BusinessException("O identificador do formulário deve ser um UUID válido");
-        }
-        return formRepository.findById(formId, formAccessService.readFilter(formScope))
+        String normalizedFormId = FormIdentifierValidator.normalize(formId);
+        return formRepository.findById(normalizedFormId, formAccessService.readFilter(formScope))
                 .orElseThrow(() -> new ResourceNotFoundException("Formulário não encontrado"));
     }
 
