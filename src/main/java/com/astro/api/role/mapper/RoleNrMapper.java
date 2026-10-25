@@ -16,18 +16,44 @@ public class RoleNrMapper {
     public List<RoleNrOptionResponse> toOptions(List<NrDocument> documents,
             List<RoleNrResponse> linked, Set<Integer> persistedCodes) {
         Map<Integer, RoleNrOptionResponse> options = new HashMap<>();
-        Set<Integer> linkedCodes = linked.stream().map(RoleNrResponse::nrCode).collect(Collectors.toSet());
+        Set<Integer> linkedCodes = linked.stream()
+                .map(RoleNrResponse::nrCode)
+                .collect(Collectors.toSet());
+
         for (RoleNrResponse nr : linked) {
-            if (persistedCodes.contains(nr.nrCode())) {
-                options.put(nr.nrCode(), new RoleNrOptionResponse(nr.nrCode(), nr.description(), true));
+            Integer nrCode = nr.nrCode();
+
+            if (persistedCodes.contains(nrCode)) {
+                RoleNrOptionResponse option = new RoleNrOptionResponse(
+                        nrCode,
+                        nr.description(),
+                        true
+                );
+
+                options.put(nrCode, option);
             }
         }
+
         for (NrDocument nr : documents) {
-            if (persistedCodes.contains(nr.getId())) {
-                options.put(nr.getId(), new RoleNrOptionResponse(nr.getId(), nr.getDescription(),
-                        linkedCodes.contains(nr.getId())));
+            Integer nrCode = nr.getId();
+
+            if (persistedCodes.contains(nrCode)) {
+                boolean linkedToRole = linkedCodes.contains(nrCode);
+                RoleNrOptionResponse option = new RoleNrOptionResponse(
+                        nrCode,
+                        nr.getDescription(),
+                        linkedToRole
+                );
+
+                options.put(nrCode, option);
             }
         }
-        return options.values().stream().sorted(Comparator.comparing(RoleNrOptionResponse::nr)).toList();
+
+        List<RoleNrOptionResponse> sortedOptions = options.values()
+                .stream()
+                .sorted(Comparator.comparing(RoleNrOptionResponse::nr))
+                .toList();
+
+        return sortedOptions;
     }
 }
