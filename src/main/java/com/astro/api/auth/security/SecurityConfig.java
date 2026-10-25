@@ -48,9 +48,14 @@ public class SecurityConfig {
                 ).permitAll()
                  .anyRequest().authenticated()
             )
-            .exceptionHandling(errors -> errors.authenticationEntryPoint((request, response, exception) ->
+            .exceptionHandling(errors -> errors.authenticationEntryPoint((request, response, exception) -> {
+                if (request.getRequestURI().startsWith("/admin/nrs/")) {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                } else {
                     response.sendError(isUnauthorizedRoute(request.getRequestURI())
-                            ? HttpServletResponse.SC_UNAUTHORIZED : HttpServletResponse.SC_FORBIDDEN)))
+                            ? HttpServletResponse.SC_UNAUTHORIZED : HttpServletResponse.SC_FORBIDDEN);
+                }
+            }))
             .addFilterBefore(
                 firebaseAuthenticationFilter,
                 UsernamePasswordAuthenticationFilter.class
@@ -59,7 +64,7 @@ public class SecurityConfig {
     }
 
     private static boolean isUnauthorizedRoute(String requestUri) {
-        return requestUri.equals("/events") || requestUri.startsWith("/events/")
+        return requestUri.startsWith("/admin/nrs/") || requestUri.equals("/events") || requestUri.startsWith("/events/")
                 || requestUri.equals("/workspace") || requestUri.startsWith("/workspace/")
                 || requestUri.equals("/units") || requestUri.startsWith("/units/")
                 || requestUri.equals("/chats") || requestUri.startsWith("/chats/");
