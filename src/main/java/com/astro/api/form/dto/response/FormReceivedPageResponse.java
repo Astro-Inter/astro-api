@@ -7,5 +7,5 @@ import java.util.List;
 
 public record FormReceivedPageResponse(List<Item> items, int page, int size, long totalElements, long totalPages) {
     public record Item(String id, String title, String description, Integer nrCode, Long unitId, Long senderManagerId,
-            LocalDate dueDate, Instant createdAt, Instant respondedAt, int questionCount, FormStatus status, String reviewStatus) {}
+            LocalDate dueDate, Instant createdAt, Instant respondedAt, int questionCount, FormStatus status, String reviewStatus, boolean viewed) {}
 }

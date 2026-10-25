@@ -3,8 +3,8 @@
 Complementa [forms.md](forms.md). Subtarefas da SCRUM-548: SCRUM-611 a SCRUM-616.
 Referências funcionais: SCRUM-272, SCRUM-273, SCRUM-275, SCRUM-276, SCRUM-278,
 SCRUM-342 e SCRUM-610. Os detalhes incluem as coordenadas da unidade vinculada
-para comparação no front. O envio das respostas registra GPS sem bloquear por distância,
-com ou sem unidade definida.
+para comparação no front. O envio das respostas não recebe GPS. A verificação de presença fica no Android,
+com ou sem unidade definida conforme as regras descritas abaixo.
 
 ## Autenticação e escopo
 
@@ -18,7 +18,9 @@ inclusive quando a conta é de gestor de workspace. Para consultar respostas e
 imagens, são participantes autorizados: destinatário, remetente e gestor do
 mesmo workspace. Apenas remetente e gestor do workspace podem analisar.
 Rascunhos não aparecem ao destinatário. Recurso inexistente ou fora do escopo: 404.
-Sem autenticação/perfil/conta/unidade elegíveis: 403, conforme a segurança existente.
+Nas novas rotas desta entrega, token ausente/inválido retorna 401; falta de perfil,
+conta/unidade elegíveis ou permissão retorna 403, ambos com envelope ApiResult.
+As rotas anteriores de formulários e os demais módulos mantêm seus comportamentos.
 
 ## Rotas
 
@@ -26,7 +28,7 @@ Sem autenticação/perfil/conta/unidade elegíveis: 403, conforme a segurança e
 | --- | --- | --- |
 | SCRUM-611 | `GET /forms/received` | Caixa de formulários recebidos do gestor autenticado |
 | SCRUM-612 | `GET /forms/received/{id}` | Perguntas, metadados, respostas atuais e política de GPS |
-| SCRUM-613 | `POST /forms/{id}/responses` | Envio final único das respostas, GPS e imagens |
+| SCRUM-613 | `POST /forms/{id}/responses` | Envio final único das respostas e imagens |
 | SCRUM-614 | `GET /forms/{id}/responses` | Consulta das respostas e da análise no web/mobile |
 | SCRUM-615 | `POST /forms/{id}/review` | Aprovação ou reprovação definitiva |
 | SCRUM-616 | `GET /forms/{id}/images/{imageId}` | URL temporária de uma imagem do formulário |
@@ -48,7 +50,12 @@ Ordenação: criação e ID decrescentes. Não carrega respostas na listagem.
 `data` contém `items`, `page`, `size`, `totalElements`, `totalPages`.
 Cada item tem `id`, `title`, `description`, `nrCode`, `unitId`, `senderManagerId`,
 `dueDate` (`YYYY-MM-DD`), `createdAt`, `respondedAt`, `questionCount`, `status`,
-`reviewStatus`. Lista vazia: sucesso com `items: []` e totais zero.
+`reviewStatus` e `viewed` (boolean). Lista vazia: sucesso com `items: []` e totais zero.
+Sem filtro de status, inclui pendentes e concluídos, inclusive aprovados e reprovados.
+Não existe status CANCELADO: reprovação é `status: CONCLUIDO` e `reviewStatus: rejected`.
+`viewed` é individual por usuário e reutiliza ViewedService (Redis), com a mesma chave
+`forms` da home. Abrir `GET /forms/received/{id}` marca como visualizado somente após
+validar o acesso e obter os detalhes. Listar não marca itens como visualizados.
 Parâmetros adicionais como `managerId=999&workspaceId=999` não alteram o escopo.
 
 ### Detalhes e respostas
@@ -75,8 +82,8 @@ e segue a visibilidade dos participantes. Ambos retornam o mesmo formato em `dat
   "senderName": "Gestor remetente",
   "recipientName": "Gestor destinatário",
   "unitName": "Sede",
-  "locationPolicy": {"captureRequired": true, "enforceUnitRadius": false, "radiusMeters": 100, "maxReadingAgeSeconds": null},
-  "locations": [{"latitude": -23.5, "longitude": -46.6, "accuracyMeters": 5, "recordedAt": "2026-10-24T12:00:00Z"}],
+  "locationPolicy": {"captureRequired": false, "enforceUnitRadius": false, "radiusMeters": 100, "maxReadingAgeSeconds": null},
+  "locations": [],
   "review": {"status": "awaiting_review"},
   "canReview": true
 }
@@ -96,10 +103,6 @@ Sem imagens, envie `Content-Type: application/json`:
 
 ```json
 {
-  "locationConsent": true,
-  "locations": [
-    {"latitude": -23.5, "longitude": -46.6, "accuracyMeters": 5, "recordedAt": "2026-10-24T12:00:00Z"}
-  ],
   "answers": [
     {"questionId": 1, "text": "Condição segura"},
     {"questionId": 2, "optionIds": [1]},
@@ -109,7 +112,7 @@ Sem imagens, envie `Content-Type: application/json`:
 ```
 
 Com imagens, use `multipart/form-data` com uma parte `response` do tipo
-`application/json`, contendo o mesmo JSON, e partes repetidas `files` contendo
+`application/json`, contendo somente `answers`, e partes repetidas `files` contendo
 os binários. Para responder uma pergunta de foto, inclua em `answers`:
 `{"questionId":3,"fileIndexes":[0,1]}`. Os índices começam em zero e se referem à
 ordem global das partes `files`; cada arquivo pertence a uma única pergunta.
@@ -126,12 +129,12 @@ Regras:
 - Escolha simples aceita uma opção; múltipla respeita a definição da pergunta.
 - Fotos respeitam `maxFiles` e `maxFileSizeMb` da pergunta. O servidor também limita cada arquivo a 50 MB e a requisição multipart a 151 MB.
 - Apenas JPEG e PNG decodificáveis, até 32 milhões de pixels. O servidor verifica os bytes; MIME/extensão declarados não bastam. A câmera mobile atual gera JPEG.
-- `locationConsent` precisa ser `true`; de 1 a 1440 leituras com latitude ±90, longitude ±180 e precisão entre 0 e 10000 metros.
-- Cada leitura precisa estar após a criação do formulário e no máximo 5 minutos no futuro, para tolerar diferença de relógio.
-- O envio registra GPS com ou sem unidade vinculada. A API não compara a posição com a unidade, não calcula distância nem exige uma leitura dos últimos 120 segundos.
-- A comparação de presença fica no front, usando as coordenadas retornadas pelos detalhes. Unidade sem coordenadas não impede o envio das respostas.
+- Não envie `locations` nem `locationConsent`: esses campos foram removidos do DTO. Não há validação de coordenadas, precisão, horários ou consentimento no envio.
+- A verificação do raio de 100 metros é feita no Android antes do início e a cada minuto durante o preenchimento. Nenhum registro de GPS é enviado à API.
+- Com `unitId` e `unitLocation: null`, o Android bloqueia o início e informa a indisponibilidade. Sem `unitId`, não há restrição de endereço.
+- O prazo não bloqueia a resposta: um formulário ainda PENDENTE pode ser respondido após `dueDate`.
 
-O servidor preserva perguntas/opções, grava respostas e GPS no mesmo documento,
+O servidor preserva perguntas/opções, grava as respostas no mesmo documento,
 define `respondido_em`, incrementa a versão e muda o status para `CONCLUIDO` em
 uma única operação condicional no Mongo. Os dados do formulário ficam protegidos
 contra edição e exclusão pelas rotas existentes. Sem endpoint de reenvio.
@@ -199,24 +202,24 @@ As coordenadas são obtidas de `unidade_endereco.geolocalizacao` da unidade vinc
 ao formulário salvo, dentro do workspace autorizado. Parâmetros adicionais ou
 coordenadas enviados pelo cliente não substituem essa referência. Sem unidade,
 sem coordenadas válidas ou sem vínculo nesse workspace, `unitLocation` é `null`.
-O front decide como tratar a ausência e como comparar a posição atual com a unidade.
+Com unidade vinculada e coordenadas ausentes, o Android bloqueia o início e informa
+a indisponibilidade. Sem unidade vinculada, não há restrição de endereço.
 
 Os detalhes de recebidos/respostas também mantêm o campo de política:
 
 ```json
 "locationPolicy": {
-  "captureRequired": true,
+  "captureRequired": false,
   "enforceUnitRadius": false,
   "radiusMeters": 100,
   "maxReadingAgeSeconds": null
 }
 ```
 
-`radiusMeters` é uma referência de 100 metros para o front quando há unidade;
-sem unidade, é `null`. `enforceUnitRadius: false` e `maxReadingAgeSeconds: null`
-indicam que o servidor não bloqueia por distância nem aplica o limite de 120 segundos.
-A captura, o consentimento e a validação do formato das leituras continuam no contrato
-de envio. O servidor não comprova presença física no local.
+`radiusMeters` é a referência de 100 metros quando há unidade; sem unidade, é `null`.
+`captureRequired: false` indica que não existe captura obrigatória para envio à API.
+`enforceUnitRadius: false` indica que a API não compara distância; essa regra é do Android,
+antes de iniciar e a cada minuto. `maxReadingAgeSeconds` é `null`.
 
 A consulta reutiliza `UnitRepository`, com `@Query` nativa e parâmetros nomeados,
 retornando `UnitLocationProjection`. Ela extrai X como longitude e Y como latitude;
@@ -225,16 +228,16 @@ A coluna `unidade_endereco.geolocalizacao POINT` precisa existir no banco de exe
 conforme o [schema oficial](https://github.com/Astro-Inter/banco-de-dados/blob/main/database/scripts/1_create_table.sql).
 Não há migração ou preenchimento automático de coordenadas.
 
-Novos envios não calculam nem gravam `validacao_localizacao`; `locationCheck` é `null`.
+Novos envios não recebem GPS nem calculam ou gravam `validacao_localizacao`; `locationCheck` é `null`.
 Registros históricos que já possuírem essa comparação continuam legíveis e preservados.
 As coordenadas de `unitLocation` refletem o cadastro atual, não o GPS informado pelo gestor.
 
 ## MongoDB e camadas
 
 Continua existindo apenas a collection `forms`; não são criadas collections de
-sequência, respostas, análises ou anexos. Campos novos: `id_envio` (UUID interno
-para recuperação), `consentimento_localizacao`, `localizacoes` e `analise`.
-Leituras usam `latitude`, `longitude`, `precisao_metros`, `registrado_em`.
+sequência, respostas, análises ou anexos. Novos envios usam `id_envio` (UUID interno para recuperação) e `analise`.
+Não gravam `consentimento_localizacao`, `localizacoes` nem `validacao_localizacao`.
+Dados históricos de GPS permanecem legíveis, sem migração destrutiva.
 O campo histórico `validacao_localizacao` é preservado na leitura, mas não é criado nos novos envios.
 Análise usa `status: APROVADO|REPROVADO`, `id_gestor_revisor`, `analisado_em`.
 **`analise.descricao` só existe em reprovação**; antes da análise, `analise` é ausente.
@@ -273,8 +276,9 @@ pois descrevem filtros e condições de gravação do acesso aos dados.
 `FORM_TEST_MONGODB_URI=mongodb://127.0.0.1:27029`, executa também os testes Mongo,
 que usam e removem exclusivamente uma base `forms_test_<uuid>`.
 
-Os testes cobrem Strategies, obrigatoriedade, registro de GPS com/sem unidade,
-envio distante e com leitura acima de 120 segundos, coordenadas nos detalhes,
+Os testes cobrem Strategies, obrigatoriedade, envio JSON e multipart sem GPS,
+401/403 nas novas rotas e comportamento legado, viewed individual, pendentes vencidos,
+concluídos/reprovados, coordenadas nos detalhes,
 coordenadas ausentes, isolamento do workspace, referências de arquivos,
 formato real das imagens, bucket configurado, assinatura local, Firebase/perfis,
 rotas literais, escopos, concorrência, imutabilidade e omissão da descrição aprovada.

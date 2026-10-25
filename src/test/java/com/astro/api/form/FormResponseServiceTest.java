@@ -1,10 +1,12 @@
 package com.astro.api.form;
 
 import com.astro.api.auth.security.*;
+import com.astro.api.common.service.ViewedService;
 import com.astro.api.common.exception.*;
 import com.astro.api.form.dto.internal.FormImage;
 import com.astro.api.form.dto.request.*;
 import com.astro.api.form.dto.response.FormResponseDetailsResponse;
+import com.astro.api.form.dto.response.FormReceivedPageResponse;
 import com.astro.api.form.mapper.*;
 import com.astro.api.form.model.*;
 import com.astro.api.form.repository.*;
@@ -36,6 +38,7 @@ class FormResponseServiceTest {
     UserRepository users;
     UnitRepository unitRepository;
     FormResponseService service;
+    ViewedService viewedService;
     Form form;
     final AuthenticatedUser recipient = new AuthenticatedUser("recipient", "recipient@example.test", Role.GESTOR);
     final AuthenticatedUser sender = new AuthenticatedUser("sender", "sender@example.test", Role.GESTOR);
@@ -44,6 +47,7 @@ class FormResponseServiceTest {
     @AfterAll static void closeFactory() { factory.close(); }
     @BeforeEach void setUp() {
         unitRepository = mock(UnitRepository.class);
+        viewedService = mock(ViewedService.class);
         repository = mock(FormRepository.class); storage = mock(FormImageStorageService.class); users = mock(UserRepository.class);
         when(users.findByFirebaseUid("recipient")).thenReturn(Optional.of(FormTestFixtures.manager(20, 1, UserType.GESTOR)));
         when(users.findByFirebaseUid("sender")).thenReturn(Optional.of(FormTestFixtures.manager(10, 1, UserType.GESTOR)));
@@ -51,14 +55,13 @@ class FormResponseServiceTest {
         service = new FormResponseService(repository, new FormAccessService(users),
                 new FormAnswerValidationService(List.of(new TextAnswerStrategy(), new DateAnswerStrategy(),
                         new OptionAnswerStrategy(), new PhotoAnswerStrategy()), factory.getValidator()),
-                new FormAnswerMapper(), new FormResponseMapper(new FormMapper()), storage, users, unitRepository, factory.getValidator(), new FormLocationService(unitRepository));
+                new FormAnswerMapper(), new FormResponseMapper(new FormMapper()), storage, users, unitRepository, factory.getValidator(), new FormLocationService(unitRepository), viewedService);
         form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.PENDING); form.setVersion(0L);
         form.getQuestions().getFirst().setType("texto"); form.getQuestions().getFirst().setRequired(true);
         when(repository.findById(eq(form.getId()), any(FormReadFilter.class))).thenReturn(Optional.of(form));
     }
     FormResponseRequest answer() {
-        return new FormResponseRequest(true, List.of(new FormLocationReadingRequest(-23.0, -46.0, 4.0, Instant.now())),
-                List.of(new FormQuestionAnswerRequest(1L, "Tudo certo", null, null, null, null)));
+        return new FormResponseRequest(List.of(new FormQuestionAnswerRequest(1L, "Tudo certo", null, null, null, null)));
     }
     void complete() { form.setStatus(FormStatus.COMPLETED); form.setRespondedAt(Instant.now()); }
     @Test void recipientSubmissionUsesOwnIdentityAndAnAtomicCondition() {
@@ -70,7 +73,7 @@ class FormResponseServiceTest {
         verify(repository).submitResponse(eq(form), condition.capture());
         assertEquals(new FormResponseCondition(form.getId(), 1L, 20L, 0L, FormStatus.PENDING), condition.getValue());
         assertEquals(List.of("Tudo certo"), form.getQuestions().getFirst().getAnswer());
-        assertEquals(true, form.getLocationConsent()); assertEquals(1, form.getLocations().size());
+        assertNull(form.getLocationConsent()); assertNull(form.getLocations());
         verifyNoInteractions(storage);
         assertThrows(ConflictException.class, () -> service.submit(form.getId(), answer(), List.of(), recipient));
     }
@@ -79,6 +82,7 @@ class FormResponseServiceTest {
         when(repository.findById(eq(form.getId()), any(FormReadFilter.class))).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class, () -> service.findReceivedById(form.getId(), owner));
         verify(repository).findById(form.getId(), new FormReadFilter(1L, null, 99L, List.of(FormStatus.PENDING, FormStatus.COMPLETED)));
+        verifyNoInteractions(viewedService);
     }
 
     @Test void receivedListUsesAuthenticatedScopeAndSupportsEmptyResults() {
@@ -86,6 +90,27 @@ class FormResponseServiceTest {
                 .thenReturn(new FormRepositoryCustom.Listing(List.of(), 0));
         assertTrue(service.findReceived(recipient, " inspeção ", 6, FormStatus.PENDING, 0, 20).items().isEmpty());
         assertThrows(BusinessException.class, () -> service.findReceived(recipient, null, null, FormStatus.DRAFT, 0, 20));
+    }
+
+    @Test void receivedListIncludesViewedAndCompletedRejectedFormsWithoutAStatusFilter() {
+        Form rejected = FormTestFixtures.form(2, 1, 10, 20, FormStatus.COMPLETED);
+        rejected.setReview(new FormReview(FormReviewStatus.REJECTED, 10L, Instant.now(), "Reprovado"));
+        when(repository.findReceived(any(), isNull(), isNull(), isNull(), eq(0), eq(20)))
+                .thenReturn(new FormRepositoryCustom.Listing(List.of(form, rejected), 2));
+        when(viewedService.findViewed(20L, "forms", List.of(form.getId(), rejected.getId())))
+                .thenReturn(Set.of(rejected.getId()));
+        FormReceivedPageResponse page = service.findReceived(recipient, null, null, null, 0, 20);
+        assertFalse(page.items().get(0).viewed()); assertTrue(page.items().get(1).viewed());
+        assertEquals(FormStatus.COMPLETED, page.items().get(1).status());
+        assertEquals("rejected", page.items().get(1).reviewStatus());
+        verify(viewedService, never()).markViewed(any(), any(), any());
+        assertFalse(service.findReceived(owner, null, null, null, 0, 20).items().get(1).viewed());
+    }
+
+    @Test void rejectedFormCannotBeSubmittedAgain() {
+        complete(); form.setReview(new FormReview(FormReviewStatus.REJECTED, 10L, Instant.now(), "Reprovado"));
+        assertThrows(ConflictException.class, () -> service.submit(form.getId(), answer(), List.of(), recipient));
+        verify(repository, never()).submitResponse(any(), any());
     }
 
     @Test void onlySenderOrWorkspaceManagerCanReviewAndDecisionIsFinal() {
@@ -121,8 +146,7 @@ class FormResponseServiceTest {
         FormImage image = new FormImage("id", "key", "photo.jpg", "image/jpeg", 100);
         when(storage.upload(any(), any(), any())).thenReturn(image);
         when(repository.submitResponse(any(), any())).thenReturn(Optional.empty());
-        FormResponseRequest response = new FormResponseRequest(true, answer().locations(),
-                List.of(new FormQuestionAnswerRequest(1L, null, null, null, null, List.of(0))));
+        FormResponseRequest response = new FormResponseRequest(List.of(new FormQuestionAnswerRequest(1L, null, null, null, null, List.of(0))));
         assertThrows(ConflictException.class, () -> service.submit(form.getId(), response,
                 List.of(new MockMultipartFile("files", new byte[]{1})), recipient));
         verify(storage).delete(image);
@@ -144,32 +168,32 @@ class FormResponseServiceTest {
         when(repository.submitResponse(any(), any())).thenThrow(new DataAccessResourceFailureException("Mongo unavailable"));
         when(repository.findById(eq(form.getId()), any(FormReadFilter.class)))
                 .thenReturn(Optional.of(form)).thenThrow(new DataAccessResourceFailureException("Mongo unavailable"));
-        FormResponseRequest response = new FormResponseRequest(true, answer().locations(),
-                List.of(new FormQuestionAnswerRequest(1L, null, null, null, null, List.of(0))));
+        FormResponseRequest response = new FormResponseRequest(List.of(new FormQuestionAnswerRequest(1L, null, null, null, null, List.of(0))));
         assertThrows(DataAccessResourceFailureException.class, () -> service.submit(form.getId(), response,
                 List.of(new MockMultipartFile("files", new byte[]{1})), recipient));
         verify(storage, never()).delete(any());
     }
 
-    @Test void submissionRecordsDistantAndOlderGpsWithoutDistanceValidation() {
+    @Test void pendingFormCanBeSubmittedAfterTheDueDateWithoutGps() {
+        form.setDueDate(Instant.now().minusSeconds(86400));
         form.setUnitId(3L);
         UnitLocationProjection unitLocation = mock(UnitLocationProjection.class);
         when(unitRepository.findLocationByIdAndWorkspaceId(3L, 1L)).thenReturn(Optional.of(unitLocation));
         when(unitLocation.getLatitude()).thenReturn(0.0); when(unitLocation.getLongitude()).thenReturn(0.0);
-        FormResponseRequest response = new FormResponseRequest(true,
-                List.of(new FormLocationReadingRequest(80.0, 170.0, 5.0, Instant.now().minusSeconds(600))), answer().answers());
+        FormResponseRequest response = new FormResponseRequest(answer().answers());
         when(repository.submitResponse(any(), any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         FormResponseDetailsResponse result = service.submit(form.getId(), response, List.of(), recipient);
         verify(repository).submitResponse(any(), any());
         assertEquals(FormStatus.COMPLETED, form.getStatus());
-        assertEquals(80.0, form.getLocations().getFirst().latitude());
+        assertNull(form.getLocations());
+        assertFalse(result.locationPolicy().captureRequired());
         assertFalse(result.locationPolicy().enforceUnitRadius());
         assertNull(result.locationPolicy().maxReadingAgeSeconds());
         assertEquals(0.0, result.form().unitLocation().latitude());
         assertNull(result.locationCheck()); assertNull(form.getLocationCheck());
     }
 
-    @Test void photoSubmissionAlsoAcceptsDistantGpsWithALinkedUnit() {
+    @Test void photoSubmissionDoesNotRequireGpsWithALinkedUnit() {
         form.setUnitId(3L); form.getQuestions().getFirst().setType("foto");
         UnitLocationProjection unitLocation = mock(UnitLocationProjection.class);
         when(unitRepository.findLocationByIdAndWorkspaceId(3L, 1L)).thenReturn(Optional.of(unitLocation));
@@ -177,8 +201,7 @@ class FormResponseServiceTest {
         FormImage image = new FormImage("image-id", "private-key", "photo.jpg", "image/jpeg", 100);
         when(storage.upload(any(), any(), any())).thenReturn(image);
         when(repository.submitResponse(any(), any())).thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
-        FormResponseRequest response = new FormResponseRequest(true, answer().locations(),
-                List.of(new FormQuestionAnswerRequest(1L, null, null, null, null, List.of(0))));
+        FormResponseRequest response = new FormResponseRequest(List.of(new FormQuestionAnswerRequest(1L, null, null, null, null, List.of(0))));
         FormResponseDetailsResponse result = service.submit(form.getId(), response,
                 List.of(new MockMultipartFile("files", new byte[]{1})), recipient);
         verify(storage).upload(eq(form.getId()), eq(1L), any()); verify(storage, never()).delete(any());
@@ -204,6 +227,7 @@ class FormResponseServiceTest {
         assertEquals(-46.6, result.form().unitLocation().longitude());
         assertFalse(result.locationPolicy().enforceUnitRadius());
         verify(repository, never()).submitResponse(any(), any());
+        verify(viewedService).markViewed(20L, "forms", form.getId());
     }
 
     @Test void imageMustBelongToTheAuthorizedForm() {

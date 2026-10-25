@@ -16,12 +16,12 @@ public class FormResponseMapper {
         this.formMapper = formMapper;
     }
 
-    public FormReceivedPageResponse toPage(List<Form> forms, int page, int size, long total) {
+    public FormReceivedPageResponse toPage(List<Form> forms, int page, int size, long total, Set<String> viewedFormIds) {
         return new FormReceivedPageResponse(forms.stream().map(form -> new FormReceivedPageResponse.Item(
                 form.getId(), form.getTitle(), form.getDescription(), form.getNrCode(), form.getUnitId(),
                 form.getSenderManagerId(), form.getDueDate() == null ? null : form.getDueDate().atZone(FormMapper.FORM_ZONE).toLocalDate(),
                 form.getCreatedAt(), form.getRespondedAt(), form.getQuestions() == null ? 0 : form.getQuestions().size(),
-                form.getStatus(), reviewStatus(form))).toList(), page, size, total, (total + size - 1) / size);
+                form.getStatus(), reviewStatus(form), viewedFormIds.contains(form.getId()))).toList(), page, size, total, (total + size - 1) / size);
     }
 
     public FormResponseDetailsResponse toDetails(Form form, String senderName, String recipientName,

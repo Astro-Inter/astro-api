@@ -7,8 +7,8 @@ import com.astro.api.common.storage.R2StorageService.PresignedDownload;
 import com.astro.api.conformity.repository.NrCatalogRepository;
 import com.astro.api.form.controller.FormController;
 import com.astro.api.form.controller.FormResponseController;
+import com.astro.api.common.service.ViewedService;
 import com.astro.api.form.dto.internal.FormImage;
-import com.astro.api.form.dto.request.FormLocationReadingRequest;
 import com.astro.api.form.dto.request.FormQuestionAnswerRequest;
 import com.astro.api.form.dto.request.FormResponseRequest;
 import com.astro.api.form.mapper.FormAnswerMapper;
@@ -42,6 +42,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.Date;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -414,7 +415,8 @@ class FormRepositoryMongoTest {
         form.setLocationCheck(new FormLocationCheck(3L, -23.5, -46.6, 100, 0.0, reading));
         form.setLocations(List.of(reading)); form.setRespondedAt(respondedAt); form.setStatus(FormStatus.COMPLETED);
         form.getQuestions().getFirst().setAnswer(List.of("No local"));
-        Form saved = repository.submitResponse(form, new FormResponseCondition(form.getId(), 1L, 20L, 0L, FormStatus.PENDING)).orElseThrow();
+        mongo.save(form);
+        Form saved = repository.findById(form.getId()).orElseThrow();
         assertEquals(0.0, saved.getLocationCheck().distanceMeters()); assertEquals(3L, saved.getLocationCheck().unitId());
         Document raw = mongo.getCollection("forms").find(new Document("_id", form.getId())).first(); assertNotNull(raw);
         Document check = raw.get("validacao_localizacao", Document.class);
@@ -428,10 +430,12 @@ class FormRepositoryMongoTest {
     @Test void recipientListingExcludesDraftsOtherRecipientsAndWorkspaces() {
         Form pending = form(1, 1, 10, 20, FormStatus.PENDING); pending.setNrCode(6); mongo.insert(pending);
         Form completed = form(2, 1, 10, 20, FormStatus.COMPLETED); completed.setNrCode(6); mongo.insert(completed);
+        Form rejected = form(6, 1, 10, 20, FormStatus.COMPLETED); rejected.setNrCode(6);
+        rejected.setReview(new FormReview(FormReviewStatus.REJECTED, 10L, Instant.now(), "Reprovado")); mongo.insert(rejected);
         mongo.insert(form(3, 1, 10, 20, FormStatus.DRAFT));
         mongo.insert(form(4, 1, 20, 10, FormStatus.PENDING));
         mongo.insert(form(5, 2, 10, 20, FormStatus.PENDING));
-        assertEquals(2, repository.findReceived(formAccessService.recipientFilter(new FormScope(20L, 1L, false)), "Clima", 6, null, 0, 20).total());
+        assertEquals(3, repository.findReceived(formAccessService.recipientFilter(new FormScope(20L, 1L, false)), "Clima", 6, null, 0, 20).total());
         assertEquals(1, repository.findReceived(formAccessService.recipientFilter(new FormScope(20L, 1L, false)), null, 6, FormStatus.PENDING, 0, 20).total());
         assertTrue(repository.findReceived(formAccessService.recipientFilter(new FormScope(99L, 1L, true)), null, null, null, 0, 20).forms().isEmpty());
         assertEquals(0, repository.findReceived(formAccessService.recipientFilter(new FormScope(20L, 1L, false)), ".*", null, null, 0, 20).total());
@@ -460,8 +464,8 @@ class FormRepositoryMongoTest {
         assertEquals(List.of("Resposta única"), completed.getQuestions().getFirst().getAnswer());
         Document raw = mongo.getCollection("forms").find(new Document("_id", pending.getId())).first(); assertNotNull(raw);
         assertEquals("CONCLUIDO", raw.getString("status")); assertEquals(1, raw.getInteger("versao"));
-        assertTrue(raw.getBoolean("consentimento_localizacao")); assertFalse(raw.containsKey("analise"));
-        assertTrue(raw.getList("localizacoes", Document.class).getFirst().containsKey("registrado_em"));
+        assertFalse(raw.containsKey("consentimento_localizacao")); assertFalse(raw.containsKey("analise"));
+        assertFalse(raw.containsKey("localizacoes"));
         assertFalse(repository.deleteIfUnanswered(formAccessService.writeCondition(completed, new FormScope(10L, 1L, false))));
         FormReview approved = new FormReview(FormReviewStatus.APPROVED, 10L, Instant.now(), null);
         assertTrue(repository.review(formAccessService.writeCondition(completed, new FormScope(20L, 1L, false)), approved).isEmpty());
@@ -506,6 +510,18 @@ class FormRepositoryMongoTest {
         when(users.findByFirebaseUid("recipient")).thenReturn(Optional.of(manager(20, 1, UserType.GESTOR)));
         when(users.findByFirebaseUid("owner")).thenReturn(Optional.of(manager(99, 1, UserType.GESTOR_WORKSPACE)));
         when(users.findByFirebaseUid("outsider")).thenReturn(Optional.of(manager(30, 2, UserType.GESTOR_WORKSPACE)));
+        ViewedService viewedService = mock(ViewedService.class);
+        Set<String> viewedKeys = new HashSet<>();
+        when(viewedService.findViewed(anyLong(), eq("forms"), anyCollection())).thenAnswer(invocation -> {
+            Long managerId = invocation.getArgument(0);
+            Collection<?> formIds = invocation.getArgument(2);
+            return formIds.stream().map(String::valueOf)
+                    .filter(formId -> viewedKeys.contains(managerId + ":" + formId)).collect(Collectors.toSet());
+        });
+        doAnswer(invocation -> {
+            viewedKeys.add(invocation.getArgument(0) + ":" + invocation.getArgument(2));
+            return null;
+        }).when(viewedService).markViewed(anyLong(), eq("forms"), any());
         FormImageStorageService storage = mock(FormImageStorageService.class);
         FormImage image = new FormImage("test-image", "formularios/private/image.png", "camera.png", "image/png", 80);
         when(storage.upload(any(), any(), any())).thenReturn(image);
@@ -520,7 +536,7 @@ class FormRepositoryMongoTest {
                             new OptionAnswerStrategy(), new PhotoAnswerStrategy()), factory.getValidator());
             FormResponseService service = new FormResponseService(repository,
                     new FormAccessService(users), validation, new FormAnswerMapper(),
-                    new FormResponseMapper(new FormMapper()), storage, users, units, factory.getValidator(), new FormLocationService(units));
+                    new FormResponseMapper(new FormMapper()), storage, users, units, factory.getValidator(), new FormLocationService(units), viewedService);
             MockMvc mvc = MockMvcBuilders
                     .standaloneSetup(new FormResponseController(service))
                     .setControllerAdvice(new GlobalExceptionHandler())
@@ -532,13 +548,15 @@ class FormRepositoryMongoTest {
             mvc.perform(get("/forms/received/" + pending.getId())).andExpect(status().isNotFound());
             authenticate("recipient", Role.GESTOR);
             mvc.perform(get("/forms/received").param("workspaceId", "999").param("managerId", "999"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].id").value(pending.getId()));
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].id").value(pending.getId()))
+                    .andExpect(jsonPath("$.data.items[0].viewed").value(false));
             mvc.perform(get("/forms/received/" + pending.getId())).andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.locationPolicy.enforceUnitRadius").value(false));
+                    .andExpect(jsonPath("$.data.locationPolicy.enforceUnitRadius").value(false))
+                    .andExpect(jsonPath("$.data.locationPolicy.captureRequired").value(false));
+            mvc.perform(get("/forms/received")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.items[0].viewed").value(true));
             mvc.perform(get(url + "/responses")).andExpect(status().isConflict());
-            FormResponseRequest request = new FormResponseRequest(true,
-                    List.of(new FormLocationReadingRequest(80.0, 170.0, 5.0, Instant.now())),
-                    List.of(new FormQuestionAnswerRequest(1L, "Condição segura", null, null, null, null),
+            FormResponseRequest request = new FormResponseRequest(List.of(new FormQuestionAnswerRequest(1L, "Condição segura", null, null, null, null),
                             new FormQuestionAnswerRequest(2L, null, List.of(1L), null, null, null),
                             new FormQuestionAnswerRequest(3L, null, null, null, null, List.of(0)),
                             new FormQuestionAnswerRequest(4L, null, null, null, LocalDate.of(2026, 10, 24), null)));
@@ -578,10 +596,19 @@ class FormRepositoryMongoTest {
             Document raw = mongo.getCollection("forms").find(new Document("_id", pending.getId())).first(); assertNotNull(raw);
             assertEquals("REPROVADO", raw.get("analise", Document.class).getString("status"));
             assertEquals("Foto ilegível", raw.get("analise", Document.class).getString("descricao"));
-            assertEquals(1, raw.getList("localizacoes", Document.class).size());
+            assertFalse(raw.containsKey("localizacoes"));
+            assertFalse(raw.containsKey("consentimento_localizacao"));
             assertEquals("formularios/private/image.png", raw.getList("perguntas", Document.class).get(2)
                     .getList("resposta", Document.class).getFirst().getString("chave_objeto"));
+            authenticate("recipient", Role.GESTOR);
+            mvc.perform(get("/forms/received")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.items[0].status").value("CONCLUIDO"))
+                    .andExpect(jsonPath("$.data.items[0].reviewStatus").value("rejected"))
+                    .andExpect(jsonPath("$.data.items[0].viewed").value(true));
+            mvc.perform(post(url + "/responses").contentType("application/json").content("{\"answers\":[]}"))
+                    .andExpect(status().isConflict());
             Form bound = form(2, 1, 10, 20, FormStatus.PENDING); bound.setUnitId(3L); bound.setVersion(0L);
+            bound.setDueDate(Instant.now().minusSeconds(86400));
             bound.getQuestions().getFirst().setType("texto"); bound.getQuestions().getFirst().setRequired(true);
             repository.insert(bound);
             UnitLocationProjection unitLocation = mock(UnitLocationProjection.class);
@@ -597,18 +624,20 @@ class FormRepositoryMongoTest {
                     .andExpect(jsonPath("$.data.locationPolicy.enforceUnitRadius").value(false))
                     .andExpect(jsonPath("$.data.locationPolicy.maxReadingAgeSeconds").isEmpty())
                     .andExpect(jsonPath("$.data.locationPolicy.radiusMeters").value(100));
-            String positionBody = "{\"locationConsent\":true,\"unitId\":999,\"workspaceId\":999,\"locations\":[{\"latitude\":80,\"longitude\":170,\"accuracyMeters\":5,\"recordedAt\":\"%s\"}],\"answers\":[{\"questionId\":1,\"text\":\"Fora do local\"}]}";
-            mvc.perform(post(boundUrl + "/responses").contentType("application/json")
-                    .content(positionBody.formatted(Instant.now().minusSeconds(600))))
+            mvc.perform(get("/forms/received")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.totalElements").value(2));
+            String answersBody = "{\"unitId\":999,\"workspaceId\":999,\"answers\":[{\"questionId\":1,\"text\":\"Após o prazo\"}]}";
+            mvc.perform(post(boundUrl + "/responses").contentType("application/json").content(answersBody))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.form.status").value("CONCLUIDO"))
-                    .andExpect(jsonPath("$.data.locations[0].latitude").value(80.0))
+                    .andExpect(jsonPath("$.data.locations").isEmpty())
                     .andExpect(jsonPath("$.data.locationCheck").isEmpty());
             verify(units, times(2)).findLocationByIdAndWorkspaceId(3L, 1L);
             verify(units, never()).findLocationByIdAndWorkspaceId(999L, 999L);
             assertNull(repository.findById(bound.getId()).orElseThrow().getLocationCheck());
             Document boundRaw = mongo.getCollection("forms").find(new Document("_id", bound.getId())).first();
             assertNotNull(boundRaw); assertFalse(boundRaw.containsKey("validacao_localizacao"));
+            assertFalse(boundRaw.containsKey("localizacoes")); assertFalse(boundRaw.containsKey("consentimento_localizacao"));
             verify(storage, times(1)).upload(any(), any(), any()); verify(storage, never()).delete(any());
         } finally { SecurityContextHolder.clearContext(); }
     }

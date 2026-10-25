@@ -7,7 +7,6 @@ import com.astro.api.form.strategy.answer.FormAnswerStrategy;
 import jakarta.validation.Validator;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import java.time.Instant;
 import java.util.*;
 
 @Service
@@ -21,18 +20,10 @@ public class FormAnswerValidationService {
         for (FormAnswerStrategy strategy : strategies) answerStrategies.put(strategy.supportedType(), strategy);
     }
 
-    public Map<Long, List<Object>> validate(Form form, FormResponseRequest request, List<MultipartFile> files, Instant now) {
+    public Map<Long, List<Object>> validate(Form form, FormResponseRequest request, List<MultipartFile> files) {
         if (request == null) throw new BusinessException("Informe as respostas do formulário");
         List<String> violations = validator.validate(request).stream().map(value -> value.getMessage()).sorted().toList();
         if (!violations.isEmpty()) throw new BusinessException(String.join("; ", violations));
-        for (FormLocationReadingRequest location : request.locations()) {
-            if (!Double.isFinite(location.latitude()) || !Double.isFinite(location.longitude())
-                    || (location.accuracyMeters() != null && !Double.isFinite(location.accuracyMeters()))
-                    || location.recordedAt().isAfter(now.plusSeconds(300))
-                    || (form.getCreatedAt() != null && location.recordedAt().isBefore(form.getCreatedAt()))) {
-                throw new BusinessException("Registro de GPS inválido ou fora do período do formulário");
-            }
-        }
         Map<Long, FormQuestionAnswerRequest> suppliedAnswers = new HashMap<>();
         Set<Long> questionIds = new HashSet<>();
         for (Form.FormQuestion question : form.getQuestions()) questionIds.add(question.getId());

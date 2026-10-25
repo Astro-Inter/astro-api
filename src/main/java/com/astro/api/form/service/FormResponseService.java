@@ -1,6 +1,7 @@
 package com.astro.api.form.service;
 
 import com.astro.api.auth.security.AuthenticatedUser;
+import com.astro.api.common.service.ViewedService;
 import com.astro.api.common.exception.*;
 import com.astro.api.common.storage.R2StorageService.PresignedDownload;
 import com.astro.api.form.dto.internal.FormImage;
@@ -28,6 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class FormResponseService {
+    private static final String FORMS_RESOURCE = "forms";
     private static final Logger LOGGER = LoggerFactory.getLogger(FormResponseService.class);
     private final FormRepository formRepository;
     private final FormAccessService formAccessService;
@@ -39,11 +41,12 @@ public class FormResponseService {
     private final UnitRepository unitRepository;
     private final Validator validator;
     private final FormLocationService formLocationService;
+    private final ViewedService viewedService;
 
     public FormResponseService(FormRepository formRepository, FormAccessService formAccessService,
             FormAnswerValidationService formAnswerValidationService, FormAnswerMapper formAnswerMapper,
             FormResponseMapper formResponseMapper, FormImageStorageService formImageStorageService,
-            UserRepository userRepository, UnitRepository unitRepository, Validator validator, FormLocationService formLocationService) {
+            UserRepository userRepository, UnitRepository unitRepository, Validator validator, FormLocationService formLocationService, ViewedService viewedService) {
         this.formRepository = formRepository;
         this.formAccessService = formAccessService;
         this.formAnswerValidationService = formAnswerValidationService;
@@ -54,6 +57,7 @@ public class FormResponseService {
         this.unitRepository = unitRepository;
         this.validator = validator;
         this.formLocationService = formLocationService;
+        this.viewedService = viewedService;
     }
 
     public FormReceivedPageResponse findReceived(AuthenticatedUser principal, String search, Integer nrCode,
@@ -65,13 +69,18 @@ public class FormResponseService {
         }
         FormRepositoryCustom.Listing listing = formRepository.findReceived(formAccessService.recipientFilter(scope),
                 search == null ? null : search.strip(), nrCode, status, page, size);
-        return formResponseMapper.toPage(listing.forms(), page, size, listing.total());
+        List<String> formIds = listing.forms().stream().map(Form::getId).toList();
+        Set<String> viewedFormIds = formIds.isEmpty() ? Set.of()
+                : viewedService.findViewed(scope.managerId(), FORMS_RESOURCE, formIds);
+        return formResponseMapper.toPage(listing.forms(), page, size, listing.total(), viewedFormIds);
     }
 
     public FormResponseDetailsResponse findReceivedById(String formId, AuthenticatedUser principal) {
         FormScope scope = formAccessService.requireManager(principal);
         Form form = requireForm(formId, formAccessService.recipientFilter(scope));
-        return details(form, scope);
+        FormResponseDetailsResponse response = details(form, scope);
+        viewedService.markViewed(scope.managerId(), FORMS_RESOURCE, form.getId());
+        return response;
     }
 
     public FormResponseDetailsResponse submit(String formId, FormResponseRequest request, List<MultipartFile> files,
@@ -84,7 +93,7 @@ public class FormResponseService {
         }
         List<MultipartFile> submittedFiles = files == null ? List.of() : files;
         Instant respondedAt = Instant.now().truncatedTo(ChronoUnit.MILLIS);
-        Map<Long, List<Object>> answers = formAnswerValidationService.validate(form, request, submittedFiles, respondedAt);
+        Map<Long, List<Object>> answers = formAnswerValidationService.validate(form, request, submittedFiles);
         FormResponseCondition responseCondition = new FormResponseCondition(form.getId(), scope.workspaceId(),
                 scope.managerId(), form.getVersion(), form.getStatus());
         Map<Integer, FormImage> uploadedImages = new LinkedHashMap<>();
@@ -100,7 +109,7 @@ public class FormResponseService {
                     }
                 }
             }
-            formAnswerMapper.applyAnswers(form, request, answers, uploadedImages);
+            formAnswerMapper.applyAnswers(form, answers, uploadedImages);
             form.setRespondedAt(respondedAt);
             form.setSubmissionId(submissionId);
             form.setStatus(FormStatus.COMPLETED);

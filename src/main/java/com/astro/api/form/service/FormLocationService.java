@@ -17,7 +17,7 @@ public class FormLocationService {
     }
 
     public FormLocationPolicy policy(Form form) {
-        return new FormLocationPolicy(true, false, form.getUnitId() == null ? null : UNIT_RADIUS_METERS, null);
+        return new FormLocationPolicy(false, false, form.getUnitId() == null ? null : UNIT_RADIUS_METERS, null);
     }
 
     @Transactional(readOnly = true)

@@ -2,14 +2,13 @@ package com.astro.api.form.mapper;
 
 import com.astro.api.form.dto.internal.FormImage;
 import com.astro.api.form.dto.internal.FormOtherAnswer;
-import com.astro.api.form.dto.request.FormResponseRequest;
 import com.astro.api.form.model.*;
 import java.util.*;
 import org.springframework.stereotype.Component;
 
 @Component
 public class FormAnswerMapper {
-    public void applyAnswers(Form form, FormResponseRequest request, Map<Long, List<Object>> answers,
+    public void applyAnswers(Form form, Map<Long, List<Object>> answers,
                              Map<Integer, FormImage> images) {
         for (Form.FormQuestion question : form.getQuestions()) {
             List<Object> normalized = answers.get(question.getId());
@@ -19,9 +18,7 @@ public class FormAnswerMapper {
                 question.setAnswer(normalized.stream().map(this::toStoredAnswer).toList());
             }
         }
-        form.setLocationConsent(request.locationConsent());
-        form.setLocations(request.locations().stream().map(location -> new FormLocationReading(location.latitude(),
-                location.longitude(), location.accuracyMeters(), location.recordedAt())).toList());
+
     }
 
     private Object toStoredAnswer(Object value) {

@@ -69,7 +69,8 @@ As perguntas de foto têm `maxFiles` e `maxFileSizeMb`.
 Os detalhes também incluem `unitLocation: {"latitude": -23.5, "longitude": -46.6}`,
 obtido da unidade vinculada no mesmo workspace. Sem unidade ou coordenadas válidas,
 `unitLocation` é `null`. O front usa esses dados para verificar a presença;
-o envio das respostas não bloqueia por distância. Consulte [respostas e análise](forms-responses.md).
+o envio das respostas não recebe GPS. Com unidade sem coordenadas, o mobile bloqueia
+o início; sem unidade, não há restrição de endereço. Consulte [respostas e análise](forms-responses.md).
 
 ## Criação e rascunhos
 

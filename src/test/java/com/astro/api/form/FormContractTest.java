@@ -3,6 +3,9 @@ package com.astro.api.form;
 import com.astro.api.form.dto.request.FormOptionRequest;
 import com.astro.api.form.dto.request.FormQuestionDefinitionRequest;
 import com.astro.api.form.dto.request.FormRequest;
+import com.astro.api.form.dto.request.FormResponseRequest;
+import com.astro.api.form.dto.request.FormQuestionAnswerRequest;
+import com.astro.api.form.dto.request.FormReviewRequest;
 import com.astro.api.form.mapper.FormMapper;
 import com.astro.api.form.model.Form;
 import com.astro.api.form.model.FormQuestionType;
@@ -97,7 +100,7 @@ class FormContractTest {
             messages.load(new InputStreamReader(source, StandardCharsets.UTF_8));
         }
         try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
-            for (Class<?> type : new Class<?>[]{FormRequest.class, FormQuestionDefinitionRequest.class, FormOptionRequest.class}) {
+            for (Class<?> type : new Class<?>[]{FormRequest.class, FormQuestionDefinitionRequest.class, FormOptionRequest.class, FormResponseRequest.class, FormQuestionAnswerRequest.class, FormReviewRequest.class}) {
                 for (PropertyDescriptor property : factory.getValidator().getConstraintsForClass(type).getConstrainedProperties()) {
                     assertMessages(property, messages);
                 }

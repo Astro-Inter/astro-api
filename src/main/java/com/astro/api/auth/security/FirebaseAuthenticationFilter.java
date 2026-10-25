@@ -42,32 +42,29 @@ public class FirebaseAuthenticationFilter extends OncePerRequestFilter {
 
         String idToken = authorization.substring(7);
 
+        FirebaseToken token;
         try {
-            FirebaseToken token = firebaseTokenService.verify(idToken);
-
-            Optional<Role> role = authorizationService.getRole(token.getUid());
-
-            if (role.isPresent()) {
-                AuthenticatedUser principal = new AuthenticatedUser(
-                    token.getUid(),
-                    token.getEmail(),
-                    role.get()
-                );
-
-                GrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + role.get().name());
-
-                Authentication authentication = new UsernamePasswordAuthenticationToken(
-                    principal,
-                    null,
-                    List.of(authority)
-                );
-
-                SecurityContextHolder
-                        .getContext()
-                        .setAuthentication(authentication);
-            }
+            token = firebaseTokenService.verify(idToken);
         } catch (FirebaseAuthException exception) {
             SecurityContextHolder.clearContext();
+            filterChain.doFilter(request, response);
+            return;
+        } catch (IllegalArgumentException exception) {
+            if (!FormResponseRequestMatcher.INSTANCE.matches(request)) {
+                throw exception;
+            }
+            SecurityContextHolder.clearContext();
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        Optional<Role> role = authorizationService.getRole(token.getUid());
+        if (role.isPresent() || FormResponseRequestMatcher.INSTANCE.matches(request)) {
+            AuthenticatedUser principal = new AuthenticatedUser(token.getUid(), token.getEmail(), role.orElse(null));
+            List<GrantedAuthority> authorities = role.isPresent()
+                    ? List.of(new SimpleGrantedAuthority("ROLE_" + role.get().name())) : List.of();
+            Authentication authentication = new UsernamePasswordAuthenticationToken(principal, null, authorities);
+            SecurityContextHolder.getContext().setAuthentication(authentication);
         }
 
         filterChain.doFilter(request, response);

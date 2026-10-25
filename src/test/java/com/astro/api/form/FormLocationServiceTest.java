@@ -49,13 +49,13 @@ class FormLocationServiceTest {
     @Test void formsWithoutUnitDoNotQueryTheUnitRepository() {
         form.setUnitId(null); clearInvocations(unitRepository);
         assertNull(formLocationService.findUnitLocation(form)); verifyNoInteractions(unitRepository);
-        assertTrue(formLocationService.policy(form).captureRequired());
+        assertFalse(formLocationService.policy(form).captureRequired());
         assertFalse(formLocationService.policy(form).enforceUnitRadius());
         assertNull(formLocationService.policy(form).radiusMeters());
     }
 
     @Test void exposesAReferenceRadiusWithoutServerEnforcementOrReadingAgeLimit() {
-        assertTrue(formLocationService.policy(form).captureRequired());
+        assertFalse(formLocationService.policy(form).captureRequired());
         assertFalse(formLocationService.policy(form).enforceUnitRadius());
         assertEquals(100, formLocationService.policy(form).radiusMeters());
         assertNull(formLocationService.policy(form).maxReadingAgeSeconds());

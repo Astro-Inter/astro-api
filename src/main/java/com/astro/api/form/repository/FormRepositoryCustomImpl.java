@@ -118,11 +118,9 @@ public class FormRepositoryCustomImpl implements FormRepositoryCustom {
                 Criteria.where("respondido_em").is(null), Criteria.where("analise").is(null),
                 Criteria.where("perguntas").not().elemMatch(Criteria.where("resposta.0").exists(true))));
         Update update = new Update().set("questions", form.getQuestions()).set("submissionId", form.getSubmissionId())
-                .set("locationConsent", form.getLocationConsent()).set("locations", form.getLocations())
                 .set("respondedAt", form.getRespondedAt()).set("updatedAt", form.getRespondedAt())
                 .set("status", form.getStatus())
                 .set("version", condition.expectedVersion() == null ? 1L : condition.expectedVersion() + 1);
-        if (form.getLocationCheck() != null) update.set("locationCheck", form.getLocationCheck());
         return Optional.ofNullable(mongoTemplate.findAndModify(query, update,
                 FindAndModifyOptions.options().returnNew(true), Form.class));
     }
