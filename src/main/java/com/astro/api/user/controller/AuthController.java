@@ -28,7 +28,7 @@ public class AuthController {
     }
 
     @PostMapping("verify-email")
-    @Operation(summary = "Verifica o e-mail de um usuário", description = "Identifica o usuário correspondente ao e-mail informado e retorna seu tipo e status.")
+    @Operation(summary = "Verifica o e-mail de um usuário", description = "Retorna o tipo e o status pelo e-mail. Para administradores, retorna ADMIN e status nulo.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Usuário identificado com sucesso"),
             @ApiResponse(responseCode = "404", description = "Usuário não encontrado")

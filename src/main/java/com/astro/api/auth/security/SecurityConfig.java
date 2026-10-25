@@ -56,6 +56,10 @@ public class SecurityConfig {
                                 "Não autenticado", "Envie um token Firebase válido");
                         return;
                     }
+                    if (request.getRequestURI().startsWith("/admin/nrs/")) {
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        return;
+                    }
                     response.sendError(isUnauthorizedRoute(request.getRequestURI())
                             ? HttpServletResponse.SC_UNAUTHORIZED : HttpServletResponse.SC_FORBIDDEN);
                 })
@@ -75,7 +79,7 @@ public class SecurityConfig {
     }
 
     private static boolean isUnauthorizedRoute(String requestUri) {
-        return requestUri.equals("/events") || requestUri.startsWith("/events/")
+        return requestUri.startsWith("/admin/nrs/") || requestUri.equals("/events") || requestUri.startsWith("/events/")
                 || requestUri.equals("/workspace") || requestUri.startsWith("/workspace/")
                 || requestUri.equals("/units") || requestUri.startsWith("/units/")
                 || requestUri.equals("/chats") || requestUri.startsWith("/chats/");

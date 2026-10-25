@@ -12,6 +12,7 @@ import com.astro.api.user.model.User;
 import com.astro.api.user.model.WorkModel;
 import com.astro.api.user.repository.UserProfilePhotoRepository;
 import com.astro.api.user.repository.UserRepository;
+import com.astro.api.user.repository.AdminRepository;
 import com.astro.api.user.repository.UserNrValidityProjection;
 import com.astro.api.user.service.UserService;
 import com.astro.api.user.service.UserAvatarService;
@@ -47,7 +48,7 @@ class ProfileServiceTest {
         userProfilePhotoRepository = mock(UserProfilePhotoRepository.class);
         r2StorageService = mock(R2StorageService.class);
         avatars = mock(UserAvatarService.class);
-        userService = new UserService(userRepository, mock(org.springframework.data.redis.core.StringRedisTemplate.class),
+        userService = new UserService(userRepository, mock(AdminRepository.class), mock(org.springframework.data.redis.core.StringRedisTemplate.class),
                 nrDocumentRepository, userProfilePhotoRepository, new UserMapper(), r2StorageService, avatars);
     }
 
