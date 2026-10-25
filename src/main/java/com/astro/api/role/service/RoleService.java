@@ -85,18 +85,38 @@ public class RoleService {
             }
         }
         Set<Integer> availableCodes = findPersistedNrCodes(codes);
-        String unavailable = body.nrs().stream()
-                .filter(nr -> nr.active() && !availableCodes.contains(nr.nr()))
-                .map(RoleNrRequest::nr).sorted().map(String::valueOf)
-                .collect(Collectors.joining(", "));
-        if (!unavailable.isEmpty()) {
-            throw new BusinessException("NRs indisponíveis no catálogo: " + unavailable
-                    + ". Atualize a lista e tente novamente.");
+        List<RoleNrRequest> requestedNrs = body.nrs();
+
+        List<Integer> unavailableCodes = requestedNrs.stream()
+                .filter(RoleNrRequest::active)
+                .map(RoleNrRequest::nr)
+                .filter(code -> !availableCodes.contains(code))
+                .sorted()
+                .toList();
+
+        if (!unavailableCodes.isEmpty()) {
+            String unavailableCodesText = unavailableCodes.stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(", "));
+
+            String errorMessage = "NRs indisponíveis no catálogo: " + unavailableCodesText
+                    + ". Atualize a lista e tente novamente.";
+
+            throw new BusinessException(errorMessage);
         }
-        List<RoleNrRequest> changes = body.nrs().stream()
-                .filter(nr -> availableCodes.contains(nr.nr())).toList();
+
+        List<RoleNrRequest> changes = requestedNrs.stream()
+                .filter(nr -> availableCodes.contains(nr.nr()))
+                .toList();
+
         try {
-            managementRepository.updateNrs(body.firebaseUid(), roleId, objectMapper.writeValueAsString(changes));
+            String changesJson = objectMapper.writeValueAsString(changes);
+
+            managementRepository.updateNrs(
+                    body.firebaseUid(),
+                    roleId,
+                    changesJson
+            );
         } catch (JacksonException ex) {
             throw new IllegalStateException("Não foi possível serializar a lista de NRs", ex);
         }
