@@ -37,6 +37,8 @@ Os sucessos usam HTTP 200 e o envelope `success`, `message`, `data`, `errors`,
 `path` já existente. IDs de formulário/imagem são strings; IDs de gestores,
 perguntas e opções são numéricos. As rotas literais `/received` e `/recipients`
 têm precedência sobre `/forms/{id}`. IDs de formulário inválidos: 400.
+Envio com Content-Type não suportado nas novas rotas: 415 com ApiResult.
+Upload acima do limite da requisição: 413. Os status estão documentados no OpenAPI.
 
 ### Listagem de recebidos
 
@@ -288,3 +290,5 @@ imagens para o bucket real e não usa credenciais de produção.
 A integração `UnitRepositoryPostgresTest` usa `UNIT_TEST_JDBC_URL` em uma instância
 PostgreSQL local descartável. Ela cria a coluna POINT apenas no schema próprio do
 teste e verifica a ordem longitude/latitude, valores nulos e o isolamento do workspace.
+
+A revisão de organização e aderência à skill está em [forms-skill-review.md](forms-skill-review.md).

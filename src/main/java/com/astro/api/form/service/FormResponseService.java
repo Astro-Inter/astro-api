@@ -118,7 +118,6 @@ public class FormResponseService {
                             "O formulário foi alterado ou respondido; consulte novamente"));
         } catch (RuntimeException failure) {
             if (databaseWriteStarted && !(failure instanceof ConflictException)) {
-                // A lost Mongo acknowledgement does not prove failure. Never remove images from a possibly saved response.
                 Optional<Form> recovered = Optional.empty();
                 try {
                     recovered = formRepository.findById(form.getId(), formAccessService.recipientFilter(scope))

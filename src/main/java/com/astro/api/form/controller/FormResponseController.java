@@ -7,6 +7,8 @@ import com.astro.api.form.dto.response.*;
 import com.astro.api.form.model.FormStatus;
 import com.astro.api.form.service.FormResponseService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.beans.PropertyEditorSupport;
@@ -21,6 +23,14 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/forms")
 @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
+@ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Operação concluída no envelope ApiResult"),
+        @ApiResponse(responseCode = "400", description = "Identificador, parâmetros ou dados inválidos"),
+        @ApiResponse(responseCode = "401", description = "Token Firebase ausente ou inválido; envelope ApiResult"),
+        @ApiResponse(responseCode = "403", description = "Conta, unidade, perfil ou permissão sem acesso; envelope ApiResult"),
+        @ApiResponse(responseCode = "404", description = "Recurso inexistente ou fora do escopo autorizado"),
+        @ApiResponse(responseCode = "503", description = "Conexão com a persistência indisponível")
+})
 public class FormResponseController {
     private final FormResponseService formResponseService;
     public FormResponseController(FormResponseService formResponseService) {
@@ -57,6 +67,10 @@ public class FormResponseController {
                 formResponseService.findReceivedById(id, principal), request.getRequestURI()));
     }
 
+    @ApiResponses({
+            @ApiResponse(responseCode = "409", description = "Formulário já respondido, alterado ou não pendente"),
+            @ApiResponse(responseCode = "415", description = "Formato de conteúdo não suportado")
+    })
     @PostMapping(value = "/{id}/responses", consumes = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Envia resposta única definitiva sem imagens; localização é verificada somente no mobile")
     public ResponseEntity<ApiResult<FormResponseDetailsResponse>> submitJson(@PathVariable("id") String id,
@@ -65,6 +79,11 @@ public class FormResponseController {
         return submitted(id, response, List.of(), principal, request);
     }
 
+    @ApiResponses({
+            @ApiResponse(responseCode = "409", description = "Formulário já respondido, alterado ou não pendente"),
+            @ApiResponse(responseCode = "413", description = "Upload excede o tamanho permitido"),
+            @ApiResponse(responseCode = "415", description = "Formato de conteúdo não suportado")
+    })
     @PostMapping(value = "/{id}/responses", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Envia respostas e imagens JPEG/PNG; partes response (JSON) e files; sem envio de GPS")
     public ResponseEntity<ApiResult<FormResponseDetailsResponse>> submitMultipart(@PathVariable("id") String id,
@@ -80,6 +99,7 @@ public class FormResponseController {
                 formResponseService.submit(id, response, files, principal), request.getRequestURI()));
     }
 
+    @ApiResponse(responseCode = "409", description = "Formulário ainda não respondido")
     @GetMapping("/{id}/responses")
     @Operation(summary = "Consulta respostas e análise para participantes autorizados")
     public ResponseEntity<ApiResult<FormResponseDetailsResponse>> responses(@PathVariable("id") String id,
@@ -88,6 +108,7 @@ public class FormResponseController {
                 formResponseService.findResponses(id, principal), request.getRequestURI()));
     }
 
+    @ApiResponse(responseCode = "409", description = "Formulário não respondido, já analisado ou alterado")
     @PostMapping("/{id}/review")
     @Operation(summary = "Registra análise definitiva do remetente ou gestor do workspace: approved ou rejected")
     public ResponseEntity<ApiResult<FormResponseDetailsResponse>> review(@PathVariable("id") String id,

@@ -173,7 +173,6 @@ public class FormService {
     }
 
     private Instant now() {
-        // BSON dates preserve milliseconds; use that precision in the initial HTTP response too.
         return Instant.now().truncatedTo(ChronoUnit.MILLIS);
     }
 }

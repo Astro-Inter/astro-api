@@ -50,7 +50,6 @@ public class FormImageStorageService {
             s3Client.getObject().putObject(PutObjectRequest.builder().bucket(bucketName).key(objectKey)
                     .contentType(contentType).build(), RequestBody.fromBytes(bytes));
         } catch (RuntimeException failure) {
-            // A timeout can occur after R2 accepted the object; remove only this request's generated key.
             try { delete(image); } catch (RuntimeException cleanupFailure) { failure.addSuppressed(cleanupFailure); }
             throw failure;
         }

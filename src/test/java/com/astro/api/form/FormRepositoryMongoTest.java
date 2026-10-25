@@ -257,7 +257,6 @@ class FormRepositoryMongoTest {
             assertEquals(1, successful);
         }
         Form saved = repository.findById(formId(1), formAccessService.readFilter(scope)).orElseThrow(); assertEquals(1L, saved.getVersion());
-        // Simulate a mobile submission after the web loaded the current version.
         mongo.getCollection("forms").updateOne(new Document("_id", formId(1)),
                 new Document("$set", new Document("status", "CONCLUIDO")));
         assertTrue(repository.update(saved, formAccessService.writeCondition(saved, scope)).isEmpty());
@@ -375,7 +374,6 @@ class FormRepositoryMongoTest {
             authenticate("owner", Role.GESTOR_WORKSPACE);
             mvc.perform(put(url).contentType("application/json").content(json.writeValueAsString(FormTestFixtures.content(FormStatus.PENDING))))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.data.senderManagerId").value(10));
-            // Simulate the future mobile completion without adding response endpoints to this scope.
             mongo.getCollection("forms").updateOne(new Document("_id", id), new Document("$set",
                     new Document("status", "CONCLUIDO").append("perguntas.0.resposta", List.of("Resposta única"))));
             mvc.perform(delete(url)).andExpect(status().isConflict());

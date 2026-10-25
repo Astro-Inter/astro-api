@@ -76,6 +76,12 @@ class FormResponseSecurityTest {
                     .contentType("application/json").content("{}"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.errors[0]").value("answers: A lista de respostas é obrigatória"));
+            mvc.perform(post("/forms/" + id + "/responses").header("Authorization", "Bearer valid")
+                    .contentType("text/plain").content("invalid"))
+                    .andExpect(status().isUnsupportedMediaType())
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.message").value("Formato de conteúdo não suportado"))
+                    .andExpect(jsonPath("$.path").value("/forms/" + id + "/responses"));
             mvc.perform(post("/forms/" + id + "/review").header("Authorization", "Bearer valid")
                     .contentType("application/json").content("{\"status\":\"unknown\"}"))
                     .andExpect(status().isBadRequest());
