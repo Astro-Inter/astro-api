@@ -55,6 +55,15 @@ Uma lista vazia é permitida. Códigos devem ser inteiros positivos, sem repeti�
 e cada item exige `ativo` booleano. A procedure valida a existência dos códigos
 em `nr_catalogo` e executa a alteração em uma transação.
 
+Antes de chamar a procedure, a API consulta os códigos no catálogo relacional. Uma
+NR marcada que ainda não está nesse catálogo retorna 400 com os códigos
+indisponíveis e orientação para atualizar a lista, sem gravar parte do lote.
+Itens desmarcados que não existem mais no catálogo são ignorados, permitindo
+salvar uma lista de opções carregada antes de uma mudança de catálogo. Itens
+desmarcados existentes continuam sendo enviados para efetivar a desvinculação.
+Mesmo se a lista resultante ficar vazia, a procedure é chamada e mantém as
+validações de identidade, cargo e workspace.
+
 ## Banco e configuração
 
 Assinaturas e colunas conferidas nos arquivos `database/functions/10_...` a `13_...`,
@@ -63,8 +72,17 @@ do repositório `banco-de-dados`. Essas rotinas e a view precisam estar instalad
 no PostgreSQL conectado à aplicação; a API não as cria automaticamente.
 
 As funções de consulta retornam listas vazias para gestor/cargo sem acesso,
-conforme o SQL. Na lista de opções, apenas documentos com `usabilidade: "Colaborador"`
-são retornados, usando `_id` numérico, `descricao` do Mongo e comparação com `codigo_nr`.
+conforme o SQL. As opções novas combinam documentos com `usabilidade: "Colaborador"`
+do Mongo com os códigos realmente existentes em `nr_catalogo` no PostgreSQL.
+O `_id` numérico é comparado com `codigo_nr`, e a descrição continua vindo do Mongo.
+Um documento ainda não sincronizado com o catálogo relacional não é oferecido
+como nova opção. NRs já vinculadas ao cargo permanecem nas opções mesmo quando
+o documento deixa de ser oferecido pelo Mongo, usando a descrição da consulta SQL,
+para que o gestor possa desvinculá-las. A lista continua ordenada por código.
+
+Essa leitura não insere NRs nem altera a sincronização de catálogos. A publicação
+e sincronização de NRs mantém o fluxo próprio de revisão. A API não depende de
+um ajuste no frontend para evitar o envio de referências inexistentes ao banco.
 
 O modelo existente usa a collection `nrs`. A documentação do banco propõe
 `nr_catalogo` e a especificação também menciona `NRs`; o nome real não foi confirmado

@@ -4,6 +4,8 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.service.FirebaseIdentityService;
 import com.astro.api.common.exception.SpreadsheetImportException;
 import com.astro.api.conformity.repository.NrDocumentRepository;
+import com.astro.api.conformity.repository.NrCatalogRepository;
+import com.astro.api.role.mapper.RoleNrMapper;
 import com.astro.api.role.model.Role;
 import com.astro.api.role.repository.RoleManagementRepository;
 import com.astro.api.role.repository.RoleRepository;
@@ -52,7 +54,8 @@ class WorkspaceImportServiceTest {
     private final UnitSettingsService settings = new UnitSettingsService(access, units,
             mock(UnitAddressRepository.class), new UnitMapper(), new UnitResponseMapper(), unitService, users);
     private final RoleService roleService = new RoleService(roles, mock(RoleManagementRepository.class),
-            mock(NrDocumentRepository.class), JsonMapper.builder().build());
+            mock(NrDocumentRepository.class), mock(NrCatalogRepository.class),
+            new RoleNrMapper(), JsonMapper.builder().build());
     private final FirebaseIdentityService firebase = mock(FirebaseIdentityService.class);
     private final CollaboratorRepository repository = mock(CollaboratorRepository.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
