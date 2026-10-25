@@ -112,7 +112,7 @@ public class SpreadsheetImportService {
         List<CollaboratorImportRow> collaboratorRows = rows.stream().filter(row -> row != managerRow).toList();
         Set<String> emails = collaboratorRows.stream().map(CollaboratorImportRow::email)
                 .filter(this::notBlank).map(PersonalDataNormalizer::email).collect(Collectors.toSet());
-        Set<String> cpfs = collaboratorRows.stream().map(CollaboratorImportRow::cpf)
+        Set<String> cpfs = rows.stream().map(CollaboratorImportRow::cpf)
                 .filter(this::notBlank).map(PersonalDataNormalizer::cpfDigits).collect(Collectors.toSet());
         Set<String> existingEmails = emails.isEmpty() ? Set.of() : userRepository.findByEmailInIgnoreCase(emails).stream()
                 .map(User::getEmail)
@@ -130,6 +130,8 @@ public class SpreadsheetImportService {
         }
         List<User> validUsers = new ArrayList<>();
         List<SpreadsheetImportMessage> errors = new ArrayList<>();
+        validateManagerPersonalData(managerRow, existingCpfs, errors);
+
         for (CollaboratorImportRow row : collaboratorRows) {
             CollaboratorImportData data = collaboratorMapper.toRegistrationData(row);
             String normalizedEmail = data.email();
@@ -153,6 +155,24 @@ public class SpreadsheetImportService {
             validUsers.add(user);
         }
         return new ImportProcessingResult(validUsers, errors);
+    }
+
+    private void validateManagerPersonalData(CollaboratorImportRow row, Set<String> existingCpfs,
+                                             List<SpreadsheetImportMessage> errors) {
+        CollaboratorImportData data = collaboratorMapper.toRegistrationData(row);
+
+        if (notBlank(row.cpf())) {
+            Optional<SpreadsheetImportMessage> cpfError = spreadsheetValidator.validateCpfForRegistration(data, row.number());
+            if (cpfError.isPresent()) {
+                errors.add(cpfError.get());
+            } else if (existingCpfs.contains(data.cpf())) {
+                error(errors, row, "cpf", "CPF já cadastrado");
+            }
+        }
+
+        if (notBlank(row.workModel()) && data.workModel() == null) {
+            error(errors, row, "modalidade", "Modalidade inválida");
+        }
     }
 
     private void error(List<SpreadsheetImportMessage> errors, CollaboratorImportRow row, String field, String message) { errors.add(new SpreadsheetImportMessage(row.number(), field, message)); }
