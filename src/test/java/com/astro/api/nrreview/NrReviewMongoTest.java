@@ -109,7 +109,6 @@ class NrReviewMongoTest {
     }
     @Test void failureAfterCatalogWriteRollsBackBothCollections() {
         NrSnapshot candidate = service.get(20, true);
-        // Fail only delete commands in this disposable database, after replaceOne succeeds.
         client.getDatabase("admin").runCommand(new Document("configureFailPoint", "failCommand")
                 .append("mode", new Document("times", 1)).append("data", new Document("failCommands", List.of("delete"))
                         .append("errorCode", 2).append("namespace", DATABASE + ".nrs_pendentes")));

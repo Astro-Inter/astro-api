@@ -50,7 +50,6 @@ public class SecurityConfig {
             )
             .exceptionHandling(errors -> errors.authenticationEntryPoint((request, response, exception) -> {
                 if (request.getRequestURI().startsWith("/admin/nrs/")) {
-                    // Avoid ERROR dispatch replacing 401 with 403 in the servlet container.
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 } else {
                     response.sendError(isUnauthorizedRoute(request.getRequestURI())

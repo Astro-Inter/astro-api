@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
-/** Field names preserve the existing Mongo-shaped HTTP contract consumed by the WEB. */
 public record NrContent(
         @NotBlank(message = "{nrReview.name.required}")
         @Size(max = 300, message = "{nrReview.name.size}") String nome,
