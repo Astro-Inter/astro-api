@@ -2,8 +2,9 @@ package com.astro.api.nrreview.dto;
 
 import java.util.Map;
 
-public record NrApprovalResult(Map<String, Object> document, String revision, String approvedRevision, boolean sqlSynchronized) {
-    public static NrApprovalResult from(NrSnapshot snapshot, boolean synchronizedSql) {
-        return new NrApprovalResult(snapshot.document(), snapshot.revision(), snapshot.approvedRevision(), synchronizedSql);
-    }
-}
+public record NrApprovalResult(
+        Map<String, Object> document,
+        String revision,
+        String approvedRevision,
+        boolean sqlSynchronized
+) {}

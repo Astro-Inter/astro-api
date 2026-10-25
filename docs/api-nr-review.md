@@ -27,26 +27,27 @@ As coleções padrão são `nrs` e `nrs_pendentes`. Podem ser configuradas por `
 
 ## Sincronização SQL
 
-Após o commit MongoDB, o backend executa `CALL ler_json_nr(CAST(? AS text))` usando parâmetro preparado com um array JSON da NR aprovada: `id`, `nome`, `revogada`, `tempo_reciclagem_mes`. A procedure oficial faz upsert somente dessa NR. Deve existir no banco, com permissão de execução e chave única em `nr_catalogo.codigo_nr`.
+Após o commit MongoDB, o backend chama a procedure existente `ler_json_nr` pela API de procedures do JPA com um array JSON da NR aprovada: `id`, `nome`, `revogada`, `tempo_reciclagem_mes`. A procedure oficial faz upsert somente dessa NR. Deve existir no banco, com permissão de execução e chave única em `nr_catalogo.codigo_nr`.
 
 O retorno acrescenta `sqlSynchronized`. Em falha SQL, a aprovação permanece concluída, o job persiste e esse campo vale false. O agendador repete a cada 30 segundos, configurável por `astro.nr-review.sql-sync-delay-ms`. O job só é removido após commit SQL. O WEB explica que não é necessário aprovar outra vez.
 
-Não existe transação distribuída entre MongoDB e PostgreSQL. Cada tentativa usa bloqueio `pg_advisory_xact_lock(619, nrId)` e lê a versão publicada atual após obter o bloqueio. A transação SQL tem limite de 10 segundos; repetições são idempotentes e removem somente o próprio job. Leituras, conflitos e rollback MongoDB não chamam a procedure.
+Não existe transação distribuída entre MongoDB e PostgreSQL. Cada tentativa obtém um bloqueio por NR pela API de chamadas de funções do Spring e lê a versão publicada atual após obter o bloqueio. A transação SQL tem limite de 10 segundos; repetições são idempotentes e removem somente o próprio job. Leituras, conflitos e rollback MongoDB não chamam a procedure.
 
 O sincronizador diário existente continua independente. Não existe endpoint para disparar a procedure separadamente.
 
 ## Validação
 
-`NrReviewSecurityTest` cobre todos os endpoints com ADMIN, outros perfis, ausência e token inválido, além de payloads inválidos. `NrReviewMongoTest` cobre publicação, correção, conflitos, repetição, validação e rollback. `NrSqlCatalogIntegrationTest` usa a procedure oficial em schema e banco descartáveis para testar correções, falha SQL, repetição, preservação de outras NRs e leitura da versão mais recente.
+`NrReviewSecurityTest` cobre todos os endpoints com ADMIN, outros perfis, ausência e token inválido, além de payloads inválidos. `NrReviewMongoTest` cobre publicação, correção, conflitos, repetição, validação e rollback. `NrReviewServiceTest` verifica a busca em lote das versões publicadas. `NrSqlCatalogSynchronizerTest` cobre a leitura da versão atual após o bloqueio, falhas, repetição e remoção do job somente após sincronização. As dependências de sincronização são simuladas; os testes não criam tabelas nem procedures e não contêm comandos SQL.
 
 Os testes de escrita exigem explicitamente bancos locais isolados:
 
 ```powershell
 $env:NR_TEST_MONGODB_URI='mongodb://127.0.0.1:27019/?replicaSet=astroLocal'
-$env:NR_TEST_POSTGRES_URL='jdbc:postgresql://127.0.0.1:5439/astro_nr_local'
-mvn "-Dtest=NrReviewMongoTest,NrReviewSecurityTest,NrSqlCatalogIntegrationTest" test
+mvn "-Dtest=NrReviewMongoTest,NrReviewSecurityTest,NrReviewServiceTest,NrSqlCatalogSynchronizerTest" test
 ```
 
-Os bancos de teste precisam estar iniciados. PostgreSQL usa a identidade local de teste declarada na fixture; os schemas têm prefixo `nr_sql_test_` e são removidos ao terminar. O teste MongoDB remove apenas seu banco descartável com prefixo validado. O teste de rollback requer failpoint habilitado no mongod isolado (`enableTestCommands=1`); esse parâmetro não deve ser usado em bancos compartilhados. Sem essas variáveis, os testes de integração locais ficam desabilitados; os testes de segurança continuam executando.
+O MongoDB isolado de teste precisa estar iniciado. O teste MongoDB remove apenas seu banco descartável com prefixo validado. O teste de rollback requer failpoint habilitado no mongod isolado (`enableTestCommands=1`); esse parâmetro não deve ser usado em bancos compartilhados. Sem essas variáveis, os testes de integração locais ficam desabilitados; os testes de segurança continuam executando.
 
-As configurações locais de execução e os arquivos `.env` não fazem parte desta alteração. Nenhuma migration ou procedure é instalada automaticamente no ambiente compartilhado.
+As configurações locais de execução e os arquivos `.env` não fazem parte desta alteração. A procedure deve existir previamente no banco. Esta alteração não inclui scripts SQL nem definições de procedures, inclusive nos testes.
+
+A listagem pendente carrega as versões publicadas em uma única consulta por lote, sem consultas dentro do loop. Repositórios concentram acesso aos bancos; mapper e validador concentram suas próprias responsabilidades. As mensagens de validação dos requests ficam em ValidationMessages.properties.

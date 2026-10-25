@@ -1,7 +1,16 @@
 package com.astro.api.nrreview;
 
-import com.astro.api.auth.security.*;
-import com.astro.api.auth.service.*;
+import static org.mockito.Mockito.*;
+
+import static org.mockito.ArgumentMatchers.anyString;
+import com.google.firebase.auth.FirebaseAuthException;
+import org.springframework.web.servlet.config.annotation.EnableWebMvc;
+
+import com.astro.api.auth.security.FirebaseAuthenticationFilter;
+import com.astro.api.auth.security.Role;
+import com.astro.api.auth.security.SecurityConfig;
+import com.astro.api.auth.service.AuthorizationService;
+import com.astro.api.auth.service.FirebaseTokenService;
 import com.astro.api.common.handler.GlobalExceptionHandler;
 import com.astro.api.config.CorsConfig;
 import com.astro.api.nrreview.controller.NrReviewController;
@@ -14,27 +23,28 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockServletContext;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.test.web.servlet.*;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
-import java.util.*;
-import static org.mockito.Mockito.*;
+import java.util.List;
+import java.util.Optional;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+
 class NrReviewSecurityTest {
     @Test void allEndpointsRequireValidatedAdminAndRejectMalformedWrites() throws Exception {
-        try (var context = new AnnotationConfigWebApplicationContext()) {
+        try (AnnotationConfigWebApplicationContext context = new AnnotationConfigWebApplicationContext()) {
             context.setServletContext(new MockServletContext()); context.register(Config.class); context.refresh();
             MockMvc mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(context.getBean("springSecurityFilterChain", Filter.class)).build();
-            var tokens = context.getBean(FirebaseTokenService.class);
-            var roles = context.getBean(AuthorizationService.class);
-            var service = context.getBean(NrReviewService.class);
+            FirebaseTokenService tokens = context.getBean(FirebaseTokenService.class);
+            AuthorizationService roles = context.getBean(AuthorizationService.class);
+            NrReviewService service = context.getBean(NrReviewService.class);
             mvc.perform(get("/admin/nrs/pendentes")).andExpect(status().isUnauthorized());
             mvc.perform(get("/admin/nrs/catalogo/20").header("Authorization", "invalid")).andExpect(status().isUnauthorized());
-            when(tokens.verify("invalid")).thenThrow(mock(com.google.firebase.auth.FirebaseAuthException.class));
+            when(tokens.verify("invalid")).thenThrow(mock(FirebaseAuthException.class));
             mvc.perform(get("/admin/nrs/pendentes").header("Authorization", "Bearer invalid")).andExpect(status().isUnauthorized());
-            var token = mock(FirebaseToken.class); when(token.getUid()).thenReturn("local-user"); when(tokens.verify("valid")).thenReturn(token);
+            FirebaseToken token = mock(FirebaseToken.class); when(token.getUid()).thenReturn("local-user"); when(tokens.verify("valid")).thenReturn(token);
             String content = "{\"nome\":\"Nome\",\"descricao\":\"Descrição\",\"objetivo\":\"Objetivo\",\"aplicabilidade\":\"Aplicabilidade\",\"usabilidade\":\"Empresa\",\"revogada\":false,\"tempo_reciclagem_meses\":12}";
             String revision = "a".repeat(64);
             String approval = "{\"revision\":\"" + revision + "\",\"approvedRevision\":\"absent\",\"corrections\":" + content + "}";
@@ -55,7 +65,7 @@ class NrReviewSecurityTest {
             verifyNoInteractions(service);
         }
     }
-    @Configuration @EnableWebSecurity @org.springframework.web.servlet.config.annotation.EnableWebMvc
+    @Configuration @EnableWebSecurity @EnableWebMvc
     @Import({SecurityConfig.class, CorsConfig.class, NrReviewController.class, GlobalExceptionHandler.class})
     static class Config {
         @Bean FirebaseTokenService firebaseTokenService() { return mock(FirebaseTokenService.class); }

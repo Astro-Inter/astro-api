@@ -1,63 +1,80 @@
 package com.astro.api.nrreview.service;
 
+import com.astro.api.nrreview.mapper.NrReviewMapper;
+import com.astro.api.nrreview.repository.NrReviewRepository;
+import com.astro.api.nrreview.repository.NrSqlCatalogRepository;
+import java.util.List;
 import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.transaction.PlatformTransactionManager;
-import java.util.List;
-import static com.mongodb.client.model.Filters.eq;
 
-/** Durable jobs are inserted by the same Mongo transaction that publishes an NR. */
 @Service
 public class NrSqlCatalogSynchronizer {
-    public static final String JOBS = "nr_catalog_sql_sync";
-    private static final Logger LOG = LoggerFactory.getLogger(NrSqlCatalogSynchronizer.class);
-    private final MongoTemplate mongo;
-    private final JdbcTemplate jdbc;
-    private final TransactionTemplate sql;
-    private final String catalog;
+    private static final Logger LOGGER = LoggerFactory.getLogger(NrSqlCatalogSynchronizer.class);
+    private static final int RETRY_BATCH_SIZE = 50;
 
-    public NrSqlCatalogSynchronizer(MongoTemplate mongo, JdbcTemplate jdbc, PlatformTransactionManager transactionManager,
-            @Value("${astro.mongodb.nr-collection:nrs}") String catalog) {
-        this.mongo = mongo; this.jdbc = jdbc; this.sql = new TransactionTemplate(transactionManager); this.catalog = catalog; this.sql.setTimeout(10);
+    private final NrReviewRepository nrReviewRepository;
+    private final NrSqlCatalogRepository nrSqlCatalogRepository;
+    private final NrReviewMapper nrReviewMapper;
+
+    public NrSqlCatalogSynchronizer(NrReviewRepository nrReviewRepository,
+            NrSqlCatalogRepository nrSqlCatalogRepository, NrReviewMapper nrReviewMapper) {
+        this.nrReviewRepository = nrReviewRepository;
+        this.nrSqlCatalogRepository = nrSqlCatalogRepository;
+        this.nrReviewMapper = nrReviewMapper;
     }
 
     public boolean synchronize(String jobId) {
         try {
-            Document job = mongo.getCollection(JOBS).find(eq("_id", jobId)).first();
-            if (job == null) return true;
-            int nrId = job.getInteger("nrId");
-            sql.executeWithoutResult(status -> {
-                // All API instances serialize SQL publication for this norm, then read the latest approved version.
-                jdbc.queryForList("SELECT pg_advisory_xact_lock(619, ?)", nrId);
-                Document approved = mongo.getCollection(catalog).find(eq("_id", nrId)).first();
-                if (approved == null) throw new IllegalStateException("NR publicada não encontrada para sincronização");
-                String payload = "[" + new Document("id", nrId).append("nome", approved.getString("nome"))
-                        .append("revogada", approved.getBoolean("revogada"))
-                        .append("tempo_reciclagem_mes", approved.get("tempo_reciclagem_meses")).toJson() + "]";
-                jdbc.update("CALL ler_json_nr(CAST(? AS text))", payload);
-            });
-            // Delete only this job after SQL commit. A concurrent approval owns a separate job.
-            mongo.getCollection(JOBS).deleteOne(eq("_id", jobId));
-            return true;
+            Document job = nrReviewRepository.findSqlSyncJob(jobId);
+            if (job == null) {
+                return true;
+            }
+            return synchronizeJob(job);
         } catch (RuntimeException exception) {
-            LOG.warn("Sincronização do catálogo SQL pendente para o job {} ({})", jobId, exception.getClass().getSimpleName());
+            logPending(jobId, exception);
             return false;
         }
     }
 
     @Scheduled(fixedDelayString = "${astro.nr-review.sql-sync-delay-ms:30000}")
     public void retryPending() {
-        try (var cursor = mongo.getCollection(JOBS).find().sort(new Document("createdAt", 1)).limit(50).iterator()) {
-            while (cursor.hasNext()) synchronize(cursor.next().getString("_id"));
+        try {
+            List<Document> jobs = nrReviewRepository.findPendingSqlSyncJobs(RETRY_BATCH_SIZE);
+            for (Document job : jobs) {
+                synchronizeJob(job);
+            }
         } catch (RuntimeException exception) {
-            LOG.warn("Não foi possível consultar a fila de sincronização de NRs ({})", exception.getClass().getSimpleName());
+            LOGGER.warn("Não foi possível consultar a fila de sincronização de NRs ({})",
+                    exception.getClass().getSimpleName());
         }
+    }
+
+    private boolean synchronizeJob(Document job) {
+        String jobId = job.getString("_id");
+        try {
+            int nrId = job.getInteger("nrId");
+            nrSqlCatalogRepository.synchronizeLocked(nrId, () -> latestPublishedPayload(nrId));
+            nrReviewRepository.deleteSqlSyncJob(jobId);
+            return true;
+        } catch (RuntimeException exception) {
+            logPending(jobId, exception);
+            return false;
+        }
+    }
+
+    private String latestPublishedPayload(int nrId) {
+        Document approved = nrReviewRepository.findById(nrId, false);
+        if (approved == null) {
+            throw new IllegalStateException("NR publicada não encontrada para sincronização");
+        }
+        return nrReviewMapper.toSqlPayload(nrId, approved);
+    }
+
+    private void logPending(String jobId, RuntimeException exception) {
+        LOGGER.warn("Sincronização do catálogo SQL pendente para o job {} ({})",
+                jobId, exception.getClass().getSimpleName());
     }
 }
