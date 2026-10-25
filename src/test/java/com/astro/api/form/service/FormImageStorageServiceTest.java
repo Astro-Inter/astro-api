@@ -3,7 +3,7 @@ package com.astro.api.form.service;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.storage.R2StorageService.PresignedDownload;
 import com.astro.api.config.R2Properties;
-import com.astro.api.form.model.FormImage;
+import com.astro.api.form.dto.internal.FormImage;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
@@ -38,6 +38,7 @@ class FormImageStorageServiceTest {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         ImageIO.write(new BufferedImage(2, 2, BufferedImage.TYPE_INT_RGB), "png", output); return output.toByteArray();
     }
+
     @Test void rejectsFakeAndTruncatedImagesBeforeUploading() {
         for (byte[] bytes : new byte[][] {"<html>not a photo</html>".getBytes(), new byte[]{(byte)0xff, (byte)0xd8, (byte)0xff}}) {
             assertThrows(BusinessException.class, () -> service.upload("form", 1L,
@@ -45,6 +46,7 @@ class FormImageStorageServiceTest {
         }
         verifyNoInteractions(client);
     }
+
     @Test void detectsRealFormatAndUsesDedicatedConfiguredBucketAndGeneratedKey() throws Exception {
         FormImage image = service.upload("form-id", 3L, new MockMultipartFile("files", "../../camera.png", "application/octet-stream", png()));
         assertEquals("image/png", image.contentType()); assertEquals("camera.png", image.name());
@@ -54,6 +56,7 @@ class FormImageStorageServiceTest {
         assertEquals("test-form-images", request.getValue().bucket());
         assertEquals("image/png", request.getValue().contentType());
     }
+
     @Test void cleansUpAnUploadWhoseOutcomeIsUncertain() throws Exception {
         when(client.putObject(any(PutObjectRequest.class), any(RequestBody.class))).thenThrow(new IllegalStateException("timeout"));
         assertThrows(IllegalStateException.class, () -> service.upload("form", 1L,
@@ -61,6 +64,7 @@ class FormImageStorageServiceTest {
         ArgumentCaptor<DeleteObjectRequest> deletion = ArgumentCaptor.forClass(DeleteObjectRequest.class);
         verify(client).deleteObject(deletion.capture()); assertEquals("test-form-images", deletion.getValue().bucket());
     }
+
     @Test void signsPrivateUrlsLocallyWithExpirationCappedAtFifteenMinutes() {
         try (S3Presigner presigner = S3Presigner.builder().endpointOverride(URI.create(properties.endpoint()))
                 .region(Region.of("auto"))

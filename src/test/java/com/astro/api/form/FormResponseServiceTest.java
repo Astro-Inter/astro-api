@@ -2,11 +2,15 @@ package com.astro.api.form;
 
 import com.astro.api.auth.security.*;
 import com.astro.api.common.exception.*;
+import com.astro.api.form.dto.internal.FormImage;
 import com.astro.api.form.dto.request.*;
 import com.astro.api.form.dto.response.FormResponseDetailsResponse;
 import com.astro.api.form.mapper.*;
 import com.astro.api.form.model.*;
 import com.astro.api.form.repository.*;
+import com.astro.api.form.repository.FormReadFilter;
+import com.astro.api.form.repository.FormResponseCondition;
+import com.astro.api.form.repository.FormWriteCondition;
 import com.astro.api.form.service.*;
 import com.astro.api.form.strategy.answer.*;
 import com.astro.api.unit.repository.UnitLocationProjection;
@@ -70,17 +74,20 @@ class FormResponseServiceTest {
         verifyNoInteractions(storage);
         assertThrows(ConflictException.class, () -> service.submit(form.getId(), answer(), List.of(), recipient));
     }
+
     @Test void recipientFilterHasNoWorkspaceManagerBypass() {
         when(repository.findById(eq(form.getId()), any(FormReadFilter.class))).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class, () -> service.findReceivedById(form.getId(), owner));
         verify(repository).findById(form.getId(), new FormReadFilter(1L, null, 99L, List.of(FormStatus.PENDING, FormStatus.COMPLETED)));
     }
+
     @Test void receivedListUsesAuthenticatedScopeAndSupportsEmptyResults() {
         when(repository.findReceived(new FormReadFilter(1L, null, 20L, List.of(FormStatus.PENDING, FormStatus.COMPLETED)), "inspeção", 6, FormStatus.PENDING, 0, 20))
                 .thenReturn(new FormRepositoryCustom.Listing(List.of(), 0));
         assertTrue(service.findReceived(recipient, " inspeção ", 6, FormStatus.PENDING, 0, 20).items().isEmpty());
         assertThrows(BusinessException.class, () -> service.findReceived(recipient, null, null, FormStatus.DRAFT, 0, 20));
     }
+
     @Test void onlySenderOrWorkspaceManagerCanReviewAndDecisionIsFinal() {
         complete();
         assertThrows(AccessDeniedException.class, () -> service.review(form.getId(), new FormReviewRequest(FormReviewStatus.APPROVED, null), recipient));
@@ -92,6 +99,7 @@ class FormResponseServiceTest {
         assertThrows(ConflictException.class, () -> service.review(form.getId(), new FormReviewRequest(FormReviewStatus.REJECTED, "Motivo"), owner));
         assertEquals(FormStatus.COMPLETED, form.getStatus());
     }
+
     @Test void rejectionRequiresDescriptionAndWorkspaceManagerHasAdministrativeAuthority() {
         complete();
         assertThrows(BusinessException.class, () -> service.review(form.getId(), new FormReviewRequest(FormReviewStatus.REJECTED, " "), owner));
@@ -101,11 +109,13 @@ class FormResponseServiceTest {
         ArgumentCaptor<FormWriteCondition> condition = ArgumentCaptor.forClass(FormWriteCondition.class);
         verify(repository).review(condition.capture(), any()); assertNull(condition.getValue().senderManagerId());
     }
+
     @Test void cannotReviewBeforeReceivingAnswersAndReportsConcurrentReview() {
         assertThrows(ConflictException.class, () -> service.review(form.getId(), new FormReviewRequest(FormReviewStatus.APPROVED, null), sender));
         complete(); when(repository.review(any(), any())).thenReturn(Optional.empty());
         assertThrows(ConflictException.class, () -> service.review(form.getId(), new FormReviewRequest(FormReviewStatus.APPROVED, null), sender));
     }
+
     @Test void removesNewImagesWhenAnotherSubmissionWins() {
         form.getQuestions().getFirst().setType("foto");
         FormImage image = new FormImage("id", "key", "photo.jpg", "image/jpeg", 100);
@@ -117,6 +127,7 @@ class FormResponseServiceTest {
                 List.of(new MockMultipartFile("files", new byte[]{1})), recipient));
         verify(storage).delete(image);
     }
+
     @Test void recoversACommittedResponseAfterLosingTheMongoAcknowledgement() {
         when(repository.submitResponse(any(), any())).thenAnswer(invocation -> {
             form.setStatus(FormStatus.COMPLETED);
@@ -125,6 +136,7 @@ class FormResponseServiceTest {
         assertEquals("awaiting_review", service.submit(form.getId(), answer(), List.of(), recipient).review().status());
         assertNotNull(form.getSubmissionId()); verifyNoInteractions(storage);
     }
+
     @Test void neverDeletesPossiblyCommittedImagesWhenMongoOutcomeCannotBeRecovered() {
         form.getQuestions().getFirst().setType("foto");
         FormImage image = new FormImage("id", "key", "photo.jpg", "image/jpeg", 100);
@@ -138,6 +150,7 @@ class FormResponseServiceTest {
                 List.of(new MockMultipartFile("files", new byte[]{1})), recipient));
         verify(storage, never()).delete(any());
     }
+
     @Test void submissionRecordsDistantAndOlderGpsWithoutDistanceValidation() {
         form.setUnitId(3L);
         UnitLocationProjection unitLocation = mock(UnitLocationProjection.class);
@@ -197,6 +210,7 @@ class FormResponseServiceTest {
         assertThrows(ResourceNotFoundException.class, () -> service.image(form.getId(), "forged-image", sender));
         verifyNoInteractions(storage);
     }
+
     @Test void inactiveAuthenticatedAccountIsBlockedBeforeReadingMongo() {
         when(users.findByFirebaseUid("recipient")).thenReturn(Optional.empty());
         assertThrows(AccessDeniedException.class, () -> service.findReceivedById(form.getId(), recipient));

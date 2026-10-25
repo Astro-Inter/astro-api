@@ -7,14 +7,23 @@ import com.astro.api.form.model.FormQuestionType;
 import java.util.Collection;
 
 final class FormAnswerRules {
-    private FormAnswerRules() {}
-    static boolean present(Collection<?> values) { return values != null && !values.isEmpty(); }
-    static String clean(String text) { return text == null ? "" : text.strip(); }
+    private FormAnswerRules() {
+    }
+
+    static boolean present(Collection<?> values) {
+        return values != null && !values.isEmpty();
+    }
+
+    static String clean(String text) {
+        return text == null ? "" : text.strip();
+    }
+
     static void requireAnswer(Form.FormQuestion question, boolean answered) {
         if (Boolean.TRUE.equals(question.getRequired()) && !answered) {
             throw new BusinessException("Responda a pergunta obrigatória " + question.getId());
         }
     }
+
     static void requireType(FormQuestionAnswerRequest answer, FormQuestionType type) {
         boolean incompatible = (type != FormQuestionType.TEXT && answer.text() != null)
                 || (type != FormQuestionType.OPTION && (answer.optionIds() != null || answer.otherText() != null))

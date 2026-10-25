@@ -1,15 +1,19 @@
 package com.astro.api.form.strategy.answer;
 
 import com.astro.api.common.exception.BusinessException;
+import com.astro.api.form.dto.internal.FormOtherAnswer;
 import com.astro.api.form.dto.request.FormQuestionAnswerRequest;
 import com.astro.api.form.model.*;
+import java.util.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
-import java.util.*;
 
 @Component
 public class OptionAnswerStrategy implements FormAnswerStrategy {
-    public FormQuestionType supportedType() { return FormQuestionType.OPTION; }
+    public FormQuestionType supportedType() {
+        return FormQuestionType.OPTION;
+    }
+
     public List<Object> validateAndNormalize(Form.FormQuestion question, FormQuestionAnswerRequest answer,
                                               List<MultipartFile> files) {
         FormAnswerRules.requireType(answer, supportedType());

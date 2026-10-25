@@ -1,9 +1,16 @@
 package com.astro.api.form.service;
 
 import com.astro.api.common.exception.BusinessException;
-import com.astro.api.config.R2Properties;
 import com.astro.api.common.storage.R2StorageService.PresignedDownload;
-import com.astro.api.form.model.FormImage;
+import com.astro.api.config.R2Properties;
+import com.astro.api.form.dto.internal.FormImage;
+import java.io.*;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -13,13 +20,6 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.*;
-import javax.imageio.ImageIO;
-import javax.imageio.ImageReader;
-import javax.imageio.stream.ImageInputStream;
-import java.io.*;
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
-import java.util.*;
 
 @Service
 public class FormImageStorageService {
@@ -70,7 +70,7 @@ public class FormImageStorageService {
         }
     }
 
-    String validateImage(byte[] bytes) {
+    private String validateImage(byte[] bytes) {
         try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
             Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
             if (!readers.hasNext()) throw new BusinessException("Envie uma imagem JPEG ou PNG válida");

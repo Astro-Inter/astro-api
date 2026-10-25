@@ -1,23 +1,22 @@
 package com.astro.api.form.mapper;
 
-import java.util.Map;
-import com.astro.api.unit.repository.UnitLocationProjection;
-import com.astro.api.form.dto.response.FormRecipientsResponse;
-import com.astro.api.user.repository.FormRecipientProjection;
-import com.astro.api.form.dto.response.FormSummaryResponse;
-import com.astro.api.form.dto.response.FormPageResponse;
+import com.astro.api.form.dto.request.*;
 import com.astro.api.form.dto.response.FormDetailsResponse;
-import com.astro.api.form.dto.response.FormDetailsResponse.QuestionResponse;
 import com.astro.api.form.dto.response.FormDetailsResponse.OptionResponse;
+import com.astro.api.form.dto.response.FormDetailsResponse.QuestionResponse;
+import com.astro.api.form.dto.response.FormPageResponse;
+import com.astro.api.form.dto.response.FormRecipientsResponse;
+import com.astro.api.form.dto.response.FormSummaryResponse;
 import com.astro.api.form.model.Form;
 import com.astro.api.form.model.FormQuestionType;
-import com.astro.api.form.dto.request.*;
-import org.springframework.stereotype.Component;
-
+import com.astro.api.unit.repository.UnitLocationProjection;
+import com.astro.api.user.repository.FormRecipientProjection;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+import org.springframework.stereotype.Component;
 
 @Component
 public class FormMapper {
@@ -70,7 +69,9 @@ public class FormMapper {
         return result;
     }
 
-    private String clean(String value) { return value == null ? "" : value.strip(); }
+    private String clean(String value) {
+        return value == null ? "" : value.strip();
+    }
 
     public FormRequest toFormRequest(Form form) {
         List<FormQuestionDefinitionRequest> questions = form.getQuestions() == null ? List.<FormQuestionDefinitionRequest>of() : form.getQuestions().stream()

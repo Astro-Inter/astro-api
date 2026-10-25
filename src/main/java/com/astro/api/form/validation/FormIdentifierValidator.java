@@ -4,7 +4,8 @@ import com.astro.api.common.exception.BusinessException;
 import java.util.UUID;
 
 public final class FormIdentifierValidator {
-    private FormIdentifierValidator() {}
+    private FormIdentifierValidator() {
+    }
 
     public static String normalize(String formId) {
         if (formId == null || formId.length() != 36) {

@@ -1,7 +1,7 @@
 package com.astro.api.form.service;
 
+import com.astro.api.form.dto.internal.FormLocationPolicy;
 import com.astro.api.form.model.Form;
-import com.astro.api.form.model.FormLocationPolicy;
 import com.astro.api.unit.repository.UnitLocationProjection;
 import com.astro.api.unit.repository.UnitRepository;
 import org.springframework.stereotype.Service;
@@ -12,7 +12,9 @@ public class FormLocationService {
     private static final int UNIT_RADIUS_METERS = 100;
     private final UnitRepository unitRepository;
 
-    public FormLocationService(UnitRepository unitRepository) { this.unitRepository = unitRepository; }
+    public FormLocationService(UnitRepository unitRepository) {
+        this.unitRepository = unitRepository;
+    }
 
     public FormLocationPolicy policy(Form form) {
         return new FormLocationPolicy(true, false, form.getUnitId() == null ? null : UNIT_RADIUS_METERS, null);

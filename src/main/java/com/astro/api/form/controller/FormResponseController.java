@@ -9,26 +9,31 @@ import com.astro.api.form.service.FormResponseService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.beans.PropertyEditorSupport;
+import java.util.List;
 import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import java.beans.PropertyEditorSupport;
-import java.util.List;
 
 @RestController
 @RequestMapping("/forms")
 @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
 public class FormResponseController {
     private final FormResponseService formResponseService;
-    public FormResponseController(FormResponseService formResponseService) { this.formResponseService = formResponseService; }
+    public FormResponseController(FormResponseService formResponseService) {
+        this.formResponseService = formResponseService;
+    }
 
     @InitBinder
     public void configureStatusBinding(WebDataBinder binder) {
         binder.registerCustomEditor(FormStatus.class, new PropertyEditorSupport() {
-            @Override public void setAsText(String text) { setValue(FormStatus.fromValue(text)); }
+            @Override
+            public void setAsText(String text) {
+                setValue(FormStatus.fromValue(text));
+            }
         });
     }
 

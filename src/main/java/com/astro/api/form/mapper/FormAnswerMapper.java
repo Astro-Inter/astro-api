@@ -1,9 +1,11 @@
 package com.astro.api.form.mapper;
 
+import com.astro.api.form.dto.internal.FormImage;
+import com.astro.api.form.dto.internal.FormOtherAnswer;
 import com.astro.api.form.dto.request.FormResponseRequest;
 import com.astro.api.form.model.*;
-import org.springframework.stereotype.Component;
 import java.util.*;
+import org.springframework.stereotype.Component;
 
 @Component
 public class FormAnswerMapper {

@@ -4,7 +4,8 @@ import com.astro.api.common.exception.BusinessException;
 import com.astro.api.form.dto.request.FormQuestionDefinitionRequest;
 
 final class QuestionRules {
-    private QuestionRules() {}
+    private QuestionRules() {
+    }
 
     static void require(boolean valid, String message) {
         if (!valid) throw new BusinessException(message);

@@ -254,6 +254,19 @@ gestão e de resposta. Nomes de participantes são obtidos antes da chamada ao m
 Os vínculos e nomes reutilizam `UserRepository` e `UnitRepository`, sem novas
 tabelas, consultas SQL manuais ou alterações do cadastro da unidade.
 
+### Organização dos tipos internos
+
+`model` contém o documento `Form`, os valores persistidos dentro dele (`FormReview`,
+`FormLocationReading` e o histórico `FormLocationCheck`) e seus enums. Esses valores
+embutidos não criam collections próprias.
+
+`FormImage` representa metadados de armazenamento usados entre service e mapper;
+não é uma entidade nem um documento Mongo. Ele fica em `dto.internal`, junto com
+`FormOtherAnswer` e `FormLocationPolicy`, sem fazer parte do contrato HTTP público.
+`FormScope` fica no pacote `service`, pois representa o contexto de autorização.
+`FormReadFilter`, `FormWriteCondition` e `FormResponseCondition` ficam em `repository`,
+pois descrevem filtros e condições de gravação do acesso aos dados.
+
 ## Verificação
 
 `mvn verify` executa a suíte e o build. Com

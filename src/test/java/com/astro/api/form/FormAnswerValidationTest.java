@@ -1,6 +1,8 @@
 package com.astro.api.form;
 
 import com.astro.api.common.exception.BusinessException;
+import com.astro.api.form.dto.internal.FormImage;
+import com.astro.api.form.dto.internal.FormOtherAnswer;
 import com.astro.api.form.dto.request.*;
 import com.astro.api.form.mapper.*;
 import com.astro.api.form.model.*;
@@ -37,6 +39,7 @@ class FormAnswerValidationTest {
                 new FormQuestionAnswerRequest(3L, null, null, null, null, List.of(0)),
                 new FormQuestionAnswerRequest(4L, null, null, null, LocalDate.of(2026, 10, 24), null));
     }
+
     @Test void validatesEveryTypeAndRecordsGpsWithoutDistanceEnforcement() {
         Map<Long, List<Object>> normalized = validation.validate(form, request(answers()),
                 List.of(new MockMultipartFile("files", "photo.jpg", "image/jpeg", new byte[]{1})), now);
@@ -49,12 +52,14 @@ class FormAnswerValidationTest {
         assertDoesNotThrow(() -> validation.validate(form, farAway,
                 List.of(new MockMultipartFile("files", new byte[]{1})), now));
     }
+
     @Test void optionalQuestionsMayBeAbsentButRequiredOnesMayNot() {
         form.getQuestions().forEach(question -> question.setRequired(false));
         assertTrue(validation.validate(form, request(List.of()), List.of(), now).values().stream().allMatch(List::isEmpty));
         form.getQuestions().getFirst().setRequired(true);
         assertThrows(BusinessException.class, () -> validation.validate(form, request(List.of()), List.of(), now));
     }
+
     @Test void rejectsForgedDuplicateOrIncompatibleAnswers() {
         form.getQuestions().forEach(question -> question.setRequired(false));
         FormQuestionAnswerRequest text = new FormQuestionAnswerRequest(1L, "answer", null, null, null, null);
@@ -64,6 +69,7 @@ class FormAnswerValidationTest {
             assertThrows(BusinessException.class, () -> validation.validate(form, request(invalid), List.of(), now));
         }
     }
+
     @Test void validatesOptionsOtherAndSingleSelection() {
         form.getQuestions().forEach(question -> question.setRequired(false));
         form.getQuestions().get(1).setMultiple(false);
@@ -76,6 +82,7 @@ class FormAnswerValidationTest {
             assertThrows(BusinessException.class, () -> validation.validate(form, request(List.of(invalid)), List.of(), now));
         }
     }
+
     @Test void validatesPhotoReferencesAndNeverIgnoresUnreferencedFiles() {
         form.getQuestions().forEach(question -> question.setRequired(false));
         MockMultipartFile file = new MockMultipartFile("files", new byte[]{1});
@@ -85,6 +92,7 @@ class FormAnswerValidationTest {
             assertThrows(BusinessException.class, () -> validation.validate(form, request(List.of(answer)), List.of(file), now));
         }
     }
+
     @Test void validatesConsentCoordinatesAndCaptureTimesWithPortugueseMessages() {
         form.getQuestions().forEach(question -> question.setRequired(false));
         for (FormResponseRequest invalid : List.of(new FormResponseRequest(false, request(List.of()).locations(), List.of()),
@@ -95,6 +103,7 @@ class FormAnswerValidationTest {
             assertFalse(failure.getMessage().contains("{form."));
         }
     }
+
     @Test void mapperKeepsStorageNamesPrivateAndUsesPlainNumbers() {
         FormAnswerMapper mapper = new FormAnswerMapper();
         FormImage image = new FormImage("image-id", "private/key.jpg", "camera.jpg", "image/jpeg", 200);

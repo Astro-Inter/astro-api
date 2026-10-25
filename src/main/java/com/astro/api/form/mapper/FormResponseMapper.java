@@ -1,16 +1,20 @@
 package com.astro.api.form.mapper;
 
-import com.astro.api.form.dto.response.*;
 import com.astro.api.common.storage.R2StorageService.PresignedDownload;
+import com.astro.api.form.dto.internal.FormImage;
+import com.astro.api.form.dto.internal.FormLocationPolicy;
+import com.astro.api.form.dto.response.*;
 import com.astro.api.form.model.*;
-import org.springframework.stereotype.Component;
-import java.util.*;
 import com.astro.api.unit.repository.UnitLocationProjection;
+import java.util.*;
+import org.springframework.stereotype.Component;
 
 @Component
 public class FormResponseMapper {
     private final FormMapper formMapper;
-    public FormResponseMapper(FormMapper formMapper) { this.formMapper = formMapper; }
+    public FormResponseMapper(FormMapper formMapper) {
+        this.formMapper = formMapper;
+    }
 
     public FormReceivedPageResponse toPage(List<Form> forms, int page, int size, long total) {
         return new FormReceivedPageResponse(forms.stream().map(form -> new FormReceivedPageResponse.Item(
