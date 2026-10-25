@@ -1,23 +1,20 @@
 package com.astro.api.workspace.service;
 
-import com.astro.api.common.text.PersonalDataNormalizer;
 import com.astro.api.role.model.Role;
 import com.astro.api.role.service.RoleService;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.unit.service.UnitService;
 import com.astro.api.user.model.CollaboratorImportRow;
 import com.astro.api.user.model.User;
-import com.astro.api.user.model.UserStatus;
-import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.user.service.UserBatchService;
 import com.astro.api.workspace.dto.request.CreateWorkspaceRequest;
 import com.astro.api.workspace.dto.response.RegisterWorkspaceResponse;
 import com.astro.api.workspace.event.PreRegisteredCollaboratorsCreatedEvent;
 import com.astro.api.workspace.mapper.WorkspaceMapper;
+import com.astro.api.workspace.mapper.WorkspaceManagerMapper;
 import com.astro.api.workspace.model.Workspace;
 import com.astro.api.workspace.repository.WorkspaceRepository;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.springframework.context.ApplicationEventPublisher;
@@ -34,11 +31,13 @@ public class WorkspaceRegistrationTransactionalService {
     private final WorkspaceMapper workspaceMapper;
     private final RoleService roleService;
     private final UserBatchService userBatchService;
+    private final WorkspaceManagerMapper workspaceManagerMapper;
 
     public WorkspaceRegistrationTransactionalService(WorkspaceRepository workspaceRepository, UserRepository userRepository,
                                                      UnitService unitService, SpreadsheetImportService spreadsheetImportService,
                                                      ApplicationEventPublisher eventPublisher, WorkspaceMapper workspaceMapper,
-                                                     RoleService roleService, UserBatchService userBatchService) {
+                                                     RoleService roleService, UserBatchService userBatchService,
+                                                     WorkspaceManagerMapper workspaceManagerMapper) {
         this.workspaceRepository = workspaceRepository;
         this.userRepository = userRepository;
         this.unitService = unitService;
@@ -47,6 +46,7 @@ public class WorkspaceRegistrationTransactionalService {
         this.workspaceMapper = workspaceMapper;
         this.roleService = roleService;
         this.userBatchService = userBatchService;
+        this.workspaceManagerMapper = workspaceManagerMapper;
     }
 
     @Transactional
@@ -61,15 +61,7 @@ public class WorkspaceRegistrationTransactionalService {
         Map<String, Role> rolesByName = roleService.createForWorkspace(workspace,
                 rows.stream().map(CollaboratorImportRow::role).toList());
         Role managerRole = spreadsheetImportService.findManagerRole(managerRow, rolesByName);
-        User manager = new User();
-        manager.setName(PersonalDataNormalizer.name(managerRow.name()));
-        manager.setEmail(PersonalDataNormalizer.email(request.email()));
-        manager.setFirebaseUid(firebaseUid);
-        manager.setType(UserType.GESTOR_WORKSPACE);
-        manager.setStatus(UserStatus.ATIVO);
-        manager.setUnit(managerUnit);
-        manager.setRole(managerRole);
-        manager.setCreatedAt(Instant.now());
+        User manager = workspaceManagerMapper.toNewManager(managerRow, firebaseUid, managerRole, managerUnit);
         userRepository.save(manager);
 
         spreadsheetImportService.bindPersistedDependencies(importResult.validUsers(), units, rolesByName);
