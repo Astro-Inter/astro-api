@@ -1,6 +1,5 @@
 package com.astro.api.form;
 
-import org.springframework.test.web.servlet.MockMvc;
 import com.astro.api.auth.security.*;
 import com.astro.api.auth.security.Role;
 import com.astro.api.auth.service.AuthorizationService;
@@ -9,17 +8,19 @@ import com.astro.api.common.handler.GlobalExceptionHandler;
 import com.astro.api.config.CorsConfig;
 import com.astro.api.form.controller.FormController;
 import com.astro.api.form.service.FormService;
+import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
+import jakarta.servlet.Filter;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.*;
 import org.springframework.mock.web.MockServletContext;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
-import jakarta.servlet.Filter;
-
-import java.util.List;
-import java.util.Optional;
+import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
@@ -36,7 +37,7 @@ class FormSecurityTest {
             AuthorizationService authorization = context.getBean(AuthorizationService.class);
             FormService service = context.getBean(FormService.class);
             mvc.perform(get("/forms")).andExpect(result -> assertTrue(result.getResponse().getStatus() >= 400));
-            when(tokens.verify("invalid")).thenThrow(mock(com.google.firebase.auth.FirebaseAuthException.class));
+            when(tokens.verify("invalid")).thenThrow(mock(FirebaseAuthException.class));
             mvc.perform(get("/forms").header("Authorization", "Bearer invalid"))
                     .andExpect(result -> assertTrue(result.getResponse().getStatus() >= 400));
             mvc.perform(get("/forms/recipients"))
@@ -70,7 +71,7 @@ class FormSecurityTest {
 
     @Configuration
     @EnableWebSecurity
-    @org.springframework.web.servlet.config.annotation.EnableWebMvc
+    @EnableWebMvc
     @Import({SecurityConfig.class, CorsConfig.class, FormController.class, GlobalExceptionHandler.class})
     static class Config {
         @Bean FirebaseTokenService firebaseTokenService() { return mock(FirebaseTokenService.class); }

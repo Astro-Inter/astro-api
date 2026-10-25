@@ -26,6 +26,8 @@ Os contratos da própria conta autenticada no web estão em
 
 O contrato dos endpoints de formulários da web, com rascunhos, publicação e
 validações por tipo de pergunta, está em [docs/forms.md](docs/forms.md).
+O fluxo de respostas mobile, imagens privadas e análise web está em
+[docs/forms-responses.md](docs/forms-responses.md).
 
 ## Stack técnica
 

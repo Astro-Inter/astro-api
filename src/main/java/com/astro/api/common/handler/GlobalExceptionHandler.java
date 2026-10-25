@@ -1,5 +1,6 @@
 package com.astro.api.common.handler;
 
+import com.astro.api.auth.security.FormResponseRequestMatcher;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ConflictException;
 import com.astro.api.common.exception.ResourceNotFoundException;
@@ -21,6 +22,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -206,7 +208,18 @@ public class GlobalExceptionHandler {
                 ));
     }
 
-    // Erro inesperado. Ex: falha não tratada pela aplicação.
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiResult<Void>> handleUnsupportedMediaType(
+            HttpMediaTypeNotSupportedException exception, HttpServletRequest request) {
+        if (!FormResponseRequestMatcher.INSTANCE.matches(request)) {
+            return handleGeneric(exception, request);
+        }
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(ApiResult.error(
+                "Formato de conteúdo não suportado",
+                List.of("Use application/json ou multipart/form-data conforme o envio do formulário"),
+                request.getRequestURI()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResult<Void>> handleGeneric(Exception ex, HttpServletRequest request) {
         LOGGER.error("Erro interno ao processar a requisição para {}", request.getRequestURI(), ex);

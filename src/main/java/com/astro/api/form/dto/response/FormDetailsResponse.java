@@ -20,8 +20,11 @@ public record FormDetailsResponse(
         Instant createdAt,
         Instant updatedAt,
         Instant respondedAt,
-        List<QuestionResponse> questions
+        List<QuestionResponse> questions,
+        UnitLocationResponse unitLocation
 ) {
+    public record UnitLocationResponse(Double latitude, Double longitude) {}
+
     public record QuestionResponse(
             Long id,
             String type,

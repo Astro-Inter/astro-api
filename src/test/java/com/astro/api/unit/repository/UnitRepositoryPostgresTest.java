@@ -56,6 +56,8 @@ class UnitRepositoryPostgresTest {
         new JdbcTemplate(dataSource).execute("CREATE SCHEMA " + SCHEMA);
         context = new AnnotationConfigApplicationContext(Config.class);
         unitRepository = context.getBean(UnitRepository.class);
+        // The production schema owns this native PostgreSQL field; Hibernate does not map POINT to the address entity.
+        new JdbcTemplate(dataSource).execute("ALTER TABLE unidade_endereco ADD COLUMN geolocalizacao POINT");
         transactionTemplate = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
         testUnits = transactionTemplate.execute(status -> {
             EntityManager entityManager = EntityManagerFactoryUtils.getTransactionalEntityManager(
@@ -99,6 +101,23 @@ class UnitRepositoryPostgresTest {
                     testUnits.workspaceId()).orElseThrow();
             assertNull(legacyUnit.address);
         });
+    }
+
+    @Test
+    void projectsNativePointAsLongitudeThenLatitudeAndScopesTheUnit() {
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+        jdbcTemplate.update("UPDATE unidade_endereco SET geolocalizacao = point(?, ?) WHERE unidade_id = ?",
+                -46.6, -23.5, testUnits.addressedUnitId());
+        UnitLocationProjection location = unitRepository.findLocationByIdAndWorkspaceId(testUnits.addressedUnitId(),
+                testUnits.workspaceId()).orElseThrow();
+        assertEquals(testUnits.addressedUnitId(), location.getUnitId()); assertTrue(location.getActive());
+        assertEquals(-23.5, location.getLatitude()); assertEquals(-46.6, location.getLongitude());
+        assertTrue(unitRepository.findLocationByIdAndWorkspaceId(testUnits.addressedUnitId(), testUnits.otherWorkspaceId()).isEmpty());
+        UnitLocationProjection missingAddress = unitRepository.findLocationByIdAndWorkspaceId(testUnits.legacyUnitId(),
+                testUnits.workspaceId()).orElseThrow();
+        assertNull(missingAddress.getLatitude()); assertNull(missingAddress.getLongitude());
+        jdbcTemplate.update("UPDATE unidade_endereco SET geolocalizacao = NULL WHERE unidade_id = ?", testUnits.addressedUnitId());
+        assertNull(unitRepository.findLocationByIdAndWorkspaceId(testUnits.addressedUnitId(), testUnits.workspaceId()).orElseThrow().getLatitude());
     }
 
     @Test

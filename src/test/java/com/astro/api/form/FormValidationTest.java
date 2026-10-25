@@ -5,9 +5,9 @@ import com.astro.api.form.dto.request.*;
 import com.astro.api.form.model.*;
 import com.astro.api.form.service.FormValidationService;
 import com.astro.api.form.strategy.*;
-import org.junit.jupiter.api.Test;
-
+import java.util.Collections;
 import java.util.List;
+import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -70,6 +70,6 @@ class FormValidationTest {
         assertThrows(BusinessException.class, () -> validator.validate(new FormRequest(null, null, null, null, null,
                 null, FormStatus.DRAFT, List.of(question, question)), FormValidationMode.DRAFT));
         assertThrows(BusinessException.class, () -> validator.validate(new FormRequest(null, null, null, null, null,
-                null, FormStatus.DRAFT, java.util.Collections.nCopies(101, FormTestFixtures.question(FormQuestionType.TEXT))), FormValidationMode.DRAFT));
+                null, FormStatus.DRAFT, Collections.nCopies(101, FormTestFixtures.question(FormQuestionType.TEXT))), FormValidationMode.DRAFT));
     }
 }

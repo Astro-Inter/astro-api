@@ -9,11 +9,14 @@ import com.astro.api.form.repository.FormRepository;
 import com.astro.api.form.service.FormAccessService;
 import com.astro.api.form.service.FormReferenceService;
 import com.astro.api.form.service.FormService;
+import com.astro.api.form.service.FormLocationService;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.FormRecipientProjection;
 import com.astro.api.user.repository.UserRepository;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,9 +27,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-
-import java.util.List;
-import java.util.Optional;
 
 import static org.hamcrest.Matchers.aMapWithSize;
 import static org.hamcrest.Matchers.nullValue;
@@ -39,7 +39,7 @@ class FormRecipientsTest {
     private final FormRepository formRepository = mock(FormRepository.class);
     private final FormService formService = new FormService(formRepository,
             new FormAccessService(userRepository), new FormMapper(), FormTestFixtures.validator(),
-            mock(FormReferenceService.class), userRepository);
+            mock(FormReferenceService.class), userRepository, mock(FormLocationService.class));
     private MockMvc mockMvc;
     private User currentManager;
 
