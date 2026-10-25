@@ -21,9 +21,6 @@ Os contratos de Configurações > Workspace, incluindo sincronização de
 colaboradores por planilha e a alteração de schema necessária para o número do
 endereço, estão em [docs/api-workspace-settings.md](docs/api-workspace-settings.md).
 
-O cadastro inicial de workspace e a importação dos dados do gestor estão em
-[docs/api-workspace-registration.md](docs/api-workspace-registration.md).
-
 Os contratos da própria conta autenticada no web estão em
 [docs/api-account.md](docs/api-account.md).
 
