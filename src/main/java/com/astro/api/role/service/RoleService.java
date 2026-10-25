@@ -4,7 +4,11 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ConflictException;
 import com.astro.api.common.text.NormalizedText;
+import com.astro.api.conformity.model.NrCatalog;
+import com.astro.api.conformity.model.NrDocument;
+import com.astro.api.conformity.repository.NrCatalogRepository;
 import com.astro.api.conformity.repository.NrDocumentRepository;
+import com.astro.api.role.mapper.RoleNrMapper;
 import com.astro.api.role.dto.request.RoleNrRequest;
 import com.astro.api.role.dto.request.RoleRequest;
 import com.astro.api.role.dto.request.UpdateRoleNrsRequest;
@@ -16,7 +20,6 @@ import com.astro.api.role.repository.RoleManagementRepository;
 import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.workspace.model.Workspace;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,13 +37,18 @@ public class RoleService {
     private final RoleRepository roleRepository;
     private final RoleManagementRepository managementRepository;
     private final NrDocumentRepository nrDocuments;
+    private final NrCatalogRepository nrCatalog;
+    private final RoleNrMapper nrMapper;
     private final JsonMapper objectMapper;
 
     public RoleService(RoleRepository roleRepository, RoleManagementRepository managementRepository,
-                        NrDocumentRepository nrDocuments, JsonMapper objectMapper) {
+                        NrDocumentRepository nrDocuments, NrCatalogRepository nrCatalog,
+                        RoleNrMapper nrMapper, JsonMapper objectMapper) {
         this.roleRepository = roleRepository;
         this.managementRepository = managementRepository;
         this.nrDocuments = nrDocuments;
+        this.nrCatalog = nrCatalog;
+        this.nrMapper = nrMapper;
         this.objectMapper = objectMapper;
     }
 
@@ -76,8 +84,19 @@ public class RoleService {
                 throw new BusinessException("A lista não pode repetir códigos de NR");
             }
         }
+        Set<Integer> availableCodes = findPersistedNrCodes(codes);
+        String unavailable = body.nrs().stream()
+                .filter(nr -> nr.active() && !availableCodes.contains(nr.nr()))
+                .map(RoleNrRequest::nr).sorted().map(String::valueOf)
+                .collect(Collectors.joining(", "));
+        if (!unavailable.isEmpty()) {
+            throw new BusinessException("NRs indisponíveis no catálogo: " + unavailable
+                    + ". Atualize a lista e tente novamente.");
+        }
+        List<RoleNrRequest> changes = body.nrs().stream()
+                .filter(nr -> availableCodes.contains(nr.nr())).toList();
         try {
-            managementRepository.updateNrs(body.firebaseUid(), roleId, objectMapper.writeValueAsString(body.nrs()));
+            managementRepository.updateNrs(body.firebaseUid(), roleId, objectMapper.writeValueAsString(changes));
         } catch (JacksonException ex) {
             throw new IllegalStateException("Não foi possível serializar a lista de NRs", ex);
         }
@@ -104,12 +123,18 @@ public class RoleService {
 
     @Transactional(readOnly = true)
     public List<RoleNrOptionResponse> findNrOptions(String uid, Long roleId, AuthenticatedUser user) {
-        Set<Integer> linked = findNrs(uid, roleId, user).stream()
-                .map(RoleNrResponse::nrCode).collect(Collectors.toSet());
-        return nrDocuments.findByUsability("Colaborador").stream()
-                .map(nr -> new RoleNrOptionResponse(nr.getId(), nr.getDescription(), linked.contains(nr.getId())))
-                .sorted(Comparator.comparing(RoleNrOptionResponse::nr))
-                .toList();
+        List<RoleNrResponse> linked = findNrs(uid, roleId, user);
+        List<NrDocument> documents = nrDocuments.findByUsability("Colaborador");
+        Set<Integer> codes = documents.stream().map(NrDocument::getId).collect(Collectors.toSet());
+        linked.stream().map(RoleNrResponse::nrCode).forEach(codes::add);
+        return nrMapper.toOptions(documents, linked, findPersistedNrCodes(codes));
+    }
+
+    private Set<Integer> findPersistedNrCodes(Collection<Integer> codes) {
+        if (codes.isEmpty()) {
+            return Set.of();
+        }
+        return nrCatalog.findAllById(codes).stream().map(NrCatalog::getCodeNr).collect(Collectors.toSet());
     }
 
     private void checkIdentity(String uid, AuthenticatedUser user) {

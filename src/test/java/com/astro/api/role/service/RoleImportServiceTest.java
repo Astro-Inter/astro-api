@@ -2,6 +2,8 @@ package com.astro.api.role.service;
 
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.conformity.repository.NrDocumentRepository;
+import com.astro.api.conformity.repository.NrCatalogRepository;
+import com.astro.api.role.mapper.RoleNrMapper;
 import com.astro.api.role.model.Role;
 import com.astro.api.role.repository.RoleManagementRepository;
 import com.astro.api.role.repository.RoleRepository;
@@ -17,7 +19,8 @@ import static org.mockito.Mockito.*;
 class RoleImportServiceTest {
     private final RoleRepository roleRepository = mock(RoleRepository.class);
     private final RoleService roleService = new RoleService(roleRepository,
-            mock(RoleManagementRepository.class), mock(NrDocumentRepository.class), JsonMapper.builder().build());
+            mock(RoleManagementRepository.class), mock(NrDocumentRepository.class), mock(NrCatalogRepository.class),
+            new RoleNrMapper(), JsonMapper.builder().build());
     private final Workspace workspace = new Workspace();
 
     @Test
