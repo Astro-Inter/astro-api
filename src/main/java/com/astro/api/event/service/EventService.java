@@ -165,7 +165,7 @@ public class EventService {
     public List<CollaboratorEventResponse> findForCollaborator(String firebaseUid) {
         User user = findAuthenticatedUser(firebaseUid);
         List<EventClassParticipant> participations = eventClassParticipantRepository
-                .findByUser_IdOrderByEventClass_EndDateAsc(user.getId());
+                .findByUser_IdOrderByEventClass_EndDateDesc(user.getId());
         if (participations.isEmpty()) {
             return List.of();
         }
