@@ -22,7 +22,7 @@ public interface ConformityRepository extends JpaRepository<Conformity, Long> {
 
     @Query(value = """
             SELECT c.* FROM conformidade c
-            JOIN usuario u ON u.id_usuario = c.usuario_id AND u.tipo = 'COLABORADOR'
+            JOIN usuario u ON u.id_usuario = c.usuario_id AND u.tipo IN ('COLABORADOR', 'GESTOR', 'GESTOR_WORKSPACE')
             JOIN unidade un ON un.id_unidade = u.unidade_id
             WHERE c.id_conformidade = :conformityId AND un.workspace_id = :workspaceId
               AND u.unidade_id IN (SELECT id_unidade FROM fn_seleciona_unidades(:firebaseUid))
@@ -62,7 +62,7 @@ public interface ConformityRepository extends JpaRepository<Conformity, Long> {
                    CASE WHEN c.data_validade IS NULL THEN 'Sem validade'
                         WHEN c.data_validade < CURRENT_DATE THEN 'Vencida' ELSE 'Válida' END AS status
             FROM conformidade c
-            JOIN usuario u ON u.id_usuario = c.usuario_id AND u.tipo = 'COLABORADOR'
+            JOIN usuario u ON u.id_usuario = c.usuario_id AND u.tipo IN ('COLABORADOR', 'GESTOR', 'GESTOR_WORKSPACE')
             JOIN unidade un ON un.id_unidade = u.unidade_id
             JOIN nr_catalogo nr ON nr.codigo_nr = c.nr_id
             WHERE c.id_conformidade = :conformityId AND un.workspace_id = :workspaceId
@@ -78,7 +78,7 @@ public interface ConformityRepository extends JpaRepository<Conformity, Long> {
                    v.origem AS origin, v.aplicavel AS applicable,
                    v.conclusao_evento_id AS "eventCompletionId", v.status
             FROM vw_conformidades v
-            JOIN usuario u ON u.id_usuario = v.usuario_id AND u.tipo = 'COLABORADOR'
+            JOIN usuario u ON u.id_usuario = v.usuario_id AND u.tipo IN ('COLABORADOR', 'GESTOR', 'GESTOR_WORKSPACE')
             WHERE v.workspace_id = :workspaceId AND v.aplicavel = TRUE
               AND v.unidade_id IN (SELECT id_unidade FROM fn_seleciona_unidades(:firebaseUid))
             ORDER BY LOWER(v.nome), v.usuario_id, v.nr_id, v.id_conformidade

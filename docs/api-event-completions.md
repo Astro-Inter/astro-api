@@ -1,6 +1,6 @@
 # Solicitação de conclusão de evento
 
-`POST /events/{eventId}/completion` permite que o colaborador participante envie uma solicitação de conclusão para um evento configurado no modo `COLABORADOR`.
+`POST /events/{eventId}/completion` permite que o participante ativo dos tipos `COLABORADOR`, `GESTOR` ou `GESTOR_WORKSPACE` envie uma solicitação de conclusão para um evento configurado no modo `COLABORADOR`.
 
 Envie `multipart/form-data`. A parte `files` é opcional e pode ser repetida para encaminhar até três evidências. Cada arquivo aceita qualquer tipo MIME e tem limite de 50 MB; a requisição inteira aceita até 151 MB. Quando o evento exige evidência, é necessário enviar pelo menos um arquivo.
 

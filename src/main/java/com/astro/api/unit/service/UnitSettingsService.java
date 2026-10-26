@@ -14,6 +14,7 @@ import com.astro.api.unit.model.UnitAddress;
 import com.astro.api.unit.repository.UnitAddressRepository;
 import com.astro.api.unit.repository.UnitRepository;
 import com.astro.api.user.model.UserType;
+import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.workspace.model.Workspace;
 import com.astro.api.workspace.service.WorkspaceAccessService;
@@ -31,6 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UnitSettingsService {
+    private static final List<UserType> EMPLOYEE_TYPES = List.of(
+            UserType.COLABORADOR, UserType.GESTOR, UserType.GESTOR_WORKSPACE);
     private final WorkspaceAccessService workspaceAccessService;
     private final UnitRepository unitRepository;
     private final UnitAddressRepository unitAddressRepository;
@@ -90,7 +93,7 @@ public class UnitSettingsService {
     }
 
     private UnitResponse buildUnitResponse(Unit unit) {
-        long collaboratorCount = userRepository.countByUnit_IdAndType(unit.id, UserType.COLABORADOR);
+        long collaboratorCount = userRepository.countByUnit_IdAndTypeInAndStatus(unit.id, EMPLOYEE_TYPES, UserStatus.ATIVO);
         return unitResponseMapper.toResponse(unit, collaboratorCount);
     }
 

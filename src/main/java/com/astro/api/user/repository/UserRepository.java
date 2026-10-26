@@ -16,7 +16,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
-    long countByUnit_IdAndType(Long unitId, UserType type);
+    long countByUnit_IdAndTypeInAndStatus(Long unitId, Collection<UserType> types, UserStatus status);
 
     long countByUnit_WorkspaceAndType(Workspace workspace, UserType type);
 

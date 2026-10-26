@@ -166,8 +166,10 @@ Consumidores que liam os nomes anteriores em português precisam atualizar a
 integração. `number` corresponde à coluna `numero` e pode ser null em registros legados.
 
 Nas respostas de criação e edição, `collaboratorCount` usa o método derivado
-`UserRepository.countByUnit_IdAndType`. O service informa o tipo `COLABORADOR`;
-a contagem mantém todos os status e não exige uma `@Query` escrita manualmente.
+`UserRepository.countByUnit_IdAndTypeInAndStatus`. O service considera os tipos
+`COLABORADOR`, `GESTOR` e `GESTOR_WORKSPACE`, somente com status `ATIVO` e na mesma
+unidade, em conformidade com `vw_unidades`. O método derivado não exige uma
+`@Query` escrita manualmente. Unidades inativas mantêm a contagem de seus usuários ativos.
 
 ## Sincronização de planilha
 

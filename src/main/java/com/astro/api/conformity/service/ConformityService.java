@@ -10,7 +10,7 @@ import com.astro.api.conformity.dto.request.ConformityApplicabilityRequest;
 import com.astro.api.conformity.model.Conformity;
 import com.astro.api.conformity.model.NrCatalog;
 import com.astro.api.conformity.repository.NrCatalogRepository;
-import com.astro.api.user.repository.CollaboratorRepository;
+import com.astro.api.conformity.repository.ConformityUserRepository;
 import com.astro.api.conformity.dto.response.ConformityResponse;
 import com.astro.api.conformity.mapper.ConformityMapper;
 import com.astro.api.conformity.repository.ConformityRepository;
@@ -35,17 +35,17 @@ public class ConformityService {
     private final ConformityRepository conformityRepository;
     private final UserRepository userRepository;
     private final ConformityMapper conformityMapper;
-    private final CollaboratorRepository collaboratorRepository;
+    private final ConformityUserRepository conformityUserRepository;
     private final NrCatalogRepository nrCatalogRepository;
     private final UserAvatarService userAvatarService;
 
     public ConformityService(ConformityRepository conformityRepository, UserRepository userRepository, ConformityMapper conformityMapper,
-                             CollaboratorRepository collaboratorRepository, NrCatalogRepository nrCatalogRepository,
+                             ConformityUserRepository conformityUserRepository, NrCatalogRepository nrCatalogRepository,
                              UserAvatarService userAvatarService) {
         this.conformityRepository = conformityRepository;
         this.userRepository = userRepository;
         this.conformityMapper = conformityMapper;
-        this.collaboratorRepository = collaboratorRepository;
+        this.conformityUserRepository = conformityUserRepository;
         this.nrCatalogRepository = nrCatalogRepository;
         this.userAvatarService = userAvatarService;
     }
@@ -80,7 +80,7 @@ public class ConformityService {
     }
 
     private User requireCollaborator(Long collaboratorId, AuthenticatedUser principal, User manager) {
-        return collaboratorRepository.findForUpdateInScope(collaboratorId, principal.firebaseUid(), manager.getUnit().workspace.id)
+        return conformityUserRepository.findForUpdateInScope(collaboratorId, principal.firebaseUid(), manager.getUnit().workspace.id)
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
     }
 
@@ -187,7 +187,7 @@ public class ConformityService {
     public boolean importRow(String cpf, Integer nrId, LocalDate expiresAt, AuthenticatedUser principal) {
         User manager = requireManager(principal);
         conformityRepository.lockWrites();
-        Long collaboratorId = collaboratorRepository.findIdByCpfInScope(cpf, principal.firebaseUid(), manager.getUnit().workspace.id)
+        Long collaboratorId = conformityUserRepository.findIdByCpfInScope(cpf, principal.firebaseUid(), manager.getUnit().workspace.id)
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado no escopo autorizado"));
         User collaborator = requireCollaborator(collaboratorId, principal, manager);
         Optional<Conformity> representative = conformityRepository.findApplicableRepresentative(collaboratorId, nrId, Limit.of(1));

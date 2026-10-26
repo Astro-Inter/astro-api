@@ -1,6 +1,11 @@
 package com.astro.api.unit.repository;
 
 import com.astro.api.unit.model.Unit;
+import com.astro.api.user.model.User;
+import com.astro.api.user.model.UserStatus;
+import com.astro.api.user.model.UserType;
+import com.astro.api.user.repository.UserRepository;
+import java.util.List;
 import com.astro.api.unit.model.UnitAddress;
 import com.astro.api.workspace.model.Workspace;
 import jakarta.persistence.EntityManager;
@@ -104,6 +109,38 @@ class UnitRepositoryPostgresTest {
     }
 
     @Test
+    void countsOnlyActiveEmployeesOfAllThreeProfilesInTheSameUnit() {
+        transactionTemplate.executeWithoutResult(status -> {
+            EntityManager entityManager = EntityManagerFactoryUtils.getTransactionalEntityManager(
+                    context.getBean(EntityManagerFactory.class));
+            assertNotNull(entityManager);
+            Unit countedUnit = entityManager.find(Unit.class, testUnits.addressedUnitId());
+            Unit otherUnit = entityManager.find(Unit.class, testUnits.legacyUnitId());
+            for (UserType type : UserType.values()) {
+                for (UserStatus userStatus : UserStatus.values()) {
+                    User employee = new User();
+                    employee.setName(type.name());
+                    employee.setEmail(type.name() + userStatus.name() + "@example.com");
+                    employee.setType(type); employee.setStatus(userStatus); employee.setUnit(countedUnit);
+                    entityManager.persist(employee);
+                }
+                User employeeInOtherUnit = new User();
+                employeeInOtherUnit.setEmail(type.name() + "other@example.com");
+                employeeInOtherUnit.setType(type); employeeInOtherUnit.setStatus(UserStatus.ATIVO);
+                employeeInOtherUnit.setUnit(otherUnit);
+                entityManager.persist(employeeInOtherUnit);
+            }
+            entityManager.flush();
+            UserRepository users = context.getBean(UserRepository.class);
+            List<UserType> types = List.of(UserType.COLABORADOR, UserType.GESTOR, UserType.GESTOR_WORKSPACE);
+            assertEquals(3, users.countByUnit_IdAndTypeInAndStatus(countedUnit.id, types, UserStatus.ATIVO));
+            assertEquals(3, users.countByUnit_IdAndTypeInAndStatus(otherUnit.id, types, UserStatus.ATIVO));
+            assertEquals(0, users.countByUnit_IdAndTypeInAndStatus(-1L, types, UserStatus.ATIVO));
+            status.setRollbackOnly();
+        });
+    }
+
+    @Test
     void projectsNativePointAsLongitudeThenLatitudeAndScopesTheUnit() {
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         jdbcTemplate.update("UPDATE unidade_endereco SET geolocalizacao = point(?, ?) WHERE unidade_id = ?",
@@ -167,7 +204,7 @@ class UnitRepositoryPostgresTest {
 
     @Configuration
     @EnableTransactionManagement
-    @EnableJpaRepositories(basePackageClasses = UnitRepository.class)
+    @EnableJpaRepositories(basePackageClasses = {UnitRepository.class, UserRepository.class})
     static class Config {
         @Bean DataSource dataSource() { return UnitRepositoryPostgresTest.dataSource; }
 
