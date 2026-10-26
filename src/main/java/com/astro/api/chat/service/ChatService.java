@@ -1,6 +1,7 @@
 package com.astro.api.chat.service;
 
 import com.astro.api.auth.security.AuthenticatedUser;
+import com.astro.api.auth.security.Role;
 import com.astro.api.chat.dto.response.ChatLastMessageResponse;
 import com.astro.api.chat.dto.response.ChatMessagePageResponse;
 import com.astro.api.chat.dto.response.ChatParticipantResponse;
@@ -56,39 +57,12 @@ public class ChatService {
     @Transactional(readOnly = true)
     public ChatMessagePageResponse findMessages(AuthenticatedUser authenticatedUser, String conversationId,
                                                int limit, String before) {
-        String uid = authenticatedUser == null ? null : authenticatedUser.firebaseUid();
-        if (uid == null || uid.isBlank()) {
-            throw new AccessDeniedException("Usuário autenticado necessário para consultar mensagens");
-        }
         if (limit < 1 || limit > 100) {
             throw new BusinessException("O limite deve estar entre 1 e 100");
         }
         UUID conversationUuid = parseUuid(conversationId, "conversationId");
         String normalizedConversationId = conversationUuid.toString();
-
-        UserChatProjection currentUser = userRepository.findChatUserByFirebaseUid(uid)
-                .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
-        if (currentUser.getWorkspaceId() == null) {
-            throw new AccessDeniedException("Colaborador autenticado sem Workspace associado");
-        }
-
-        ConversationDocument conversation = chatMongoRepository.findConversation(normalizedConversationId);
-        if (conversation == null) {
-            throw new ResourceNotFoundException("Conversa não encontrada");
-        }
-        List<Long> participants = conversation.participants();
-        if (participants == null || participants.size() != 2 || participants.get(0) == null
-                || participants.get(1) == null || participants.get(0).equals(participants.get(1))) {
-            throw new ResourceNotFoundException("Conversa não encontrada");
-        }
-        if (!participants.contains(currentUser.getId())) {
-            throw new AccessDeniedException("Usuário não participa desta conversa");
-        }
-        List<UserChatProjection> participantUsers = userRepository.findChatUsersByIds(participants);
-        if (participantUsers.size() != 2 || participantUsers.stream()
-                .anyMatch(user -> !currentUser.getWorkspaceId().equals(user.getWorkspaceId()))) {
-            throw new AccessDeniedException("Conversa fora do Workspace autorizado");
-        }
+        authorizeConversation(authenticatedUser, normalizedConversationId);
 
         MessageCursor cursor = before == null ? null : decodeCursor(before, normalizedConversationId);
         List<ChatMessageDocument> fetched = chatMongoRepository.findMessagesBefore(
@@ -114,6 +88,46 @@ public class ChatService {
         } catch (RuntimeException exception) {
             throw new BusinessException("Identificador inválido: " + field);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public void markAsRead(AuthenticatedUser authenticatedUser, String conversationId) {
+        String normalizedConversationId = parseUuid(conversationId, "conversationId").toString();
+        UserChatProjection currentUser = authorizeConversation(authenticatedUser, normalizedConversationId);
+        redisTemplate.delete(unreadKey(normalizedConversationId, currentUser.getId()));
+    }
+
+    private UserChatProjection authorizeConversation(AuthenticatedUser authenticatedUser, String conversationId) {
+        String uid = authenticatedUser == null ? null : authenticatedUser.firebaseUid();
+        if (uid == null || uid.isBlank()) {
+            throw new AccessDeniedException("Usuário autenticado necessário para acessar a conversa");
+        }
+        if (authenticatedUser.role() == Role.ADMIN) {
+            throw new AccessDeniedException("Usuários ADMIN não participam do Chat operacional");
+        }
+        UserChatProjection currentUser = userRepository.findChatUserByFirebaseUid(uid)
+                .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
+        if (currentUser.getWorkspaceId() == null) {
+            throw new AccessDeniedException("Colaborador autenticado sem Workspace associado");
+        }
+        ConversationDocument conversation = chatMongoRepository.findConversation(conversationId);
+        if (conversation == null) {
+            throw new ResourceNotFoundException("Conversa não encontrada");
+        }
+        List<Long> participants = conversation.participants();
+        if (participants == null || participants.size() != 2 || participants.get(0) == null
+                || participants.get(1) == null || participants.get(0).equals(participants.get(1))) {
+            throw new ResourceNotFoundException("Conversa não encontrada");
+        }
+        if (!participants.contains(currentUser.getId())) {
+            throw new AccessDeniedException("Usuário não participa desta conversa");
+        }
+        List<UserChatProjection> participantUsers = userRepository.findChatUsersByIds(participants);
+        if (participantUsers.size() != 2 || participantUsers.stream()
+                .anyMatch(user -> !currentUser.getWorkspaceId().equals(user.getWorkspaceId()))) {
+            throw new AccessDeniedException("Conversa fora do Workspace autorizado");
+        }
+        return currentUser;
     }
 
     private String encodeCursor(String conversationId, Instant date, String messageId) {

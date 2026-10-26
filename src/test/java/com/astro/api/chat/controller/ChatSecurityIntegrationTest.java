@@ -38,6 +38,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class ChatSecurityIntegrationTest {
@@ -77,6 +78,8 @@ class ChatSecurityIntegrationTest {
                 .andExpect(status().isUnauthorized());
         mvc.perform(get("/chats/{conversationId}/messages", conversationId))
                 .andExpect(status().isUnauthorized());
+        mvc.perform(patch("/chats/{conversationId}/read", conversationId))
+                .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(chatService);
     }
@@ -98,6 +101,9 @@ class ChatSecurityIntegrationTest {
             mvc.perform(get("/chats/{conversationId}/messages", conversationId)
                             .header("Authorization", "Bearer valid"))
                     .andExpect(status().isOk());
+            mvc.perform(patch("/chats/{conversationId}/read", conversationId)
+                            .header("Authorization", "Bearer valid"))
+                    .andExpect(status().isNoContent());
         }
 
         when(authorization.getRole("uid")).thenReturn(Optional.of(Role.ADMIN));
@@ -106,6 +112,9 @@ class ChatSecurityIntegrationTest {
         mvc.perform(get("/chats/{conversationId}/messages", conversationId)
                         .header("Authorization", "Bearer valid"))
                 .andExpect(status().isForbidden());
+            mvc.perform(patch("/chats/{conversationId}/read", conversationId)
+                            .header("Authorization", "Bearer valid"))
+                    .andExpect(status().isForbidden());
         verify(chatService, org.mockito.Mockito.times(3)).findChats(org.mockito.ArgumentMatchers.any());
     }
 

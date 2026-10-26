@@ -26,8 +26,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
 
 class ChatServiceTest {
     private UserRepository users;
@@ -209,6 +211,93 @@ class ChatServiceTest {
         verify(mongo, never()).findMessagesBefore(org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    @Test
+    void marksAuthorizedConversationReadByDeletingOnlyAuthenticatedUsersKey() {
+        String conversationId = "11111111-2222-4333-8444-555555555555";
+        UserChatProjection ana = user(2L, "Ana", UserType.GESTOR, 10L);
+        when(mongo.findConversation(conversationId)).thenReturn(
+                new ConversationDocument(conversationId, List.of(1L, 2L)));
+        when(users.findChatUsersByIds(List.of(1L, 2L)))
+                .thenReturn(List.of(current, ana));
+
+        service.markAsRead(authenticatedUser(), conversationId);
+
+        verify(redis).delete("chat:unread:" + conversationId + ":1");
+        verify(redis, never()).delete("chat:unread:" + conversationId + ":2");
+        verify(mongo, never()).findMessagesBefore(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyInt());
+        var order = inOrder(users, mongo, redis);
+        order.verify(users).findChatUserByFirebaseUid("uid");
+        order.verify(mongo).findConversation(conversationId);
+        order.verify(users).findChatUsersByIds(List.of(1L, 2L));
+        order.verify(redis).delete("chat:unread:" + conversationId + ":1");
+    }
+
+    @Test
+    void repeatedReadRequestsDeleteTheSameKeyAndRemainIdempotent() {
+        String conversationId = "11111111-2222-4333-8444-555555555555";
+        UserChatProjection ana = user(2L, "Ana", UserType.GESTOR, 10L);
+        when(mongo.findConversation(conversationId)).thenReturn(
+                new ConversationDocument(conversationId, List.of(1L, 2L)));
+        when(users.findChatUsersByIds(List.of(1L, 2L)))
+                .thenReturn(List.of(current, ana));
+
+        service.markAsRead(authenticatedUser(), conversationId);
+        service.markAsRead(authenticatedUser(), conversationId);
+
+        verify(redis, times(2)).delete("chat:unread:" + conversationId + ":1");
+    }
+
+    @Test
+    void doesNotDeleteUnreadKeyForInvalidMissingOrUnauthorizedConversation() {
+        String conversationId = "11111111-2222-4333-8444-555555555555";
+        assertThrows(com.astro.api.common.exception.BusinessException.class,
+                () -> service.markAsRead(authenticatedUser(), "invalid"));
+
+        when(mongo.findConversation(conversationId)).thenReturn(null);
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,
+                () -> service.markAsRead(authenticatedUser(), conversationId));
+
+        when(mongo.findConversation(conversationId)).thenReturn(
+                new ConversationDocument(conversationId, List.of(2L, 3L)));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.markAsRead(authenticatedUser(), conversationId));
+
+        when(mongo.findConversation(conversationId)).thenReturn(
+                new ConversationDocument(conversationId, List.of(1L, 2L)));
+        UserChatProjection foreign = user(2L, "Ana", UserType.GESTOR, 20L);
+        when(users.findChatUsersByIds(List.of(1L, 2L)))
+                .thenReturn(List.of(current, foreign));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.markAsRead(authenticatedUser(), conversationId));
+        verify(redis, never()).delete(org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void rejectsAdminWithoutDeletingUnreadKey() {
+        String conversationId = "11111111-2222-4333-8444-555555555555";
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.markAsRead(new AuthenticatedUser("uid", "admin@example.com", Role.ADMIN), conversationId));
+        verify(redis, never()).delete(org.mockito.ArgumentMatchers.anyString());
+        verify(mongo, never()).findConversation(org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void propagatesRedisFailureInsteadOfReportingSuccessfulRead() {
+        String conversationId = "11111111-2222-4333-8444-555555555555";
+        UserChatProjection ana = user(2L, "Ana", UserType.GESTOR, 10L);
+        when(mongo.findConversation(conversationId)).thenReturn(
+                new ConversationDocument(conversationId, List.of(1L, 2L)));
+        when(users.findChatUsersByIds(List.of(1L, 2L)))
+                .thenReturn(List.of(current, ana));
+        when(redis.delete("chat:unread:" + conversationId + ":1"))
+                .thenThrow(new IllegalStateException("Redis indisponível"));
+
+        assertThrows(IllegalStateException.class,
+                () -> service.markAsRead(authenticatedUser(), conversationId));
     }
 
     private ChatMessageDocument message(String id, String conversationId, Instant date) {

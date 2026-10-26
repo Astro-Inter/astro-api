@@ -31,7 +31,9 @@ public class ChatMongoRepository {
     }
 
     public ConversationDocument findConversation(String conversationId) {
-        return mongoTemplate.findById(conversationId, ConversationDocument.class, CONVERSATIONS);
+        Query query = Query.query(Criteria.where("_id").is(conversationId));
+        query.fields().include("_id").include("participantes");
+        return mongoTemplate.findOne(query, ConversationDocument.class, CONVERSATIONS);
     }
 
     public List<ChatMessageDocument> findMessagesBefore(String conversationId, Instant cursorDate,

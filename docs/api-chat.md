@@ -53,6 +53,47 @@ Resposta de sucesso (dentro de `data` do envelope `ApiResult`):
 Para conversas sem mensagens, `messages` é vazio, `nextCursor` é null e
 `hasMore` é false. Na última página, `nextCursor` também é null.
 
+## Marcar conversa como lida
+
+`PATCH /chats/{conversationId}/read` requer um Bearer token Firebase de
+colaborador, gestor ou gestor do workspace. O endpoint não recebe corpo,
+query parameters, ID de usuário ou Workspace e retorna `204 No Content` sem
+body.
+
+O `conversationId` deve ser um UUID no formato canônico usado em `_id` na
+collection `conversas`. A API resolve o colaborador pelo UID do principal
+Firebase, verifica a conversa e seus dois participantes no MongoDB e confirma
+no PostgreSQL que o usuário autenticado participa dela e que ambos os
+participantes pertencem ao Workspace atual. Conversa inexistente retorna 404,
+ID inválido retorna 400 e falta de participação ou divergência de Workspace
+retorna 403. `ADMIN` não tem acesso ao Chat operacional. O status do outro
+participante não é consultado como critério de autorização, então sua
+desativação não bloqueia a leitura do histórico existente.
+
+Após autorizar, a API executa uma única operação Redis `DEL` na chave
+`chat:unread:{conversationId}:{userId}`, usando o ID PostgreSQL do usuário
+autenticado. Por exemplo, para a conversa
+`11111111-2222-4333-8444-555555555555` e usuário `25`, a chave removida é
+`chat:unread:11111111-2222-4333-8444-555555555555:25`. A chave do outro
+participante não é alterada. A remoção é idempotente, inclusive se a chave já
+não existir; erros de conexão Redis são propagados pelo tratamento central de
+infraestrutura.
+
+Exemplo:
+
+```http
+PATCH /chats/11111111-2222-4333-8444-555555555555/read
+Authorization: Bearer FIREBASE_ID_TOKEN
+```
+
+Resposta de sucesso: `204 No Content`, sem conteúdo.
+
+O contador simples tem uma condição de corrida conhecida: se uma nova mensagem
+incrementar a chave entre a solicitação de leitura e o `DEL`, essa mensagem
+pode deixar de ser contabilizada como não lida. O modelo atual não registra
+leituras por mensagem; esta operação não oferece garantia absoluta de leitura
+nesse cenário concorrente.
+
 ### Índice MongoDB
 
 A consulta depende do índice composto abaixo para manter o filtro, a ordenação e
