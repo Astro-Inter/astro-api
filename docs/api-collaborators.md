@@ -88,7 +88,10 @@ a API tenta desativar somente o colaborador afetado em uma nova transação,
 registra o incidente para reconciliação operacional e responde 500. Se o banco
 também estiver indisponível, essa contenção não pode ser garantida; o incidente
 permanece registrado para intervenção. A contenção afeta somente a conta editada;
-as demais contas são preservadas.
+as demais contas são preservadas. A atualização de contenção usa uma query JPQL
+condicionada ao ID e ao Firebase UID, válida para os três perfis. Uma consulta
+derivada de leitura não substitui essa atualização condicional. A consulta de
+edição permanece nativa por usar `fn_seleciona_unidades` e `FOR UPDATE OF u`.
 
 ## Status — SCRUM-522
 

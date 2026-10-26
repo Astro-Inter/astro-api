@@ -37,6 +37,27 @@ import static org.junit.jupiter.api.Assertions.*;
 @EnabledIfEnvironmentVariable(named = "COLLABORATOR_TEST_JDBC_URL", matches = "jdbc:postgresql://(localhost|127\\.0\\.0\\.1):[0-9]+/scrum517")
 class CollaboratorPostgresTest {
     @Test
+    void containsEmailFailureForEveryProfileOnlyWhenIdAndIdentityMatch() {
+        try (var context = new AnnotationConfigApplicationContext(Config.class)) {
+            var jdbc = new JdbcTemplate(context.getBean(DataSource.class));
+            var repository = context.getBean(CollaboratorRepository.class);
+            new TransactionTemplate(context.getBean(JpaTransactionManager.class)).executeWithoutResult(transaction -> {
+                transaction.setRollbackOnly();
+                seed(jdbc);
+                for (UserType type : UserType.values()) {
+                    jdbc.update("UPDATE usuario SET tipo = ?, status = 'ATIVO' WHERE id_usuario = 91003", type.name());
+                    assertEquals(0, repository.deactivateAfterEmailFailure(91003L, "other-identity"));
+                    assertEquals(0, repository.deactivateAfterEmailFailure(91002L, "scrum517-collaborator"));
+                    assertEquals("ATIVO", jdbc.queryForObject("SELECT status FROM usuario WHERE id_usuario = 91003", String.class));
+                    assertEquals(1, repository.deactivateAfterEmailFailure(91003L, "scrum517-collaborator"));
+                    assertEquals("DESATIVADO", jdbc.queryForObject("SELECT status FROM usuario WHERE id_usuario = 91003", String.class));
+                    assertEquals(type.name(), jdbc.queryForObject("SELECT tipo FROM usuario WHERE id_usuario = 91003", String.class));
+                }
+            });
+        }
+    }
+
+    @Test
     void loadsProfilePhotosFromTheExistingTableOnlyAfterAuthorizingCollaborators() {
         try (var context = new AnnotationConfigApplicationContext(Config.class)) {
             var jdbc = new JdbcTemplate(context.getBean(DataSource.class));

@@ -35,7 +35,11 @@ public interface CollaboratorRepository extends JpaRepository<User, Long> {
             @Param("firebaseUid") String firebaseUid, @Param("workspaceId") Long workspaceId);
 
     @Modifying
-    @Query("UPDATE User u SET u.status = com.astro.api.user.model.UserStatus.DESATIVADO WHERE u.id = :collaboratorId AND u.type IN (com.astro.api.user.model.UserType.COLABORADOR, com.astro.api.user.model.UserType.GESTOR, com.astro.api.user.model.UserType.GESTOR_WORKSPACE) AND u.firebaseUid = :firebaseUid")
+    @Query("""
+            UPDATE User u
+            SET u.status = com.astro.api.user.model.UserStatus.DESATIVADO
+            WHERE u.id = :collaboratorId AND u.firebaseUid = :firebaseUid
+            """)
     int deactivateAfterEmailFailure(@Param("collaboratorId") Long collaboratorId, @Param("firebaseUid") String firebaseUid);
 
     @Query(value = """
