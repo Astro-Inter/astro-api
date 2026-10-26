@@ -13,5 +13,6 @@ public record CollaboratorSummaryResponse(
         @JsonProperty("unidade") String unitName,
         UserStatus status,
         String profilePhotoUrl,
-        String avatarInitials) {
+        String avatarInitials,
+        boolean canManage) {
 }

@@ -13,8 +13,14 @@ Conformidades podem pertencer aos três perfis. A listagem, os detalhes, a ediç
 a aplicabilidade e a importação mantêm workspace e unidades autorizadas. Novas
 conformidades e reativações exigem usuário ATIVO; a consulta/edição de histórico
 mantém as regras de status e NRs revogadas existentes. ADMIN não é destinatário
-nem ganha acesso aos endpoints. A gestão cadastral de colaboradores não amplia
-suas permissões sobre gestores.
+nem ganha acesso aos endpoints. Na gestão cadastral, o gestor do workspace pode
+editar os três perfis no escopo. O gestor comum consulta todos, mas não edita
+outros gestores nem altera seu status. O campo `canManage` reflete essa regra.
+
+A listagem e os detalhes de colaboradores incluem os três perfis com a versão
+atualizada de `05_vw_colaboradores.sql`. `excludeSelf=true` oculta o solicitante
+apenas na listagem que enviar esse parâmetro; conformidades e seus seletores
+mantêm a própria conta. `03_vw_cargos.sql` também conta os três perfis ativos.
 
 `collaboratorCount` nas respostas de criação/edição de unidades conta somente
 usuários ATIVOS dos três perfis vinculados à mesma unidade. A listagem segue

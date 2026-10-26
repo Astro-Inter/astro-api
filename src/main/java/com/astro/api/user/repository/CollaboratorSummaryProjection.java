@@ -9,4 +9,5 @@ public interface CollaboratorSummaryProjection {
     Long getUnitId();
     String getUnitName();
     String getStatus();
+    String getUserType();
 }

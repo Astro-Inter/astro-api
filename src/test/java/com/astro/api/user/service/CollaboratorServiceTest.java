@@ -108,6 +108,17 @@ class CollaboratorServiceTest {
     }
 
     @Test
+    void hidesSelfOnlyOnRequestBeforeLoadingAvatarsAndPreservesOtherEmployees() {
+        var self = row(1L, "ATIVO");
+        var other = row(2L, "ATIVO");
+        when(repository.findAllInScope("manager", 3L)).thenReturn(List.of(self, other));
+        assertEquals(List.of(2L), service.findAll(principal, true).stream().map(value -> value.id()).toList());
+        verify(avatars).findUrls(List.of(2L));
+        assertEquals(List.of(1L, 2L), service.findAll(principal).stream().map(value -> value.id()).toList());
+        verify(avatars).findUrls(List.of(1L, 2L));
+    }
+
+    @Test
     void returnsAnEmptyListWhenNoCollaboratorsAreAuthorized() {
         when(repository.findAllInScope("manager", 3L)).thenReturn(List.of());
         assertTrue(service.findAll(principal).isEmpty());
@@ -137,7 +148,61 @@ class CollaboratorServiceTest {
         when(row.getUnitId()).thenReturn(12L);
         when(row.getUnitName()).thenReturn("Matriz");
         when(row.getStatus()).thenReturn(status);
+        when(row.getUserType()).thenReturn("COLABORADOR");
         return row;
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = UserType.class, names = {"GESTOR", "GESTOR_WORKSPACE"})
+    void managersCannotEditOrChangeTheStatusOfOtherManagers(UserType targetType) {
+        User target = collaborator(UserStatus.ATIVO, "completed");
+        target.setType(targetType);
+        assertThrows(AccessDeniedException.class, () -> service.update(2L, updateBody(UserStatus.ATIVO), principal));
+        assertThrows(AccessDeniedException.class, () -> service.changeStatus(2L,
+                new CollaboratorStatusRequest(CollaboratorStatusRequest.Status.DESATIVADO), principal));
+        assertEquals("Nome anterior", target.getName());
+        assertEquals(UserStatus.ATIVO, target.getStatus());
+        verify(repository, never()).saveAndFlush(any());
+        verifyNoInteractions(identities, avatars);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(UserType.class)
+    void workspaceManagersCanEditAndChangeStatusOfEveryEmployeeProfileWithoutChangingItsType(UserType targetType) {
+        manager.setType(UserType.GESTOR_WORKSPACE);
+        var owner = new AuthenticatedUser("manager", "manager@example.com", Role.GESTOR_WORKSPACE);
+        User target = collaborator(UserStatus.ATIVO, "completed");
+        target.setType(targetType);
+        assertTrue(service.update(2L, updateBody(UserStatus.ATIVO), owner).canManage());
+        assertEquals(targetType, target.getType());
+        assertEquals("completed", target.getFirebaseUid());
+        assertEquals(UserStatus.DESATIVADO, service.changeStatus(2L,
+                new CollaboratorStatusRequest(CollaboratorStatusRequest.Status.DESATIVADO), owner).status());
+        assertEquals(targetType, target.getType());
+    }
+
+    @Test
+    void readPermissionsReflectTheAuthenticatedActorWhileEveryProfileRemainsVisible() {
+        var self = row(1L, "ATIVO"); when(self.getUserType()).thenReturn("GESTOR");
+        var employee = row(2L, "ATIVO");
+        var peer = row(3L, "ATIVO"); when(peer.getUserType()).thenReturn("GESTOR");
+        var owner = row(4L, "ATIVO"); when(owner.getUserType()).thenReturn("GESTOR_WORKSPACE");
+        when(repository.findAllInScope("manager", 3L)).thenReturn(List.of(self, employee, peer, owner));
+        assertEquals(List.of(true, true, false, false), service.findAll(principal).stream().map(value -> value.canManage()).toList());
+        manager.setType(UserType.GESTOR_WORKSPACE);
+        var ownerPrincipal = new AuthenticatedUser("manager", "manager@example.com", Role.GESTOR_WORKSPACE);
+        assertTrue(service.findAll(ownerPrincipal).stream().allMatch(value -> value.canManage()));
+    }
+
+    @Test
+    void workspaceManagerStillCannotWriteOutsideItsWorkspaceOrAuthorizedUnits() {
+        manager.setType(UserType.GESTOR_WORKSPACE);
+        var owner = new AuthenticatedUser("manager", "manager@example.com", Role.GESTOR_WORKSPACE);
+        assertThrows(ResourceNotFoundException.class, () -> service.update(99L, updateBody(UserStatus.ATIVO), owner));
+        assertThrows(ResourceNotFoundException.class, () -> service.changeStatus(99L,
+                new CollaboratorStatusRequest(CollaboratorStatusRequest.Status.DESATIVADO), owner));
+        verify(repository, never()).saveAndFlush(any());
+        verifyNoInteractions(identities);
     }
 
     @Test

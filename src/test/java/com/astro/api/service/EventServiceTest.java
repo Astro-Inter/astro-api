@@ -125,9 +125,11 @@ class EventServiceTest {
         when(userRepository.findByFirebaseUid("manager")).thenReturn(Optional.of(manager));
     }
 
-    @Test
-    void createsEventWithoutNrUsingBatchOperations() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(UserType.class)
+    void createsEventWithoutNrForEveryEmployeeProfileUsingBatchOperations(UserType participantType) {
         User participant = createUser(2L, UserStatus.ATIVO, workspace);
+        participant.setType(participantType);
         when(userRepository.findEventParticipantsInWorkspace(any(), eq(workspace))).thenReturn(List.of(participant));
         when(eventRepository.save(any(Event.class))).thenAnswer(invocation -> {
             Event event = invocation.getArgument(0);
@@ -146,6 +148,7 @@ class EventServiceTest {
 
         assertEquals(EventStatus.ATIVO, response.status());
         assertEquals(1, response.eventClasses().size());
+        assertEquals(2L, response.eventClasses().getFirst().participants().getFirst().id());
         verify(userRepository).findEventParticipantsInWorkspace(any(), eq(workspace));
         verify(eventClassRepository).saveAll(any());
         verify(eventClassParticipantRepository).saveAll(any());
@@ -202,8 +205,10 @@ class EventServiceTest {
         verifyNoInteractions(eventRepository);
     }
 
-    @Test
-    void rejectsManagerAsParticipant() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = UserType.class, names = {"GESTOR", "GESTOR_WORKSPACE"})
+    void rejectsTheCreatorAsParticipantForBothManagerProfiles(UserType creatorType) {
+        manager.setType(creatorType);
         when(userRepository.findEventParticipantsInWorkspace(any(), eq(workspace))).thenReturn(List.of(manager));
 
         assertThrows(BusinessException.class, () -> service.create(

@@ -39,17 +39,18 @@ public class CollaboratorController {
 
     @GetMapping
     @Operation(summary = "Lista colaboradores do escopo do gestor",
-            description = "Lista completa, ordenada por nome e ID, com os três status, URL de foto de perfil e iniciais para fallback. Não expõe CPF nem dados de autenticação. Não exige filtros ou paginação.")
+            description = "Inclui COLABORADOR, GESTOR e GESTOR_WORKSPACE no workspace e unidades autorizadas, ordenados por nome e ID, com os três status, URL de foto e iniciais. canManage informa permissão para edição e status. excludeSelf=true oculta somente o usuário autenticado desta listagem; o padrão false mantém todos para seleções de participantes e conformidades. Não expõe CPF nem dados de autenticação.")
     @ApiResponse(responseCode = "200", description = "Lista de colaboradores, possivelmente vazia")
     public ResponseEntity<ApiResult<List<CollaboratorSummaryResponse>>> findAll(
-            @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @RequestParam(defaultValue = "false") boolean excludeSelf, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Colaboradores retornados com sucesso",
-                service.findAll(user), request.getRequestURI()));
+                service.findAll(user, excludeSelf), request.getRequestURI()));
     }
 
     @GetMapping("/{collaboratorId}")
     @Operation(summary = "Consulta detalhes do colaborador para informações e edição",
-            description = "Inclui CPF, modalidade, URL de foto de perfil e iniciais; restringe a consulta ao workspace e às unidades autorizadas. Não expõe dados de autenticação.")
+            description = "Inclui COLABORADOR, GESTOR e GESTOR_WORKSPACE, com CPF, modalidade, URL de foto, iniciais e canManage; restringe a consulta ao workspace e às unidades autorizadas. Ambos os gestores podem consultar os três perfis. Não expõe dados de autenticação.")
     @ApiResponses({@ApiResponse(responseCode = "200", description = "Detalhes do colaborador"),
             @ApiResponse(responseCode = "404", description = "Colaborador inexistente ou fora do escopo")})
     public ResponseEntity<ApiResult<CollaboratorDetailsResponse>> findById(
@@ -75,7 +76,7 @@ public class CollaboratorController {
 
     @PutMapping("/{collaboratorId}")
     @Operation(summary = "Edita todos os campos administrativos do colaborador",
-            description = "Exige todos os campos editáveis não nulos, incluindo status. Mantém vínculos inativos quando não alterados. Preserva ID, tipo, criado_em e Firebase UID. Mudanças de e-mail vinculadas ao Firebase usam compensação em caso de falha.")
+            description = "Gestor do workspace pode editar os três perfis no escopo; gestor comum pode editar colaboradores e sua própria conta, mas recebe 403 para outros gestores e gestor do workspace. Exige todos os campos editáveis não nulos, incluindo status. Mantém vínculos inativos quando não alterados. Preserva ID, tipo, criado_em e Firebase UID. Mudanças de e-mail vinculadas ao Firebase usam compensação em caso de falha.")
     @ApiResponses({@ApiResponse(responseCode = "200", description = "Colaborador atualizado"),
             @ApiResponse(responseCode = "404", description = "Colaborador, cargo ou unidade inexistente no escopo"),
             @ApiResponse(responseCode = "409", description = "CPF ou e-mail em conflito"),
@@ -89,7 +90,7 @@ public class CollaboratorController {
 
     @PatchMapping("/{collaboratorId}/status")
     @Operation(summary = "Altera explicitamente o status do colaborador",
-            description = "Aceita ATIVO ou DESATIVADO. Repetir o status atual é idempotente. Ativação exige cadastro concluído e cargo/unidade ativos; não conclui pré-cadastro. A desativação impede operações protegidas na próxima requisição.")
+            description = "Gestor do workspace pode administrar os três perfis no escopo; gestor comum não pode alterar o status de outros gestores ou do gestor do workspace (403). Aceita ATIVO ou DESATIVADO. Repetir o status atual é idempotente. Ativação exige cadastro concluído e cargo/unidade ativos; não conclui pré-cadastro. A desativação impede operações protegidas na próxima requisição.")
     @ApiResponses({@ApiResponse(responseCode = "200", description = "Status aplicado, com detalhes do colaborador"),
             @ApiResponse(responseCode = "404", description = "Colaborador inexistente ou fora do escopo")})
     public ResponseEntity<ApiResult<CollaboratorDetailsResponse>> changeStatus(@PathVariable Long collaboratorId,

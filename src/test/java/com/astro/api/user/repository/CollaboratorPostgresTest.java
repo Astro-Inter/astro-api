@@ -64,7 +64,7 @@ class CollaboratorPostgresTest {
     }
 
     @Test
-    void changesStatusThroughTheRealScopedRepositoryAndCannotTargetManagers() {
+    void changesStatusThroughTheRealScopedRepositoryAndKeepsTheManagersOwnStatus() {
         try (var context = new AnnotationConfigApplicationContext(Config.class)) {
             var jdbc = new JdbcTemplate(context.getBean(DataSource.class));
             var service = context.getBean(CollaboratorService.class);
@@ -78,7 +78,7 @@ class CollaboratorPostgresTest {
                 assertEquals(UserStatus.ATIVO, service.changeStatus(91003L, active, principal).status());
                 assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.changeStatus(91002L, active, principal));
                 assertThrows(com.astro.api.common.exception.BusinessException.class, () -> service.changeStatus(91004L, active, principal));
-                assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class, () -> service.changeStatus(91001L, inactive, principal));
+                assertEquals(UserStatus.ATIVO, service.changeStatus(91001L, active, principal).status());
                 assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class, () -> service.changeStatus(92002L, inactive, principal));
                 service.changeStatus(91003L, inactive, principal);
                 jdbc.update("UPDATE cargo SET ativo=false WHERE id_cargo=91001");
@@ -207,22 +207,22 @@ class CollaboratorPostgresTest {
                 transaction.setRollbackOnly();
                 seed(jdbc);
                 var rows = repository.findAllInScope("scrum517-manager", 91001L);
-                assertEquals(List.of(91002L, 91003L, 91004L), rows.stream().map(CollaboratorSummaryProjection::getId).toList());
-                assertEquals(List.of("PRE_CADASTRADO", "ATIVO", "DESATIVADO"),
+                assertEquals(List.of(91002L, 91003L, 91004L, 91001L), rows.stream().map(CollaboratorSummaryProjection::getId).toList());
+                assertEquals(List.of("PRE_CADASTRADO", "ATIVO", "DESATIVADO", "ATIVO"),
                         rows.stream().map(CollaboratorSummaryProjection::getStatus).toList());
-                assertEquals(3, rows.stream().map(CollaboratorSummaryProjection::getId).distinct().count());
+                assertEquals(4, rows.stream().map(CollaboratorSummaryProjection::getId).distinct().count());
                 assertTrue(repository.findAllInScope("scrum517-manager", 92001L).isEmpty());
                 assertTrue(repository.findAllInScope("unknown", 91001L).isEmpty());
                 assertTrue(repository.findAllInScope("scrum517-collaborator", 91001L).isEmpty());
                 assertTrue(repository.findDetailsInScope(92002L, "scrum517-manager", 91001L).isEmpty());
-                assertTrue(repository.findDetailsInScope(91001L, "scrum517-manager", 91001L).isEmpty());
+                assertTrue(repository.findDetailsInScope(91001L, "scrum517-manager", 91001L).isPresent());
                 assertTrue(repository.findDetailsInScope(99999L, "scrum517-manager", 91001L).isEmpty());
                 var details = repository.findDetailsInScope(91002L, "scrum517-manager", 91001L).orElseThrow();
                 assertEquals("52998224725", details.getCpf());
                 assertEquals("HIBRIDO", details.getWorkModel());
                 assertEquals(91001L, details.getWorkspaceId());
                 jdbc.update("UPDATE usuario SET tipo = 'GESTOR_WORKSPACE' WHERE id_usuario = 91001");
-                assertEquals(3, repository.findAllInScope("scrum517-manager", 91001L).size());
+                assertEquals(4, repository.findAllInScope("scrum517-manager", 91001L).size());
                 jdbc.update("UPDATE usuario SET status = 'DESATIVADO' WHERE id_usuario = 91001");
                 assertTrue(repository.findAllInScope("scrum517-manager", 91001L).isEmpty());
             });

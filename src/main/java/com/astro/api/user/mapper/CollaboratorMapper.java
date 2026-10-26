@@ -73,23 +73,23 @@ public class CollaboratorMapper {
         user.setUnit(unit);
     }
 
-    public CollaboratorDetailsResponse toDetails(User user, String profilePhotoUrl) {
+    public CollaboratorDetailsResponse toDetails(User user, String profilePhotoUrl, boolean canManage) {
         return new CollaboratorDetailsResponse(user.getId(), user.getName(), user.getCpf(), user.getEmail(),
                 user.getWorkModel(), user.getStatus(), user.getRole().getId(), user.getRole().getName(),
-                user.getUnit().id, user.getUnit().name, user.getUnit().workspace.id, profilePhotoUrl, initials(user.getName()));
+                user.getUnit().id, user.getUnit().name, user.getUnit().workspace.id, profilePhotoUrl, initials(user.getName()), canManage);
     }
 
-    public CollaboratorDetailsResponse toDetails(CollaboratorDetailsProjection row, String profilePhotoUrl) {
+    public CollaboratorDetailsResponse toDetails(CollaboratorDetailsProjection row, String profilePhotoUrl, boolean canManage) {
         return new CollaboratorDetailsResponse(row.getId(), row.getName(), row.getCpf(), row.getEmail(),
                 row.getWorkModel() == null ? null : WorkModel.valueOf(row.getWorkModel()),
                 UserStatus.valueOf(row.getStatus()), row.getRoleId(), row.getRoleName(),
-                row.getUnitId(), row.getUnitName(), row.getWorkspaceId(), profilePhotoUrl, initials(row.getName()));
+                row.getUnitId(), row.getUnitName(), row.getWorkspaceId(), profilePhotoUrl, initials(row.getName()), canManage);
     }
 
-    public CollaboratorSummaryResponse toSummary(CollaboratorSummaryProjection row, String profilePhotoUrl) {
+    public CollaboratorSummaryResponse toSummary(CollaboratorSummaryProjection row, String profilePhotoUrl, boolean canManage) {
         return new CollaboratorSummaryResponse(row.getId(), row.getName(), row.getEmail(),
                 row.getRoleId(), row.getRoleName(), row.getUnitId(), row.getUnitName(),
-                UserStatus.valueOf(row.getStatus()), profilePhotoUrl, initials(row.getName()));
+                UserStatus.valueOf(row.getStatus()), profilePhotoUrl, initials(row.getName()), canManage);
     }
 
 }
