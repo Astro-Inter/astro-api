@@ -7,6 +7,7 @@ import com.astro.api.auth.service.AuthorizationService;
 import com.astro.api.auth.service.FirebaseTokenService;
 import com.astro.api.chat.service.ChatService;
 import com.astro.api.chat.service.ChatContactService;
+import com.astro.api.chat.dto.response.ChatMessagePageResponse;
 import com.astro.api.common.handler.GlobalExceptionHandler;
 import com.astro.api.config.CorsConfig;
 import com.google.firebase.auth.FirebaseAuthException;
@@ -33,6 +34,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -66,9 +70,12 @@ class ChatSecurityIntegrationTest {
     @Test
     void requiresValidFirebaseAuthentication() throws Exception {
         when(tokens.verify("invalid")).thenThrow(mock(FirebaseAuthException.class));
+        String conversationId = "11111111-2222-4333-8444-555555555555";
 
         mvc.perform(get("/chats")).andExpect(status().isUnauthorized());
         mvc.perform(get("/chats").header("Authorization", "Bearer invalid"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/chats/{conversationId}/messages", conversationId))
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(chatService);
@@ -76,19 +83,28 @@ class ChatSecurityIntegrationTest {
 
     @Test
     void allowsCollaboratorRolesAndRejectsAdminRole() throws Exception {
+        String conversationId = "11111111-2222-4333-8444-555555555555";
         FirebaseToken token = mock(FirebaseToken.class);
         when(token.getUid()).thenReturn("uid");
         when(tokens.verify("valid")).thenReturn(token);
         when(chatService.findChats(org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
+        when(chatService.findMessages(any(), eq(conversationId), eq(30), isNull()))
+                .thenReturn(new ChatMessagePageResponse(List.of(), null, false));
 
         for (Role role : List.of(Role.COLABORADOR, Role.GESTOR, Role.GESTOR_WORKSPACE)) {
             when(authorization.getRole("uid")).thenReturn(Optional.of(role));
             mvc.perform(get("/chats").header("Authorization", "Bearer valid"))
                     .andExpect(status().isOk());
+            mvc.perform(get("/chats/{conversationId}/messages", conversationId)
+                            .header("Authorization", "Bearer valid"))
+                    .andExpect(status().isOk());
         }
 
         when(authorization.getRole("uid")).thenReturn(Optional.of(Role.ADMIN));
         mvc.perform(get("/chats").header("Authorization", "Bearer valid"))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/chats/{conversationId}/messages", conversationId)
+                        .header("Authorization", "Bearer valid"))
                 .andExpect(status().isForbidden());
         verify(chatService, org.mockito.Mockito.times(3)).findChats(org.mockito.ArgumentMatchers.any());
     }

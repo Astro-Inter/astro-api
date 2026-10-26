@@ -1,6 +1,8 @@
 package com.astro.api.chat.repository;
 
+import com.astro.api.chat.model.ChatMessageDocument;
 import com.astro.api.chat.model.ConversationDocument;
+import java.time.Instant;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
@@ -26,6 +28,32 @@ public class ChatMongoRepository {
         Query query = Query.query(Criteria.where("participantes").is(userId).size(2));
         query.fields().include("_id").include("participantes");
         return mongoTemplate.find(query, ConversationDocument.class, CONVERSATIONS);
+    }
+
+    public ConversationDocument findConversation(String conversationId) {
+        return mongoTemplate.findById(conversationId, ConversationDocument.class, CONVERSATIONS);
+    }
+
+    public List<ChatMessageDocument> findMessagesBefore(String conversationId, Instant cursorDate,
+                                                        String cursorMessageId, int limit) {
+        Criteria criteria = Criteria.where("id_conversa").is(conversationId);
+        if (cursorDate != null && cursorMessageId != null) {
+            criteria = criteria.andOperator(cursorCriteria(cursorDate, cursorMessageId));
+        }
+        Query query = Query.query(criteria)
+                .with(Sort.by(Sort.Order.desc("data"), Sort.Order.desc("_id")))
+                .limit(limit);
+        query.fields().include("_id").include("id_remetente").include("mensagem")
+                .include("resposta_mensagem_id").include("data");
+        return mongoTemplate.find(query, ChatMessageDocument.class, MESSAGES);
+    }
+
+    private Criteria cursorCriteria(Instant cursorDate, String cursorMessageId) {
+        return new Criteria().orOperator(
+                Criteria.where("data").lt(cursorDate),
+                new Criteria().andOperator(
+                        Criteria.where("data").is(cursorDate),
+                        Criteria.where("_id").lt(cursorMessageId)));
     }
 
     public List<LastMessageProjection> findLatestMessages(Collection<String> conversationIds) {
