@@ -36,6 +36,7 @@ public class SecurityConfig {
                    )
             )
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/ws", "/ws/**").permitAll()
                 .requestMatchers(HttpMethod.GET,
                     "/swagger-ui/**",
                     "/v3/api-docs/**"

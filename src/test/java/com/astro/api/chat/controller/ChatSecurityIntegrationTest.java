@@ -24,6 +24,8 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.test.context.support.TestPropertySourceUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
@@ -74,6 +76,7 @@ class ChatSecurityIntegrationTest {
         String conversationId = "11111111-2222-4333-8444-555555555555";
 
         mvc.perform(get("/chats")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/ws")).andExpect(status().isOk());
         mvc.perform(get("/chats").header("Authorization", "Bearer invalid"))
                 .andExpect(status().isUnauthorized());
         mvc.perform(get("/chats/{conversationId}/messages", conversationId))
@@ -122,11 +125,19 @@ class ChatSecurityIntegrationTest {
     @EnableWebSecurity
     @EnableWebMvc
     @Import({SecurityConfig.class, CorsConfig.class, FirebaseAuthenticationFilter.class,
-            ChatController.class, GlobalExceptionHandler.class})
+            ChatController.class, GlobalExceptionHandler.class, WebSocketHandshakeProbe.class})
     static class Config {
         @Bean ChatService chatService() { return mock(ChatService.class); }
         @Bean ChatContactService chatContactService() { return mock(ChatContactService.class); }
         @Bean FirebaseTokenService tokens() { return mock(FirebaseTokenService.class); }
         @Bean AuthorizationService authorization() { return mock(AuthorizationService.class); }
+    }
+
+    @RestController
+    static class WebSocketHandshakeProbe {
+        @GetMapping("/ws")
+        String handshake() {
+            return "handshake reached";
+        }
     }
 }
