@@ -135,6 +135,26 @@ public class EventController {
                 "Detalhes do evento retornados com sucesso", event, request.getRequestURI()));
     }
 
+    @PatchMapping("/collaborator/{eventId}/viewed")
+    @PreAuthorize("hasAnyRole('COLABORADOR', 'GESTOR', 'GESTOR_WORKSPACE')")
+    @Operation(summary = "Marca como visualizado um evento do colaborador autenticado",
+            description = "Exige participação no evento. A operação é idempotente e não altera o status da conclusão.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Evento marcado como visualizado"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado"),
+            @ApiResponse(responseCode = "403", description = "Não autorizado"),
+            @ApiResponse(responseCode = "404", description = "Evento não encontrado para o colaborador"),
+            @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
+    })
+    public ResponseEntity<ApiResult<Void>> markCollaboratorEventAsViewed(
+            @PathVariable Long eventId,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            HttpServletRequest request) {
+        eventService.markCollaboratorEventViewed(eventId, authenticatedUser.firebaseUid());
+        return ResponseEntity.ok(ApiResult.success("Evento marcado como visualizado", null,
+                request.getRequestURI()));
+    }
+
     @PostMapping(value = "/{eventId}/completion", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('COLABORADOR', 'GESTOR', 'GESTOR_WORKSPACE')")
     @Operation(summary = "Envia a solicitação de conclusão de um evento pelo colaborador",

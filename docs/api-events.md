@@ -10,6 +10,8 @@ Eventos inexistentes ou de outro workspace retornam 404; falta de autenticação
 | Método e rota | Contrato |
 | --- | --- |
 | `GET /events/{eventId}` | Detalhe completo, autoria, configurações, todas as turmas e participações |
+| `GET /events/collaborator/{eventId}` | Detalhes para o colaborador autenticado; consulta sem alterar estado |
+| `PATCH /events/collaborator/{eventId}/viewed` | Marca como visualizado um evento de que o usuário autenticado participa |
 | `GET /events?startDate=...&endDate=...` | Uma entrada por turma que sobrepõe o intervalo, incluindo status |
 | `GET /events/eligible-candidates?nrId=...` | Usuários selecionáveis com Role, unidade e modalidade |
 | `POST /events` | Criação atômica do evento ativo, turmas e participações |
