@@ -66,6 +66,11 @@ Identificador inválido retorna 400; inexistente ou fora do escopo retorna 404.
 O prazo é apresentado como `YYYY-MM-DD`, usando `America/Sao_Paulo`; no MongoDB
 é armazenado como data BSON. As opções têm `id`, `text` e `other`.
 As perguntas de foto têm `maxFiles` e `maxFileSizeMb`.
+Os detalhes também incluem `unitLocation: {"latitude": -23.5, "longitude": -46.6}`,
+obtido da unidade vinculada no mesmo workspace. Sem unidade ou coordenadas válidas,
+`unitLocation` é `null`. O front usa esses dados para verificar a presença;
+o envio das respostas não recebe GPS. Com unidade sem coordenadas, o mobile bloqueia
+o início; sem unidade, não há restrição de endereço. Consulte [respostas e análise](forms-responses.md).
 
 ## Criação e rascunhos
 
@@ -101,8 +106,9 @@ Exemplo de corpo (não é o documento completo do MongoDB):
 `status` omitido cria `PENDENTE`. Para um rascunho vazio, envie
 `{"status":"RASCUNHO"}`. Não é permitido criar como `CONCLUIDO`.
 Gestor e título podem faltar no rascunho; se gestor, unidade ou NR forem informados,
-os vínculos precisam existir e estar elegíveis. A unidade opcional é um vínculo
-contextual e não define quem responde: somente `managerId` é o destinatário.
+os vínculos precisam existir e estar elegíveis. A unidade opcional não define quem responde: somente `managerId` é o destinatário.
+Quando definida, suas coordenadas são retornadas nos detalhes para comparação no front;
+o envio não aplica validação de distância, conforme [forms-responses.md](forms-responses.md).
 
 Na publicação são obrigatórios título não vazio, gestor ativo e 1 a 100 perguntas
 com enunciados preenchidos. Descrição, NR, unidade e prazo são opcionais.
@@ -233,7 +239,8 @@ O CI fornece uma instância MongoDB para esses testes.
 
 A integração cobre persistência BSON, escopo de consultas, geração concorrente de UUIDs,
 gravações condicionais e um fluxo HTTP completo de criação do rascunho até publicação.
-Os endpoints de resposta e upload do mobile continuam fora deste módulo de entrega.
+A continuação do fluxo mobile, com envio de respostas/imagens e análise web, está em
+[forms-responses.md](forms-responses.md).
 
 ## DTOs de criação e edição
 

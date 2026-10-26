@@ -9,6 +9,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandlerImpl;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfigurationSource;
 
@@ -48,14 +49,28 @@ public class SecurityConfig {
                 ).permitAll()
                  .anyRequest().authenticated()
             )
-            .exceptionHandling(errors -> errors.authenticationEntryPoint((request, response, exception) -> {
-                if (request.getRequestURI().startsWith("/admin/nrs/")) {
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                } else {
+            .exceptionHandling(errors -> errors
+                .authenticationEntryPoint((request, response, exception) -> {
+                    if (FormResponseRequestMatcher.INSTANCE.matches(request)) {
+                        ApiSecurityResponseWriter.write(request, response, HttpServletResponse.SC_UNAUTHORIZED,
+                                "Não autenticado", "Envie um token Firebase válido");
+                        return;
+                    }
+                    if (request.getRequestURI().startsWith("/admin/nrs/")) {
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        return;
+                    }
                     response.sendError(isUnauthorizedRoute(request.getRequestURI())
                             ? HttpServletResponse.SC_UNAUTHORIZED : HttpServletResponse.SC_FORBIDDEN);
-                }
-            }))
+                })
+                .accessDeniedHandler((request, response, exception) -> {
+                    if (FormResponseRequestMatcher.INSTANCE.matches(request)) {
+                        ApiSecurityResponseWriter.write(request, response, HttpServletResponse.SC_FORBIDDEN,
+                                "Não autorizado", "Você não tem permissão para executar esta operação");
+                        return;
+                    }
+                    new AccessDeniedHandlerImpl().handle(request, response, exception);
+                }))
             .addFilterBefore(
                 firebaseAuthenticationFilter,
                 UsernamePasswordAuthenticationFilter.class

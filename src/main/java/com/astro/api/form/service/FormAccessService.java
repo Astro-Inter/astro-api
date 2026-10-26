@@ -1,16 +1,14 @@
 package com.astro.api.form.service;
 
 import com.astro.api.auth.security.AuthenticatedUser;
+import com.astro.api.form.model.Form;
+import com.astro.api.form.model.FormStatus;
+import com.astro.api.form.repository.FormReadFilter;
+import com.astro.api.form.repository.FormWriteCondition;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.UserRepository;
-import com.astro.api.form.model.Form;
-import com.astro.api.form.model.FormScope;
-import com.astro.api.form.model.FormReadFilter;
-import com.astro.api.form.model.FormStatus;
-import com.astro.api.form.model.FormWriteCondition;
-
 import java.util.List;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -20,7 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class FormAccessService {
     private final UserRepository userRepository;
 
-    public FormAccessService(UserRepository userRepository) { this.userRepository = userRepository; }
+    public FormAccessService(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
 
     @Transactional(readOnly = true)
     public FormScope requireManager(AuthenticatedUser authenticatedUser) {
@@ -44,6 +44,11 @@ public class FormAccessService {
             return new FormReadFilter(formScope.workspaceId(), null, null, List.of());
         }
         return new FormReadFilter(formScope.workspaceId(), formScope.managerId(), formScope.managerId(),
+                List.of(FormStatus.PENDING, FormStatus.COMPLETED));
+    }
+
+    public FormReadFilter recipientFilter(FormScope formScope) {
+        return new FormReadFilter(formScope.workspaceId(), null, formScope.managerId(),
                 List.of(FormStatus.PENDING, FormStatus.COMPLETED));
     }
 

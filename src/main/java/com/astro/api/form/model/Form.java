@@ -65,6 +65,21 @@ public class Form {
     @ValueConverter(FormNumberConverter.class)
     private Long version;
 
+    @Field("id_envio")
+    private String submissionId;
+
+    @Field("consentimento_localizacao")
+    private Boolean locationConsent;
+
+    @Field("localizacoes")
+    private List<FormLocationReading> locations;
+
+    @Field("validacao_localizacao")
+    private FormLocationCheck locationCheck;
+
+    @Field("analise")
+    private FormReview review;
+
     @Field("perguntas")
     private List<FormQuestion> questions;
 

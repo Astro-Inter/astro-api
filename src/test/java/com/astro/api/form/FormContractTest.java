@@ -3,28 +3,32 @@ package com.astro.api.form;
 import com.astro.api.form.dto.request.FormOptionRequest;
 import com.astro.api.form.dto.request.FormQuestionDefinitionRequest;
 import com.astro.api.form.dto.request.FormRequest;
+import com.astro.api.form.dto.request.FormResponseRequest;
+import com.astro.api.form.dto.request.FormQuestionAnswerRequest;
+import com.astro.api.form.dto.request.FormReviewRequest;
 import com.astro.api.form.mapper.FormMapper;
 import com.astro.api.form.model.Form;
 import com.astro.api.form.model.FormQuestionType;
 import com.astro.api.form.model.FormStatus;
+import com.astro.api.unit.repository.UnitLocationProjection;
 import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;
+import jakarta.validation.metadata.ConstraintDescriptor;
 import jakarta.validation.metadata.ContainerDescriptor;
 import jakarta.validation.metadata.ContainerElementTypeDescriptor;
-import jakarta.validation.metadata.ConstraintDescriptor;
 import jakarta.validation.metadata.ElementDescriptor;
 import jakarta.validation.metadata.PropertyDescriptor;
-import org.junit.jupiter.api.Test;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
-
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.Properties;
+import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 class FormContractTest {
     @Test void requestsAndResponsesUseCamelCaseIncludingNestedQuestionsAndOptions() {
@@ -56,7 +60,14 @@ class FormContractTest {
         formMapper.applyContent(request, form);
         form.setWorkspaceId(1L);
         form.setSenderManagerId(10L);
-        JsonNode response = mapper.readTree(mapper.writeValueAsString(formMapper.toDetails(form)));
+        UnitLocationProjection unitLocation = mock(UnitLocationProjection.class);
+        when(unitLocation.getLatitude()).thenReturn(-23.5); when(unitLocation.getLongitude()).thenReturn(-46.6);
+        JsonNode response = mapper.readTree(mapper.writeValueAsString(formMapper.toDetails(form, unitLocation)));
+        assertTrue(response.get("unitLocation").get("latitude").isNumber());
+        assertEquals(-23.5, response.get("unitLocation").get("latitude").asDouble());
+        assertEquals(-46.6, response.get("unitLocation").get("longitude").asDouble());
+        JsonNode withoutLocation = mapper.readTree(mapper.writeValueAsString(formMapper.toDetails(form)));
+        assertTrue(withoutLocation.get("unitLocation").isNull());
         assertEquals(1L, response.get("workspaceId").asLong());
         assertEquals(10L, response.get("senderManagerId").asLong());
         assertEquals(20L, response.get("managerId").asLong());
@@ -89,7 +100,7 @@ class FormContractTest {
             messages.load(new InputStreamReader(source, StandardCharsets.UTF_8));
         }
         try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
-            for (Class<?> type : new Class<?>[]{FormRequest.class, FormQuestionDefinitionRequest.class, FormOptionRequest.class}) {
+            for (Class<?> type : new Class<?>[]{FormRequest.class, FormQuestionDefinitionRequest.class, FormOptionRequest.class, FormResponseRequest.class, FormQuestionAnswerRequest.class, FormReviewRequest.class}) {
                 for (PropertyDescriptor property : factory.getValidator().getConstraintsForClass(type).getConstrainedProperties()) {
                     assertMessages(property, messages);
                 }

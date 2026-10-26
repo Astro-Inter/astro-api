@@ -48,13 +48,13 @@ HTTP 200, mesmo envelope, com exatamente estes nove campos em `data`:
 inativos continuam visíveis; cargo de outro workspace bloqueia o acesso.
 Não retorna senha, NRs, tokens, status, workspaceId nem a entidade completa.
 
-O CPF já é armazenado em `usuario.cpf` nos colaboradores importados e preservado
-na promoção a GESTOR. O cadastro de GESTOR_WORKSPACE em
-`WorkspaceRegistrationTransactionalService` não persiste o CPF nem a modalidade
-da linha do gestor. Esta entrega consulta o valor real: não reconstrói dados
-da planilha, não faz preenchimento retroativo e não inventa valores. A correção
-do cadastro/importação é uma pendência separada; a edição da conta permite
-informar os dados reais ausentes.
+O CPF é armazenado em `usuario.cpf` nos colaboradores importados e preservado
+na promoção a GESTOR. No cadastro inicial de GESTOR_WORKSPACE, CPF e modalidade
+também são importados da linha do gestor quando preenchidos na planilha.
+Os campos continuam opcionais para o gestor e são validados antes da criação
+da conta. Consulte [Cadastro de workspace](api-workspace-registration.md).
+Cadastros anteriores não recebem preenchimento retroativo; a edição da conta
+permite informar os dados reais ausentes.
 
 ## PUT /user/me/account-details (SCRUM-571)
 

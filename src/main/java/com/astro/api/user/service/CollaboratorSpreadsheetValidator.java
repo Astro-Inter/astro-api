@@ -33,6 +33,12 @@ public class CollaboratorSpreadsheetValidator {
                 .map(violation -> registrationError(rowNumber, violation));
     }
 
+    public Optional<SpreadsheetImportMessage> validateCpfForRegistration(CollaboratorImportData data, int rowNumber) {
+        return validator.validateProperty(data, "cpf", CollaboratorImportData.Registration.class).stream()
+                .findFirst()
+                .map(violation -> registrationError(rowNumber, violation));
+    }
+
     private SpreadsheetImportMessage registrationError(int rowNumber, ConstraintViolation<CollaboratorImportData> violation) {
         String field = violation.getPropertyPath().toString();
         String message = switch (field) {

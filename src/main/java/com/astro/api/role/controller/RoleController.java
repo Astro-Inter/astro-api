@@ -66,7 +66,8 @@ public class RoleController {
     }
 
     @PostMapping("/{roleId}/nrs")
-    @Operation(summary = "Vincula ou desvincula as NRs informadas do cargo")
+    @Operation(summary = "Vincula ou desvincula as NRs informadas do cargo",
+            description = "Rejeita NRs marcadas ausentes do catálogo relacional e ignora itens desmarcados ausentes. NRs omitidas mantêm seus vínculos.")
     public ResponseEntity<ApiResult<Void>> updateNrs(@PathVariable("roleId") Long roleId,
             @Valid @RequestBody UpdateRoleNrsRequest body,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
@@ -94,7 +95,8 @@ public class RoleController {
     }
 
     @GetMapping("/{roleId}/nrs/options")
-    @Operation(summary = "Lista opções de NRs e indica os vínculos do cargo")
+    @Operation(summary = "Lista opções de NRs e indica os vínculos do cargo",
+            description = "Oferece NRs de colaboradores presentes no catálogo relacional e preserva as NRs já vinculadas para permitir sua remoção.")
     public ResponseEntity<ApiResult<List<RoleNrOptionResponse>>> findNrOptions(
             @PathVariable("roleId") Long roleId, @RequestParam("firebase_uid") String uid,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {

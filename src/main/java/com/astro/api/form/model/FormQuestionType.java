@@ -1,15 +1,22 @@
 package com.astro.api.form.model;
 
-import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.Arrays;
 
 public enum FormQuestionType {
     TEXT("texto"), OPTION("alternativa"), PHOTO("foto"), DATE("data");
 
     private final String value;
-    FormQuestionType(String value) { this.value = value; }
-    @JsonValue public String value() { return value; }
+
+    private FormQuestionType(String value) {
+        this.value = value;
+    }
+
+    @JsonValue
+    public String value() {
+        return value;
+    }
 
     @JsonCreator
     public static FormQuestionType fromValue(String value) {

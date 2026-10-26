@@ -22,6 +22,16 @@ public interface UnitRepository extends JpaRepository<Unit, Long> {
     Optional<Unit> findByIdAndWorkspace_Id(Long unitId, Long workspaceId);
 
     @Query(value = """
+            SELECT unit.id_unidade AS "unitId", unit.ativo AS "active",
+                   (address.geolocalizacao)[1] AS "latitude", (address.geolocalizacao)[0] AS "longitude"
+            FROM unidade unit
+            LEFT JOIN unidade_endereco address ON address.unidade_id = unit.id_unidade
+            WHERE unit.id_unidade = :unitId AND unit.workspace_id = :workspaceId
+            """, nativeQuery = true)
+    Optional<UnitLocationProjection> findLocationByIdAndWorkspaceId(@Param("unitId") Long unitId,
+                                                                  @Param("workspaceId") Long workspaceId);
+
+    @Query(value = """
             SELECT listed.id_unidade AS "unitId", listed.id_workspace AS "workspaceId", listed.nome AS "name",
                    listed.status, listed.quantidade_colaboradores AS "collaboratorCount", listed.cep AS "postalCode",
                    listed.rua AS "street", listed.cidade AS "city", listed.bairro AS "neighborhood", listed.estado AS "state",
