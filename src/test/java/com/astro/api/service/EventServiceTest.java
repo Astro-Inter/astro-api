@@ -444,7 +444,7 @@ class EventServiceTest {
     }
 
     @Test
-    void listsAllCollaboratorClassesInChronologicalOrderWithIndividualStatus() {
+    void listsCollaboratorClassesFromLatestToOldestDeadline() {
         User collaborator = createUser(2L, UserStatus.ATIVO, workspace);
         collaborator.setFirebaseUid("collaborator");
         Event pastEvent = createEvent(EventStatus.CANCELADO);
@@ -462,18 +462,19 @@ class EventServiceTest {
         futureParticipation.setEventClass(futureClass);
         futureParticipation.setUser(collaborator);
         when(userRepository.findByFirebaseUid("collaborator")).thenReturn(Optional.of(collaborator));
-        when(eventClassParticipantRepository.findByUser_IdOrderByEventClass_EndDateAsc(2L))
-                .thenReturn(List.of(pastParticipation, futureParticipation));
-        when(viewedService.findViewed(2L, "events", List.of(31L, 32L))).thenReturn(Set.of("31"));
+        when(eventClassParticipantRepository.findByUser_IdOrderByEventClass_EndDateDesc(2L))
+                .thenReturn(List.of(futureParticipation, pastParticipation));
+        when(viewedService.findViewed(2L, "events", List.of(32L, 31L))).thenReturn(Set.of("31"));
 
         List<CollaboratorEventResponse> response = service.findForCollaborator("collaborator");
 
         assertEquals(2, response.size());
         assertEquals(ParticipationStatus.PENDENTE, response.getFirst().participationStatus());
-        assertEquals(EventStatus.CANCELADO, response.getFirst().eventStatus());
-        assertEquals(true, response.getFirst().viewed());
+        assertEquals(EventStatus.ATIVO, response.getFirst().eventStatus());
+        assertEquals(false, response.getFirst().viewed());
         assertEquals(ParticipationStatus.PENDENTE, response.get(1).participationStatus());
-        assertEquals(false, response.get(1).viewed());
+        assertEquals(EventStatus.CANCELADO, response.get(1).eventStatus());
+        assertEquals(true, response.get(1).viewed());
     }
 
     @Test
