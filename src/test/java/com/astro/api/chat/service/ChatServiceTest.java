@@ -216,10 +216,11 @@ class ChatServiceTest {
     @Test
     void marksAuthorizedConversationReadByDeletingOnlyAuthenticatedUsersKey() {
         String conversationId = "11111111-2222-4333-8444-555555555555";
+        UserChatProjection ana = user(2L, "Ana", UserType.GESTOR, 10L);
         when(mongo.findConversation(conversationId)).thenReturn(
                 new ConversationDocument(conversationId, List.of(1L, 2L)));
         when(users.findChatUsersByIds(List.of(1L, 2L)))
-                .thenReturn(List.of(current, user(2L, "Ana", UserType.GESTOR, 10L)));
+                .thenReturn(List.of(current, ana));
 
         service.markAsRead(authenticatedUser(), conversationId);
 
@@ -238,10 +239,11 @@ class ChatServiceTest {
     @Test
     void repeatedReadRequestsDeleteTheSameKeyAndRemainIdempotent() {
         String conversationId = "11111111-2222-4333-8444-555555555555";
+        UserChatProjection ana = user(2L, "Ana", UserType.GESTOR, 10L);
         when(mongo.findConversation(conversationId)).thenReturn(
                 new ConversationDocument(conversationId, List.of(1L, 2L)));
         when(users.findChatUsersByIds(List.of(1L, 2L)))
-                .thenReturn(List.of(current, user(2L, "Ana", UserType.GESTOR, 10L)));
+                .thenReturn(List.of(current, ana));
 
         service.markAsRead(authenticatedUser(), conversationId);
         service.markAsRead(authenticatedUser(), conversationId);
@@ -266,8 +268,9 @@ class ChatServiceTest {
 
         when(mongo.findConversation(conversationId)).thenReturn(
                 new ConversationDocument(conversationId, List.of(1L, 2L)));
+        UserChatProjection foreign = user(2L, "Ana", UserType.GESTOR, 20L);
         when(users.findChatUsersByIds(List.of(1L, 2L)))
-                .thenReturn(List.of(current, user(2L, "Ana", UserType.GESTOR, 20L)));
+                .thenReturn(List.of(current, foreign));
         assertThrows(org.springframework.security.access.AccessDeniedException.class,
                 () -> service.markAsRead(authenticatedUser(), conversationId));
         verify(redis, never()).delete(org.mockito.ArgumentMatchers.anyString());
@@ -285,10 +288,11 @@ class ChatServiceTest {
     @Test
     void propagatesRedisFailureInsteadOfReportingSuccessfulRead() {
         String conversationId = "11111111-2222-4333-8444-555555555555";
+        UserChatProjection ana = user(2L, "Ana", UserType.GESTOR, 10L);
         when(mongo.findConversation(conversationId)).thenReturn(
                 new ConversationDocument(conversationId, List.of(1L, 2L)));
         when(users.findChatUsersByIds(List.of(1L, 2L)))
-                .thenReturn(List.of(current, user(2L, "Ana", UserType.GESTOR, 10L)));
+                .thenReturn(List.of(current, ana));
         when(redis.delete("chat:unread:" + conversationId + ":1"))
                 .thenThrow(new IllegalStateException("Redis indisponível"));
 
