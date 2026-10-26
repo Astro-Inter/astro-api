@@ -234,6 +234,15 @@ public class EventService {
                 evidences);
     }
 
+    @Transactional(readOnly = true)
+    public void markCollaboratorEventViewed(Long eventId, String firebaseUid) {
+        User user = findAuthenticatedUser(firebaseUid);
+        eventClassParticipantRepository
+                .findFirstByEventClass_Event_IdAndUser_Id(eventId, user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Evento não encontrado para o colaborador"));
+        viewedService.markViewed(user.getId(), EVENTS_RESOURCE, eventId);
+    }
+
     @Transactional
     public EventCompletionResponse requestCompletion(
             Long eventId, List<MultipartFile> files, String firebaseUid) {
