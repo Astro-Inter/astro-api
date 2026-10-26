@@ -24,6 +24,9 @@ endereço, estão em [docs/api-workspace-settings.md](docs/api-workspace-setting
 Os contratos da própria conta autenticada no web estão em
 [docs/api-account.md](docs/api-account.md).
 
+O alinhamento de perfis de funcionários e funções SQL está em
+[docs/api-database-employee-profiles.md](docs/api-database-employee-profiles.md).
+
 O contrato dos endpoints de formulários da web, com rascunhos, publicação e
 validações por tipo de pergunta, está em [docs/forms.md](docs/forms.md).
 O fluxo de respostas mobile, imagens privadas e análise web está em

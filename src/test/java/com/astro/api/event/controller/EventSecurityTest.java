@@ -70,6 +70,21 @@ class EventSecurityTest {
         verify(service, times(2)).findById(1L, "uid");
         verify(service, times(2)).findEligibleCandidates(null, "uid");
     }
+    @Test void permitsEmployeeProfilesToRequestTheirOwnCompletionAndRejectsAdmin() throws Exception {
+        mvc.perform(multipart("/events/1/completion")).andExpect(status().isUnauthorized());
+        FirebaseToken token = mock(FirebaseToken.class); when(token.getUid()).thenReturn("uid");
+        when(tokens.verify("valid")).thenReturn(token);
+        for (Role role : List.of(Role.COLABORADOR, Role.GESTOR, Role.GESTOR_WORKSPACE)) {
+            when(authorization.getRole("uid")).thenReturn(Optional.of(role));
+            mvc.perform(multipart("/events/1/completion").header("Authorization", "Bearer valid"))
+                    .andExpect(status().isCreated());
+        }
+        when(authorization.getRole("uid")).thenReturn(Optional.of(Role.ADMIN));
+        mvc.perform(multipart("/events/1/completion").header("Authorization", "Bearer valid"))
+                .andExpect(status().isForbidden());
+        verify(service, times(3)).requestCompletion(eq(1L), any(), eq("uid"));
+    }
+
     @Configuration @EnableWebSecurity @EnableWebMvc
     @Import({SecurityConfig.class, CorsConfig.class, FirebaseAuthenticationFilter.class, EventController.class, GlobalExceptionHandler.class})
     static class Config {
