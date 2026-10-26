@@ -54,6 +54,7 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -215,6 +216,69 @@ class FormRepositoryMongoTest {
         assertEquals(value, restored.getVersion());
         assertEquals(value, restored.getQuestions().getFirst().getId());
         assertEquals(value, restored.getQuestions().getFirst().getOptions().getFirst().getId());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"1,APPROVED", "1,REJECTED", "2147483647,APPROVED", "2147483647,REJECTED"})
+    void keepsInt32AcrossCreationEditingPublicationSubmissionAndReview(long identifier, FormReviewStatus reviewStatus) {
+        Form draft = form(1, identifier, identifier, identifier, FormStatus.DRAFT);
+        draft.setUnitId(identifier);
+        draft.setVersion(0L);
+        Form.FormQuestion optionQuestion = draft.getQuestions().getFirst();
+        optionQuestion.setId(identifier);
+        optionQuestion.setType("alternativa");
+        Form.FormOption option = new Form.FormOption();
+        option.setId(identifier);
+        option.setText("Sim");
+        option.setOther(false);
+        optionQuestion.setOptions(List.of(option));
+        Form.FormQuestion photoQuestion = new Form.FormQuestion();
+        photoQuestion.setId(2L);
+        photoQuestion.setType("foto");
+        photoQuestion.setAnswer(List.of());
+        photoQuestion.setOptions(List.of());
+        photoQuestion.setMaxFiles(1);
+        photoQuestion.setMaxFileSizeMb(10);
+        draft.setQuestions(List.of(optionQuestion, photoQuestion));
+        FormScope scope = new FormScope(identifier, identifier, false);
+        Form created = repository.insert(draft);
+        assertStoredInt32(created.getId(), "creation");
+        created.setTitle("Edição");
+        Form edited = repository.update(created, formAccessService.writeCondition(created, scope)).orElseThrow();
+        assertStoredInt32(edited.getId(), "editing");
+        Form published = repository.updateStatus(formAccessService.writeCondition(edited, scope),
+                FormStatus.PENDING, Instant.now()).orElseThrow();
+        assertStoredInt32(published.getId(), "publication");
+        FormImage image = new FormImage(UUID.randomUUID().toString(), "formularios/photo.jpg", "photo.jpg", "image/jpeg", 123L);
+        new FormAnswerMapper().applyAnswers(published, Map.of(identifier, List.of(identifier), 2L, List.of(0)), Map.of(0, image));
+        published.setRespondedAt(Instant.now());
+        published.setSubmissionId(UUID.randomUUID().toString());
+        published.setStatus(FormStatus.COMPLETED);
+        Form completed = repository.submitResponse(published, new FormResponseCondition(published.getId(),
+                identifier, identifier, published.getVersion(), FormStatus.PENDING)).orElseThrow();
+        assertStoredInt32(completed.getId(), "submission");
+        String description = reviewStatus == FormReviewStatus.REJECTED ? "Evidência insuficiente" : null;
+        FormReview review = new FormReview(reviewStatus, identifier, Instant.now(), description);
+        Form reviewed = repository.review(formAccessService.writeCondition(completed, scope), review).orElseThrow();
+        assertStoredInt32(reviewed.getId(), "review");
+    }
+
+    private void assertStoredInt32(String formId, String stage) {
+        Document storedForm = mongo.getCollection("forms").find(new Document("_id", formId)).first();
+        assertNotNull(storedForm);
+        assertInt32Values(storedForm, stage);
+    }
+
+    private void assertInt32Values(Object value, String path) {
+        if (value instanceof Number) {
+            assertInstanceOf(Integer.class, value, path);
+        } else if (value instanceof Map<?, ?> fields) {
+            fields.forEach((field, nested) -> assertInt32Values(nested, path + "." + field));
+        } else if (value instanceof List<?> items) {
+            for (int index = 0; index < items.size(); index++) {
+                assertInt32Values(items.get(index), path + "[" + index + "]");
+            }
+        }
     }
 
     @Test void readsLegacyLongsAndWritesPlainNumbersDuringConditionalEditingAndPublication() {

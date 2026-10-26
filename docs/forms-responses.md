@@ -245,7 +245,7 @@ Análise usa `status: APROVADO|REPROVADO`, `id_gestor_revisor`, `analisado_em`.
 **`analise.descricao` só existe em reprovação**; antes da análise, `analise` é ausente.
 Fotos ficam em `perguntas[].resposta[]` com `id_imagem`, `chave_objeto`, `nome`,
 `tipo_conteudo`, `tamanho_bytes`. IDs numéricos continuam compactados para BSON
-int32 quando couberem, preservando int64 para valores maiores. Não há migração destrutiva.
+int32 quando estiverem entre -2.147.483.648 e 2.147.483.647, preservando int64 fora dessa faixa para não perder precisão. No Mongo, Long(...) representa o tipo BSON int64; o contrato JSON continua retornando números. Atualizações parciais não normalizam automaticamente campos históricos que não são alterados. Não há migração destrutiva.
 
 `FormResponseService` coordena o fluxo; `FormAccessService` define o escopo.
 As Strategies de resposta validam cada tipo. `FormAnswerMapper` e
