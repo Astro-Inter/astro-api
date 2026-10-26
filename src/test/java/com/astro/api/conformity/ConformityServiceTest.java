@@ -19,7 +19,7 @@ import static org.mockito.Mockito.*;
 class ConformityServiceTest {
     final ConformityRepository repository = mock(ConformityRepository.class);
     final UserRepository users = mock(UserRepository.class);
-    final com.astro.api.user.repository.CollaboratorRepository collaborators = mock(com.astro.api.user.repository.CollaboratorRepository.class);
+    final ConformityUserRepository collaborators = mock(ConformityUserRepository.class);
     final NrCatalogRepository nrs = mock(NrCatalogRepository.class);
     final UserAvatarService userAvatarService = mock(UserAvatarService.class);
     final ConformityService service = new ConformityService(repository, users, new ConformityMapper(), collaborators, nrs, userAvatarService);

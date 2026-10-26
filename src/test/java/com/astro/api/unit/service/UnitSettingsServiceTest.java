@@ -11,6 +11,7 @@ import com.astro.api.unit.mapper.UnitResponseMapper;
 import com.astro.api.unit.model.*;
 import com.astro.api.unit.repository.*;
 import com.astro.api.user.model.UserType;
+import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.workspace.model.Workspace;
 import com.astro.api.workspace.service.WorkspaceAccessService;
@@ -54,7 +55,7 @@ class UnitSettingsServiceTest {
         assertEquals("SP", response.state());
         assertEquals("Sala 1", response.addressLine2());
         assertEquals(0L, response.collaboratorCount());
-        verify(users).countByUnit_IdAndType(12L, UserType.COLABORADOR);
+        verify(users).countByUnit_IdAndTypeInAndStatus(12L, List.of(UserType.COLABORADOR, UserType.GESTOR, UserType.GESTOR_WORKSPACE), UserStatus.ATIVO);
         verify(addresses).save(argThat(address -> "10A".equals(address.number) && address.unit.id == 12L));
     }
 
@@ -88,13 +89,13 @@ class UnitSettingsServiceTest {
         unit.address = new UnitMapper().toAddress(body("Matriz", "Antigo"), unit);
         when(units.findByWorkspace(workspace)).thenReturn(List.of(unit));
         when(units.findByIdAndWorkspace_Id(12L, 3L)).thenReturn(Optional.of(unit));
-        when(users.countByUnit_IdAndType(12L, UserType.COLABORADOR)).thenReturn(7L);
+        when(users.countByUnit_IdAndTypeInAndStatus(12L, List.of(UserType.COLABORADOR, UserType.GESTOR, UserType.GESTOR_WORKSPACE), UserStatus.ATIVO)).thenReturn(7L);
         UnitResponse response = service.update(12L, body("Matriz", " "), user);
         assertEquals(12L, response.unitId());
         assertEquals("Inativo", response.status());
         assertNull(response.addressLine2());
         assertEquals(7L, response.collaboratorCount());
-        verify(users).countByUnit_IdAndType(12L, UserType.COLABORADOR);
+        verify(users).countByUnit_IdAndTypeInAndStatus(12L, List.of(UserType.COLABORADOR, UserType.GESTOR, UserType.GESTOR_WORKSPACE), UserStatus.ATIVO);
         assertSame(workspace, unit.workspace);
         assertSame(unit, unit.address.unit);
     }
