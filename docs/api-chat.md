@@ -1,5 +1,54 @@
 # API de Chat
 
+## WebSocket/STOMP para eventos privados
+
+O endpoint WebSocket é `GET /ws`. O handshake HTTP é permitido sem autenticação
+Firebase; essa permissão só possibilita o upgrade do transporte. A sessão STOMP
+precisa autenticar no frame `CONNECT` antes de poder assinar destinos. O servidor
+aceita origens de navegador listadas em `CORS_ALLOWED_ORIGINS` e não usa origem
+curinga. Clientes Android nativos podem conectar sem o cabeçalho `Origin`.
+
+Envie o Firebase ID Token no cabeçalho STOMP `Authorization` usando o formato
+`Bearer <token>`. O token não deve ser incluído na URL. A API valida o token pelo
+`FirebaseTokenService` existente, procura o UID no PostgreSQL e exige uma conta
+`ATIVO`, com unidade ativa e vínculo com Workspace, nos tipos `COLABORADOR`,
+`GESTOR` ou `GESTOR_WORKSPACE`. Administradores e contas sem vínculo elegível
+são recusados. O principal da sessão contém a identidade confiável da conexão;
+`Principal.getName()` retorna o ID numérico do colaborador e o contexto também
+mantém o ID do Workspace e o tipo de usuário.
+
+Exemplo de conexão STOMP 1.2:
+
+```text
+CONNECT
+Authorization:Bearer FIREBASE_ID_TOKEN
+accept-version:1.2
+heart-beat:10000,10000
+
+```
+
+Exemplo de assinatura permitida:
+
+```text
+SUBSCRIBE
+id:private-messages
+destination:/user/queue/messages
+
+```
+
+O broker simples atende somente `/queue`; `/app` está reservado para futuros
+handlers e `/user` identifica a fila privada resolvida pelo Spring a partir do
+principal da conexão. Nesta etapa, todas as operações `SEND` são recusadas,
+inclusive `/app/chat.send`. Assinaturas a `/queue/**`, `/topic/**` e caminhos
+diretos de outros usuários também são recusadas. O envio será liberado junto
+com a implementação e as validações da Etapa 2.
+
+O broker negocia heartbeats de 10 segundos e usa o agendador Spring para a
+manutenção do broker simples. Uma autenticação bem-sucedida no `CONNECT` não
+revalida periodicamente o Firebase ID Token; uma conexão longa permanece
+autenticada até encerrar. O Android deve reconectar após desconexões e enviar
+um token Firebase válido em cada novo `CONNECT`. Não há controle de presença.
+
 ## Consultar histórico de mensagens
 
 `GET /chats/{conversationId}/messages?limit=30&before={nextCursor}` requer um
