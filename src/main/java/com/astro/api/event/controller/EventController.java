@@ -136,7 +136,7 @@ public class EventController {
     }
 
     @PostMapping(value = "/{eventId}/completion", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasRole('COLABORADOR')")
+    @PreAuthorize("hasAnyRole('COLABORADOR', 'GESTOR', 'GESTOR_WORKSPACE')")
     @Operation(summary = "Envia a solicitação de conclusão de um evento pelo colaborador",
             description = "Recebe de zero a três arquivos no campo opcional files. Cada arquivo pode ter até 50 MB; eventos que exigem evidência precisam receber ao menos um arquivo.")
     @ApiResponses({
