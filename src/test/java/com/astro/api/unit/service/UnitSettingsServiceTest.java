@@ -28,8 +28,10 @@ class UnitSettingsServiceTest {
     private final UnitAddressRepository addresses = mock(UnitAddressRepository.class);
     private final UnitService unitService = mock(UnitService.class);
     private final UserRepository users = mock(UserRepository.class);
+    private final GeoapifyClient geocoder = mock(GeoapifyClient.class);
     private final UnitSettingsService service = new UnitSettingsService(access, units, addresses,
-            new UnitMapper(), new UnitResponseMapper(), unitService, users);
+            new UnitMapper(), new UnitResponseMapper(), unitService, users,
+            new UnitGeolocationService(geocoder, addresses));
     private final AuthenticatedUser user = new AuthenticatedUser("uid", null, Role.GESTOR_WORKSPACE);
     private final Workspace workspace = new Workspace();
 
@@ -44,6 +46,45 @@ class UnitSettingsServiceTest {
             return unit;
         });
         when(addresses.save(any())).thenAnswer(call -> call.getArgument(0));
+    }
+
+    @Test
+    void createsTheUnitEvenWhenGeocodingIsUnavailableAndRetriesOnUpdate() {
+        UnitRequest request = body("Matriz", null);
+        when(geocoder.geocode(request)).thenThrow(new IllegalStateException("Indisponível"));
+        UnitResponse created = service.create(request, user);
+        assertEquals(12L, created.unitId());
+        verify(addresses, never()).updateGeolocation(anyLong(), anyDouble(), anyDouble());
+
+        Unit unit = unit("Matriz", true);
+        unit.address = new UnitMapper().toAddress(request, unit);
+        when(units.findByIdAndWorkspace_Id(12L, 3L)).thenReturn(Optional.of(unit));
+        doReturn(Optional.of(new UnitCoordinates(-46.6, -23.5))).when(geocoder).geocode(request);
+        when(addresses.updateGeolocation(12L, -46.6, -23.5)).thenReturn(1);
+        service.update(12L, request, user);
+        verify(addresses).updateGeolocation(12L, -46.6, -23.5);
+    }
+
+    @Test
+    void clearsOldCoordinatesWhenAnEditedAddressCannotBeLocated() {
+        Unit unit = unit("Matriz", true);
+        unit.address = new UnitMapper().toAddress(body("Matriz", null), unit);
+        when(units.findByIdAndWorkspace_Id(12L, 3L)).thenReturn(Optional.of(unit));
+        UnitRequest changed = new UnitRequest("Matriz", "20040020", "RJ", "Rio de Janeiro",
+                "Centro", "Rua Nova", "20", null);
+        service.update(12L, changed, user);
+        verify(addresses).clearGeolocation(12L);
+    }
+
+    @Test
+    void persistsCoordinatesWhenCreatingFromSettings() {
+        UnitRequest request = body("Matriz", null);
+        when(geocoder.geocode(request)).thenReturn(Optional.of(new UnitCoordinates(-46.6, -23.5)));
+        when(addresses.updateGeolocation(12L, -46.6, -23.5)).thenReturn(1);
+        service.create(request, user);
+        var order = inOrder(addresses);
+        order.verify(addresses).save(any());
+        order.verify(addresses).updateGeolocation(12L, -46.6, -23.5);
     }
 
     @Test
@@ -98,6 +139,7 @@ class UnitSettingsServiceTest {
         verify(users).countByUnit_IdAndTypeInAndStatus(12L, List.of(UserType.COLABORADOR, UserType.GESTOR, UserType.GESTOR_WORKSPACE), UserStatus.ATIVO);
         assertSame(workspace, unit.workspace);
         assertSame(unit, unit.address.unit);
+        verify(addresses, never()).clearGeolocation(anyLong());
     }
 
     @Test
@@ -106,6 +148,7 @@ class UnitSettingsServiceTest {
         assertThrows(ConflictException.class, () -> service.create(body("matriz", null), user));
         assertThrows(ResourceNotFoundException.class, () -> service.update(99L, body("Filial", null), user));
         verifyNoInteractions(addresses);
+        verifyNoInteractions(geocoder);
     }
 
     private Unit unit(String name, boolean active) {

@@ -4,10 +4,20 @@ import com.astro.api.unit.dto.request.UnitRequest;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.unit.model.UnitAddress;
 import com.astro.api.workspace.model.Workspace;
+import java.util.Objects;
 import org.springframework.stereotype.Component;
 
 @Component
 public class UnitMapper {
+    public boolean hasSameLocation(UnitRequest request, UnitAddress address) {
+        return address != null && Objects.equals(request.cep(), address.cep)
+                && Objects.equals(request.street(), address.street)
+                && Objects.equals(request.number(), address.number)
+                && Objects.equals(request.city(), address.city)
+                && Objects.equals(request.neighborhood(), address.neighborhood)
+                && Objects.equals(request.state(), address.state);
+    }
+
     public Unit toUnit(UnitRequest request, Workspace workspace) {
         Unit unit = new Unit();
         unit.name = request.name().trim();

@@ -52,7 +52,8 @@ class WorkspaceImportServiceTest {
     private final UnitService unitService = mock(UnitService.class);
     private final UserBatchService userBatchService = mock(UserBatchService.class);
     private final UnitSettingsService settings = new UnitSettingsService(access, units,
-            mock(UnitAddressRepository.class), new UnitMapper(), new UnitResponseMapper(), unitService, users);
+            mock(UnitAddressRepository.class), new UnitMapper(), new UnitResponseMapper(), unitService, users,
+            mock(com.astro.api.unit.service.UnitGeolocationService.class));
     private final RoleService roleService = new RoleService(roles, mock(RoleManagementRepository.class),
             mock(NrDocumentRepository.class), mock(NrCatalogRepository.class),
             new RoleNrMapper(), JsonMapper.builder().build());

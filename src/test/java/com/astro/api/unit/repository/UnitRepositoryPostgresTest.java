@@ -158,6 +158,25 @@ class UnitRepositoryPostgresTest {
     }
 
     @Test
+    void persistsGeocodedCoordinatesInNativePointWithLongitudeFirst() {
+        transactionTemplate.executeWithoutResult(status -> {
+            UnitAddressRepository addresses = context.getBean(UnitAddressRepository.class);
+            assertEquals(1, addresses.updateGeolocation(testUnits.addressedUnitId(), -46.63, -23.55));
+            UnitLocationProjection location = unitRepository.findLocationByIdAndWorkspaceId(
+                    testUnits.addressedUnitId(), testUnits.workspaceId()).orElseThrow();
+            assertEquals(-46.63, location.getLongitude());
+            assertEquals(-23.55, location.getLatitude());
+            assertEquals(0, addresses.updateGeolocation(-1L, -46.63, -23.55));
+            assertEquals(1, addresses.clearGeolocation(testUnits.addressedUnitId()));
+            UnitLocationProjection cleared = unitRepository.findLocationByIdAndWorkspaceId(
+                    testUnits.addressedUnitId(), testUnits.workspaceId()).orElseThrow();
+            assertNull(cleared.getLongitude());
+            assertNull(cleared.getLatitude());
+            status.setRollbackOnly();
+        });
+    }
+
+    @Test
     void blocksAnotherConnectionUntilTheUnitTransactionFinishes() throws SQLException {
         transactionTemplate.executeWithoutResult(status -> {
             unitRepository.findByIdAndWorkspace_Id(testUnits.addressedUnitId(), testUnits.workspaceId()).orElseThrow();
