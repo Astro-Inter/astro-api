@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -67,5 +68,22 @@ public class ChatController {
         return ResponseEntity.ok(ApiResult.success("Mensagens retornadas com sucesso",
                 chatService.findMessages(authenticatedUser, conversationId.toString(), limit, before),
                 request.getRequestURI()));
+    }
+
+    @PatchMapping("/{conversationId}/read")
+    @PreAuthorize("hasAnyRole('COLABORADOR', 'GESTOR', 'GESTOR_WORKSPACE')")
+    @Operation(summary = "Marca a conversa como lida para o usuário autenticado")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Contador de mensagens não lidas removido"),
+            @ApiResponse(responseCode = "400", description = "Identificador da conversa inválido"),
+            @ApiResponse(responseCode = "401", description = "Token Firebase ausente ou inválido"),
+            @ApiResponse(responseCode = "403", description = "Usuário não participante ou conversa fora do Workspace"),
+            @ApiResponse(responseCode = "404", description = "Conversa ou colaborador não encontrado"),
+            @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
+    })
+    public ResponseEntity<Void> markAsRead(@PathVariable String conversationId,
+                                           @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+        chatService.markAsRead(authenticatedUser, conversationId);
+        return ResponseEntity.noContent().build();
     }
 }

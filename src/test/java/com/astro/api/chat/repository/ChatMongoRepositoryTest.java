@@ -23,6 +23,23 @@ class ChatMongoRepositoryTest {
     private final ChatMongoRepository repository = new ChatMongoRepository(mongoTemplate);
 
     @Test
+    void findsConversationByIdAndProjectsOnlyIdAndParticipants() {
+        when(mongoTemplate.findOne(any(Query.class),
+                eq(com.astro.api.chat.model.ConversationDocument.class), eq("conversas"))).thenReturn(null);
+
+        repository.findConversation(CONVERSATION_ID);
+
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).findOne(queryCaptor.capture(),
+                eq(com.astro.api.chat.model.ConversationDocument.class), eq("conversas"));
+        Query query = queryCaptor.getValue();
+        assertEquals(CONVERSATION_ID, query.getQueryObject().getString("_id"));
+        assertTrue(query.getFieldsObject().containsKey("_id"));
+        assertTrue(query.getFieldsObject().containsKey("participantes"));
+        assertEquals(2, query.getFieldsObject().size());
+    }
+
+    @Test
     void buildsRecentMessagesQueryWithProjectionSortAndLimit() {
         when(mongoTemplate.find(any(Query.class), eq(ChatMessageDocument.class), eq("mensagens")))
                 .thenReturn(List.of());
