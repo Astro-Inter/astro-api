@@ -1,5 +1,9 @@
 # Cadastro inicial de workspace
 
+Os endereços das unidades são geocodificados pelo backend via Geoapify e gravados
+em `unidade_endereco.geolocalizacao`. Falhas na busca não impedem o cadastro.
+Configuração, persistência e nova tentativa: [geolocalização de unidades](unit-geolocation.md).
+
 `POST /register-workspace` é público e recebe multipart com `data` (JSON de
 `CreateWorkspaceRequest`) e `file` (planilha XLS/XLSX de até 5 MiB). A primeira
 aba usa as colunas `nome`, `cpf`, `email`, `unidade`, `cargo` e `modalidade`.
