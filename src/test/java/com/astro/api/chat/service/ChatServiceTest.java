@@ -3,6 +3,8 @@ package com.astro.api.chat.service;
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.security.Role;
 import com.astro.api.chat.dto.response.ChatResponse;
+import com.astro.api.chat.mapper.ChatMessageMapper;
+import com.astro.api.chat.model.ChatMessageDocument;
 import com.astro.api.chat.model.ConversationDocument;
 import com.astro.api.chat.repository.ChatMongoRepository;
 import com.astro.api.chat.repository.LastMessageProjection;
@@ -47,7 +49,7 @@ class ChatServiceTest {
         when(redis.opsForValue()).thenReturn(values);
         current = user(1L, "João", UserType.COLABORADOR, 10L);
         when(users.findChatUserByFirebaseUid("uid")).thenReturn(Optional.of(current));
-        service = new ChatService(users, mongo, redis, avatars);
+        service = new ChatService(users, mongo, redis, avatars, new ChatMessageMapper());
     }
 
     @Test
@@ -115,6 +117,103 @@ class ChatServiceTest {
         when(values.multiGet(anyCollection())).thenThrow(new IllegalStateException("Redis indisponível"));
 
         assertThrows(IllegalStateException.class, () -> service.findChats(authenticatedUser()));
+    }
+
+    @Test
+    void pagesMessagesUsingCompositeCursorAndReturnsChronologicalOrder() {
+        String conversationId = "11111111-2222-4333-8444-555555555555";
+        String oldestId = "10000000-0000-4000-8000-000000000001";
+        String middleId = "10000000-0000-4000-8000-000000000002";
+        String newestId = "10000000-0000-4000-8000-000000000003";
+        Instant date = Instant.parse("2026-10-21T10:00:00Z");
+        when(mongo.findConversation(conversationId)).thenReturn(new ConversationDocument(conversationId, List.of(1L, 2L)));
+        UserChatProjection ana = user(2L, "Ana", UserType.GESTOR, 10L);
+        when(users.findChatUsersByIds(List.of(1L, 2L))).thenReturn(List.of(current, ana));
+        when(mongo.findMessagesBefore(conversationId, null, null, 3)).thenReturn(List.of(
+                message(newestId, conversationId, date.plusSeconds(2)),
+                new ChatMessageDocument(middleId, conversationId, 2L, "reply", oldestId, date.plusSeconds(1)),
+                message(oldestId, conversationId, date)));
+        when(mongo.findMessagesBefore(conversationId, date.plusSeconds(1), middleId, 3)).thenReturn(List.of(
+                message("10000000-0000-4000-8000-000000000000", conversationId, date.minusSeconds(1))));
+
+        var first = service.findMessages(authenticatedUser(), conversationId, 2, null);
+        var second = service.findMessages(authenticatedUser(), conversationId, 2, first.nextCursor());
+
+        assertEquals(List.of(middleId, newestId), first.messages().stream().map(m -> m.id()).toList());
+        assertEquals(oldestId, first.messages().getFirst().replyToMessageId());
+        assertEquals(true, first.hasMore());
+        assertEquals(false, second.hasMore());
+        assertEquals(null, second.nextCursor());
+        assertEquals(List.of("10000000-0000-4000-8000-000000000000"),
+                second.messages().stream().map(m -> m.id()).toList());
+        verify(mongo).findMessagesBefore(conversationId, date.plusSeconds(1), middleId, 3);
+        verify(redis, never()).opsForValue();
+    }
+
+    @Test
+    void rejectsMalformedCursorAndOutOfRangeLimit() {
+        String conversationId = "11111111-2222-4333-8444-555555555555";
+        when(mongo.findConversation(conversationId)).thenReturn(new ConversationDocument(conversationId, List.of(1L, 2L)));
+        UserChatProjection ana = user(2L, "Ana", UserType.GESTOR, 10L);
+        when(users.findChatUsersByIds(List.of(1L, 2L))).thenReturn(List.of(current, ana));
+        assertThrows(com.astro.api.common.exception.BusinessException.class,
+                () -> service.findMessages(authenticatedUser(), conversationId, 101, null));
+        assertThrows(com.astro.api.common.exception.BusinessException.class,
+                () -> service.findMessages(authenticatedUser(), conversationId, 30, "bad-cursor"));
+    }
+
+    @Test
+    void rejectsNonParticipantsAndCrossWorkspaceConversations() {
+        String conversationId = "11111111-2222-4333-8444-555555555555";
+        when(mongo.findConversation(conversationId)).thenReturn(new ConversationDocument(conversationId, List.of(2L, 3L)));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.findMessages(authenticatedUser(), conversationId, 30, null));
+
+        when(mongo.findConversation(conversationId)).thenReturn(new ConversationDocument(conversationId, List.of(1L, 2L)));
+        UserChatProjection foreign = user(2L, "Ana", UserType.GESTOR, 20L);
+        when(users.findChatUsersByIds(List.of(1L, 2L))).thenReturn(List.of(current, foreign));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.findMessages(authenticatedUser(), conversationId, 30, null));
+        verify(redis, never()).opsForValue();
+    }
+
+    @Test
+    void handlesEmptyHistoryAndRequestsAtMostLimitPlusOne() {
+        String conversationId = "11111111-2222-4333-8444-555555555555";
+        when(mongo.findConversation(conversationId)).thenReturn(new ConversationDocument(conversationId, List.of(1L, 2L)));
+        UserChatProjection ana = user(2L, "Ana", UserType.GESTOR, 10L);
+        when(users.findChatUsersByIds(List.of(1L, 2L))).thenReturn(List.of(current, ana));
+        when(mongo.findMessagesBefore(conversationId, null, null, 101)).thenReturn(List.of(
+                message("10000000-0000-4000-8000-000000000001", conversationId, Instant.parse("2026-10-21T10:00:00Z"))));
+        when(mongo.findMessagesBefore(conversationId, null, null, 2)).thenReturn(List.of());
+
+        var maximumPage = service.findMessages(authenticatedUser(), conversationId, 100, null);
+        var emptyPage = service.findMessages(authenticatedUser(), conversationId, 1, null);
+
+        assertEquals(1, maximumPage.messages().size());
+        assertEquals(false, maximumPage.hasMore());
+        assertEquals(List.of(), emptyPage.messages());
+        assertEquals(null, emptyPage.nextCursor());
+        assertEquals(false, emptyPage.hasMore());
+        verify(mongo).findMessagesBefore(conversationId, null, null, 101);
+        verify(mongo).findMessagesBefore(conversationId, null, null, 2);
+    }
+
+    @Test
+    void returnsNotFoundWhenConversationDoesNotExist() {
+        String conversationId = "11111111-2222-4333-8444-555555555555";
+        when(mongo.findConversation(conversationId)).thenReturn(null);
+
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,
+                () -> service.findMessages(authenticatedUser(), conversationId, 30, null));
+        verify(mongo, never()).findMessagesBefore(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    private ChatMessageDocument message(String id, String conversationId, Instant date) {
+        return new ChatMessageDocument(id, conversationId, 1L, "mensagem " + id,
+                null, date);
     }
 
     private AuthenticatedUser authenticatedUser() {
