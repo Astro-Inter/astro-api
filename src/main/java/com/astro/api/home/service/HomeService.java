@@ -67,7 +67,8 @@ public class HomeService {
             if (response == null || response.userName() == null || response.statistics() == null) {
                 throw new IllegalStateException("Dados da Home retornados pelo banco são inválidos");
             }
-            return workspaceHomeMapper.toResponse(response, workspaceHomeProfileService.findPhotoUrl(user.firebaseUid()));
+            String profilePhotoUrl = workspaceHomeProfileService.findPhotoUrl(user.firebaseUid());
+            return workspaceHomeMapper.toResponse(response, profilePhotoUrl);
         } catch (JacksonException exception) {
             throw new IllegalStateException("Não foi possível interpretar os dados da Home", exception);
         }
