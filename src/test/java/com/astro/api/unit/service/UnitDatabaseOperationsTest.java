@@ -30,7 +30,7 @@ class UnitDatabaseOperationsTest {
     private final UnitRepository jpa = mock(UnitRepository.class);
     private final UnitService service = new UnitService(jpa, mock(UnitAddressRepository.class),
             mock(UnitMapper.class), new UnitResponseMapper(), mock(UnitNrCatalogRepository.class),
-            JsonMapper.builder().build());
+            JsonMapper.builder().build(), mock(UnitGeolocationService.class));
     private final AuthenticatedUser user = new AuthenticatedUser("manager", "manager@astro.com", Role.GESTOR);
 
     @Test

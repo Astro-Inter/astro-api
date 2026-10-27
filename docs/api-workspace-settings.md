@@ -125,6 +125,12 @@ continua protegendo concorrência. Nome/CNPJ não recriam a empresa ou o gestor.
 
 ## Unidades
 
+POST e PUT consultam o Geoapify internamente para preencher
+`unidade_endereco.geolocalizacao`. Uma falha na busca não impede salvar a unidade;
+o PUT permite tentar novamente. Ao mudar o endereço sem conseguir localizá-lo,
+as coordenadas antigas são limpas. Consulte [geolocalização de unidades](unit-geolocation.md)
+para configuração e regras completas.
+
 POST e PUT recebem o DTO do cadastro, com nomes em inglês:
 
 ```json

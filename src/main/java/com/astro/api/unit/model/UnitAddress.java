@@ -1,6 +1,8 @@
 package com.astro.api.unit.model;
 
+import com.astro.api.unit.mapper.UnitCoordinatesConverter;
 import jakarta.persistence.*;
+import org.hibernate.annotations.ColumnTransformer;
 
 @Entity
 @Table(name = "unidade_endereco")
@@ -29,6 +31,11 @@ public class UnitAddress {
 
     @Column(name = "complemento")
     public String addressLine2;
+
+    @Column(name = "geolocalizacao", columnDefinition = "point")
+    @Convert(converter = UnitCoordinatesConverter.class)
+    @ColumnTransformer(read = "cast(geolocalizacao as text)", write = "cast(? as point)")
+    public UnitCoordinates geolocation;
 
     @OneToOne
     @MapsId

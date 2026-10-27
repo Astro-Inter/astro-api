@@ -41,11 +41,12 @@ public class UnitSettingsService {
     private final UnitResponseMapper unitResponseMapper;
     private final UnitService unitService;
     private final UserRepository userRepository;
+    private final UnitGeolocationService geolocationService;
 
     public UnitSettingsService(WorkspaceAccessService workspaceAccessService, UnitRepository unitRepository,
                                UnitAddressRepository unitAddressRepository, UnitMapper unitMapper,
                                UnitResponseMapper unitResponseMapper, UnitService unitService,
-                               UserRepository userRepository) {
+                               UserRepository userRepository, UnitGeolocationService geolocationService) {
         this.workspaceAccessService = workspaceAccessService;
         this.unitRepository = unitRepository;
         this.unitAddressRepository = unitAddressRepository;
@@ -53,6 +54,7 @@ public class UnitSettingsService {
         this.unitResponseMapper = unitResponseMapper;
         this.unitService = unitService;
         this.userRepository = userRepository;
+        this.geolocationService = geolocationService;
     }
 
     @Transactional
@@ -69,7 +71,9 @@ public class UnitSettingsService {
         Unit unit = unitRepository.findByIdAndWorkspace_Id(unitId, workspace.id)
                 .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada no workspace"));
         ensureNameAvailable(workspace, body.name(), unitId);
+        boolean addressChanged = !unitMapper.hasSameLocation(body, unit.address);
         unitMapper.applyUpdate(body, unit);
+        geolocationService.updateGeolocation(unit.address, body, addressChanged);
         unitAddressRepository.save(unit.address);
         unitRepository.save(unit);
         return buildUnitResponse(unit);
@@ -79,8 +83,9 @@ public class UnitSettingsService {
     public Unit createInWorkspace(Workspace workspace, UnitRequest body) {
         ensureNameAvailable(workspace, body.name(), null);
         Unit unit = unitRepository.save(unitMapper.toUnit(body, workspace));
-        UnitAddress address = unitAddressRepository.save(unitMapper.toAddress(body, unit));
-        unit.address = address;
+        UnitAddress address = unitMapper.toAddress(body, unit);
+        geolocationService.updateGeolocation(address, body, false);
+        unit.address = unitAddressRepository.save(address);
         return unit;
     }
 

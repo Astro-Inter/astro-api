@@ -41,7 +41,7 @@ public class WorkspaceController {
         )
     )
     @PostMapping(value = "/register-workspace", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Conclui o cadastro inicial de um workspace", description = "Endpoint público. Envie a parte JSON `data` e a planilha XLS/XLSX obrigatória em `file`. CPF e modalidade da linha do gestor são opcionais; quando preenchidos, são validados e importados.")
+    @Operation(summary = "Conclui o cadastro inicial de um workspace", description = "Endpoint público. Envie a parte JSON `data` e a planilha XLS/XLSX obrigatória em `file`. CPF e modalidade da linha do gestor são opcionais; quando preenchidos, são validados e importados. Os endereços das unidades são geocodificados via Geoapify no backend; falhas na busca não impedem o cadastro.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Workspace criado com todos os colaboradores da planilha"),
             @ApiResponse(responseCode = "400", description = "Multipart ou dados inválidos"),

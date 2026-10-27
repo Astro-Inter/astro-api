@@ -37,16 +37,18 @@ public class UnitService {
     private final UnitResponseMapper responseMapper;
     private final UnitNrCatalogRepository nrCatalogRepository;
     private final JsonMapper objectMapper;
+    private final UnitGeolocationService geolocationService;
 
     public UnitService(UnitRepository unitRepository, UnitAddressRepository unitAddressRepository, UnitMapper unitMapper,
                        UnitResponseMapper responseMapper, UnitNrCatalogRepository nrCatalogRepository,
-                       JsonMapper objectMapper) {
+                       JsonMapper objectMapper, UnitGeolocationService geolocationService) {
         this.unitRepository = unitRepository;
         this.unitAddressRepository = unitAddressRepository;
         this.unitMapper = unitMapper;
         this.responseMapper = responseMapper;
         this.nrCatalogRepository = nrCatalogRepository;
         this.objectMapper = objectMapper;
+        this.geolocationService = geolocationService;
     }
 
     @Transactional(readOnly = true)
@@ -140,6 +142,7 @@ public class UnitService {
         }
     }
 
+    @Transactional
     public List<Unit> createForWorkspace(Workspace workspace, List<UnitRequest> requests) {
         Map<String, UnitRequest> requestsByNormalizedName = new LinkedHashMap<>();
         for (UnitRequest request : requests) {
@@ -160,7 +163,9 @@ public class UnitService {
         List<UnitAddress> addresses = new ArrayList<>();
         for (int index = 0; index < requests.size(); index++) {
             UnitRequest request = requests.get(index);
-            addresses.add(unitMapper.toAddress(request, savedUnits.get(index)));
+            UnitAddress address = unitMapper.toAddress(request, savedUnits.get(index));
+            geolocationService.updateGeolocation(address, request, false);
+            addresses.add(address);
         }
         unitAddressRepository.saveAll(addresses);
         return savedUnits;

@@ -32,6 +32,10 @@ validações por tipo de pergunta, está em [docs/forms.md](docs/forms.md).
 O fluxo de respostas mobile, imagens privadas e análise web está em
 [docs/forms-responses.md](docs/forms-responses.md).
 
+A geocodificação de endereços das unidades ocorre na API via Geoapify. Configure
+`GEOAPIFY_API_KEY` no `.env` local e no ambiente de deploy. Os fluxos e o tratamento
+de falhas estão em [docs/unit-geolocation.md](docs/unit-geolocation.md).
+
 ## Stack técnica
 
 - **Java 21**

@@ -25,7 +25,7 @@ class UnitManagementServiceTest {
     private final UnitNrCatalogRepository catalog = mock(UnitNrCatalogRepository.class);
     private final JsonMapper objectMapper = JsonMapper.builder().build();
     private final UnitService service = new UnitService(repository, mock(UnitAddressRepository.class),
-            mock(UnitMapper.class), new UnitResponseMapper(), catalog, objectMapper);
+            mock(UnitMapper.class), new UnitResponseMapper(), catalog, objectMapper, mock(UnitGeolocationService.class));
     private final AuthenticatedUser user = new AuthenticatedUser("manager", "manager@astro.com", Role.GESTOR);
 
     @Test

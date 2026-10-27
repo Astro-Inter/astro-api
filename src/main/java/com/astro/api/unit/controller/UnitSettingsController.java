@@ -34,7 +34,8 @@ public class UnitSettingsController {
     }
 
     @PostMapping
-    @Operation(summary = "Cria uma unidade com endereço no workspace autenticado")
+    @Operation(summary = "Cria uma unidade com endereço no workspace autenticado",
+            description = "Consulta o Geoapify no backend para salvar a geolocalização. Se a busca falhar, salva a unidade sem coordenadas.")
     public ResponseEntity<ApiResult<UnitResponse>> create(@Valid @RequestBody UnitRequest body,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         UnitResponse response = unitSettingsService.create(body, user);
@@ -45,7 +46,8 @@ public class UnitSettingsController {
     }
 
     @PutMapping("/{unitId}")
-    @Operation(summary = "Edita nome e endereço da unidade, preservando seus vínculos e status")
+    @Operation(summary = "Edita nome e endereço da unidade, preservando seus vínculos e status",
+            description = "Repete a geocodificação. Se a busca falhar após mudar o endereço, limpa as coordenadas anteriores; se o endereço não mudar, preserva a localização existente.")
     public ResponseEntity<ApiResult<UnitResponse>> update(@PathVariable Long unitId,
             @Valid @RequestBody UnitRequest body, @AuthenticationPrincipal AuthenticatedUser user,
             HttpServletRequest request) {
