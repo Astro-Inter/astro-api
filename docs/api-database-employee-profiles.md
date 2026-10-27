@@ -33,3 +33,5 @@ prazo, modo de conclusão e evidências. ADMIN continua excluído.
 
 Validação automatizada: `./mvnw --batch-mode --no-transfer-progress verify`.
 As credenciais de contas reais não fazem parte dos testes nem dos arquivos do projeto.
+
+A view `vw_colaboradores` deve expor `tipo` como última coluna. A listagem e os detalhes leem esse campo diretamente para calcular `canManage`, sem uma nova junção à tabela `usuario`. Aplicar essa versão da view antes de publicar a API; os filtros de workspace e `fn_seleciona_unidades` permanecem nas consultas.
