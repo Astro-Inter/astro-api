@@ -4,6 +4,7 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
 import com.astro.api.user.mapper.CollaboratorMapper;
 import com.astro.api.user.repository.CollaboratorRepository;
+import com.astro.api.user.repository.CollaboratorSummaryProjection;
 import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ResourceNotFoundException;
@@ -33,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class CollaboratorService {
@@ -75,9 +77,9 @@ public class CollaboratorService {
     @Transactional(readOnly = true)
     public List<CollaboratorSummaryResponse> findAll(AuthenticatedUser principal, boolean excludeSelf) {
         User manager = requireManager(principal);
-        var rows = collaboratorRepository.findAllInScope(principal.firebaseUid(), manager.getUnit().workspace.id)
+        List<CollaboratorSummaryProjection> rows = collaboratorRepository.findAllInScope(principal.firebaseUid(), manager.getUnit().workspace.id)
                 .stream().filter(row -> !excludeSelf || !row.getId().equals(manager.getId())).toList();
-        var urls = userAvatarService.findUrls(rows.stream().map(row -> row.getId()).toList());
+        Map<Long, String> urls = userAvatarService.findUrls(rows.stream().map(row -> row.getId()).toList());
         return rows.stream().map(row -> collaboratorMapper.toSummary(row, urls.get(row.getId()),
                 canManage(manager, row.getId(), row.getUserType()))).toList();
     }
@@ -193,7 +195,7 @@ public class CollaboratorService {
                 User saved = persist(collaborator);
                 if (saved.getFirebaseUid() != null && !saved.getFirebaseUid().isBlank()
                         && !body.email().equals(previousEmail)) {
-                    var previous = firebaseIdentityService.readEmailState(saved.getFirebaseUid());
+                    FirebaseIdentityService.EmailState previous = firebaseIdentityService.readEmailState(saved.getFirebaseUid());
                     if (previous.email() == null || !previousEmail.equalsIgnoreCase(previous.email())) {
                         throw new ConflictException("O e-mail da autenticação precisa ser reconciliado antes da edição");
                     }
