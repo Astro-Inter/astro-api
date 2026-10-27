@@ -51,6 +51,8 @@ import com.astro.api.workspace.model.Workspace;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.time.Clock;
@@ -125,8 +127,8 @@ class EventServiceTest {
         when(userRepository.findByFirebaseUid("manager")).thenReturn(Optional.of(manager));
     }
 
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.EnumSource(UserType.class)
+    @ParameterizedTest
+    @EnumSource(UserType.class)
     void createsEventWithoutNrForEveryEmployeeProfileUsingBatchOperations(UserType participantType) {
         User participant = createUser(2L, UserStatus.ATIVO, workspace);
         participant.setType(participantType);
@@ -205,8 +207,8 @@ class EventServiceTest {
         verifyNoInteractions(eventRepository);
     }
 
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.EnumSource(value = UserType.class, names = {"GESTOR", "GESTOR_WORKSPACE"})
+    @ParameterizedTest
+    @EnumSource(value = UserType.class, names = {"GESTOR", "GESTOR_WORKSPACE"})
     void rejectsTheCreatorAsParticipantForBothManagerProfiles(UserType creatorType) {
         manager.setType(creatorType);
         when(userRepository.findEventParticipantsInWorkspace(any(), eq(workspace))).thenReturn(List.of(manager));
