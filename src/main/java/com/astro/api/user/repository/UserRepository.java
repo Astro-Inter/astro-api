@@ -40,6 +40,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<UserChatProjection> findChatUserByFirebaseUid(@Param("firebaseUid") String firebaseUid);
 
     @Query("""
+            select u.id as id, u.type as type, u.status as status,
+                   unit.isActive as unitActive, workspace.id as workspaceId
+            from User u
+            join u.unit unit
+            join unit.workspace workspace
+            where u.firebaseUid = :firebaseUid
+            """)
+    Optional<ChatConnectionProjection> findChatConnectionByFirebaseUid(@Param("firebaseUid") String firebaseUid);
+
+    @Query("""
             select u.id as id, u.name as name, u.type as role, workspace.id as workspaceId
             from User u join u.unit unit join unit.workspace workspace
             where u.id in :ids
