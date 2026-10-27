@@ -73,9 +73,9 @@ public class UnitSettingsService {
         ensureNameAvailable(workspace, body.name(), unitId);
         boolean addressChanged = !unitMapper.hasSameLocation(body, unit.address);
         unitMapper.applyUpdate(body, unit);
+        geolocationService.updateGeolocation(unit.address, body, addressChanged);
         unitAddressRepository.save(unit.address);
         unitRepository.save(unit);
-        geolocationService.updateGeolocation(unit.id, body, addressChanged);
         return buildUnitResponse(unit);
     }
 
@@ -83,9 +83,9 @@ public class UnitSettingsService {
     public Unit createInWorkspace(Workspace workspace, UnitRequest body) {
         ensureNameAvailable(workspace, body.name(), null);
         Unit unit = unitRepository.save(unitMapper.toUnit(body, workspace));
-        UnitAddress address = unitAddressRepository.save(unitMapper.toAddress(body, unit));
-        unit.address = address;
-        geolocationService.updateGeolocation(unit.id, body, false);
+        UnitAddress address = unitMapper.toAddress(body, unit);
+        geolocationService.updateGeolocation(address, body, false);
+        unit.address = unitAddressRepository.save(address);
         return unit;
     }
 

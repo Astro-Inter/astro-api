@@ -18,6 +18,7 @@ import com.astro.api.workspace.service.WorkspaceAccessService;
 import java.util.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessResourceFailureException;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -31,7 +32,7 @@ class UnitSettingsServiceTest {
     private final GeoapifyClient geocoder = mock(GeoapifyClient.class);
     private final UnitSettingsService service = new UnitSettingsService(access, units, addresses,
             new UnitMapper(), new UnitResponseMapper(), unitService, users,
-            new UnitGeolocationService(geocoder, addresses));
+            new UnitGeolocationService(geocoder));
     private final AuthenticatedUser user = new AuthenticatedUser("uid", null, Role.GESTOR_WORKSPACE);
     private final Workspace workspace = new Workspace();
 
@@ -54,37 +55,45 @@ class UnitSettingsServiceTest {
         when(geocoder.geocode(request)).thenThrow(new IllegalStateException("Indisponível"));
         UnitResponse created = service.create(request, user);
         assertEquals(12L, created.unitId());
-        verify(addresses, never()).updateGeolocation(anyLong(), anyDouble(), anyDouble());
+        verify(addresses).save(argThat(address -> address.geolocation == null));
 
         Unit unit = unit("Matriz", true);
         unit.address = new UnitMapper().toAddress(request, unit);
         when(units.findByIdAndWorkspace_Id(12L, 3L)).thenReturn(Optional.of(unit));
         doReturn(Optional.of(new UnitCoordinates(-46.6, -23.5))).when(geocoder).geocode(request);
-        when(addresses.updateGeolocation(12L, -46.6, -23.5)).thenReturn(1);
         service.update(12L, request, user);
-        verify(addresses).updateGeolocation(12L, -46.6, -23.5);
+        assertEquals(new UnitCoordinates(-46.6, -23.5), unit.address.geolocation);
+        verify(addresses).save(unit.address);
     }
 
     @Test
     void clearsOldCoordinatesWhenAnEditedAddressCannotBeLocated() {
         Unit unit = unit("Matriz", true);
         unit.address = new UnitMapper().toAddress(body("Matriz", null), unit);
+        unit.address.geolocation = new UnitCoordinates(-46.6, -23.5);
         when(units.findByIdAndWorkspace_Id(12L, 3L)).thenReturn(Optional.of(unit));
         UnitRequest changed = new UnitRequest("Matriz", "20040020", "RJ", "Rio de Janeiro",
                 "Centro", "Rua Nova", "20", null);
         service.update(12L, changed, user);
-        verify(addresses).clearGeolocation(12L);
+        assertNull(unit.address.geolocation);
+        verify(addresses).save(unit.address);
     }
 
     @Test
     void persistsCoordinatesWhenCreatingFromSettings() {
         UnitRequest request = body("Matriz", null);
         when(geocoder.geocode(request)).thenReturn(Optional.of(new UnitCoordinates(-46.6, -23.5)));
-        when(addresses.updateGeolocation(12L, -46.6, -23.5)).thenReturn(1);
         service.create(request, user);
-        var order = inOrder(addresses);
-        order.verify(addresses).save(any());
-        order.verify(addresses).updateGeolocation(12L, -46.6, -23.5);
+        verify(addresses).save(argThat(address -> new UnitCoordinates(-46.6, -23.5).equals(address.geolocation)));
+    }
+
+    @Test
+    void propagatesAddressPersistenceFailureAfterGeocoding() {
+        UnitRequest request = body("Matriz", null);
+        when(geocoder.geocode(request)).thenReturn(Optional.of(new UnitCoordinates(-46.6, -23.5)));
+        when(addresses.save(any())).thenThrow(new DataAccessResourceFailureException("Banco indisponível"));
+        assertThrows(DataAccessResourceFailureException.class,
+                () -> service.create(request, user));
     }
 
     @Test
@@ -128,6 +137,7 @@ class UnitSettingsServiceTest {
     void updatesAddressWithoutChangingStatusOrIdentityAndClearsComplement() {
         Unit unit = unit("Matriz", false);
         unit.address = new UnitMapper().toAddress(body("Matriz", "Antigo"), unit);
+        unit.address.geolocation = new UnitCoordinates(-46.6, -23.5);
         when(units.findByWorkspace(workspace)).thenReturn(List.of(unit));
         when(units.findByIdAndWorkspace_Id(12L, 3L)).thenReturn(Optional.of(unit));
         when(users.countByUnit_IdAndTypeInAndStatus(12L, List.of(UserType.COLABORADOR, UserType.GESTOR, UserType.GESTOR_WORKSPACE), UserStatus.ATIVO)).thenReturn(7L);
@@ -139,7 +149,7 @@ class UnitSettingsServiceTest {
         verify(users).countByUnit_IdAndTypeInAndStatus(12L, List.of(UserType.COLABORADOR, UserType.GESTOR, UserType.GESTOR_WORKSPACE), UserStatus.ATIVO);
         assertSame(workspace, unit.workspace);
         assertSame(unit, unit.address.unit);
-        verify(addresses, never()).clearGeolocation(anyLong());
+        assertEquals(new UnitCoordinates(-46.6, -23.5), unit.address.geolocation);
     }
 
     @Test

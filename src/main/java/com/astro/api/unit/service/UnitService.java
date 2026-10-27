@@ -163,12 +163,11 @@ public class UnitService {
         List<UnitAddress> addresses = new ArrayList<>();
         for (int index = 0; index < requests.size(); index++) {
             UnitRequest request = requests.get(index);
-            addresses.add(unitMapper.toAddress(request, savedUnits.get(index)));
+            UnitAddress address = unitMapper.toAddress(request, savedUnits.get(index));
+            geolocationService.updateGeolocation(address, request, false);
+            addresses.add(address);
         }
         unitAddressRepository.saveAll(addresses);
-        for (int index = 0; index < requests.size(); index++) {
-            geolocationService.updateGeolocation(savedUnits.get(index).id, requests.get(index), false);
-        }
         return savedUnits;
     }
 

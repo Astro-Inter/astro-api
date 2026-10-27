@@ -7,6 +7,7 @@ import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.UserRepository;
 import java.util.List;
 import com.astro.api.unit.model.UnitAddress;
+import com.astro.api.unit.model.UnitCoordinates;
 import com.astro.api.workspace.model.Workspace;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -61,8 +62,6 @@ class UnitRepositoryPostgresTest {
         new JdbcTemplate(dataSource).execute("CREATE SCHEMA " + SCHEMA);
         context = new AnnotationConfigApplicationContext(Config.class);
         unitRepository = context.getBean(UnitRepository.class);
-        // The production schema owns this native PostgreSQL field; Hibernate does not map POINT to the address entity.
-        new JdbcTemplate(dataSource).execute("ALTER TABLE unidade_endereco ADD COLUMN geolocalizacao POINT");
         transactionTemplate = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
         testUnits = transactionTemplate.execute(status -> {
             EntityManager entityManager = EntityManagerFactoryUtils.getTransactionalEntityManager(
@@ -161,17 +160,67 @@ class UnitRepositoryPostgresTest {
     void persistsGeocodedCoordinatesInNativePointWithLongitudeFirst() {
         transactionTemplate.executeWithoutResult(status -> {
             UnitAddressRepository addresses = context.getBean(UnitAddressRepository.class);
-            assertEquals(1, addresses.updateGeolocation(testUnits.addressedUnitId(), -46.63, -23.55));
+            EntityManager entityManager = EntityManagerFactoryUtils.getTransactionalEntityManager(
+                    context.getBean(EntityManagerFactory.class));
+            assertNotNull(entityManager);
+            UnitAddress address = addresses.findById(testUnits.addressedUnitId()).orElseThrow();
+            assertNull(address.geolocation);
+            address.geolocation = new UnitCoordinates(-46.63, -23.55);
+            addresses.saveAndFlush(address);
+            entityManager.clear();
+            address = addresses.findById(testUnits.addressedUnitId()).orElseThrow();
+            assertEquals(new UnitCoordinates(-46.63, -23.55), address.geolocation);
             UnitLocationProjection location = unitRepository.findLocationByIdAndWorkspaceId(
                     testUnits.addressedUnitId(), testUnits.workspaceId()).orElseThrow();
             assertEquals(-46.63, location.getLongitude());
             assertEquals(-23.55, location.getLatitude());
-            assertEquals(0, addresses.updateGeolocation(-1L, -46.63, -23.55));
-            assertEquals(1, addresses.clearGeolocation(testUnits.addressedUnitId()));
+            assertEquals("point", new JdbcTemplate(dataSource).queryForObject(
+                    "SELECT pg_typeof(geolocalizacao)::text FROM unidade_endereco WHERE unidade_id = ?",
+                    String.class, testUnits.addressedUnitId()));
+            address.street = "Rua atualizada";
+            addresses.saveAndFlush(address);
+            entityManager.clear();
+            address = addresses.findById(testUnits.addressedUnitId()).orElseThrow();
+            assertEquals(new UnitCoordinates(-46.63, -23.55), address.geolocation);
+            address.geolocation = new UnitCoordinates(-43.2, -22.9);
+            addresses.saveAndFlush(address);
+            entityManager.clear();
+            address = addresses.findById(testUnits.addressedUnitId()).orElseThrow();
+            assertEquals(new UnitCoordinates(-43.2, -22.9), address.geolocation);
+            address.geolocation = null;
+            addresses.saveAndFlush(address);
+            entityManager.clear();
+            assertNull(addresses.findById(testUnits.addressedUnitId()).orElseThrow().geolocation);
             UnitLocationProjection cleared = unitRepository.findLocationByIdAndWorkspaceId(
                     testUnits.addressedUnitId(), testUnits.workspaceId()).orElseThrow();
             assertNull(cleared.getLongitude());
             assertNull(cleared.getLatitude());
+            status.setRollbackOnly();
+        });
+    }
+
+    @Test
+    void insertsAddressWithMappedPointThroughJpa() {
+        transactionTemplate.executeWithoutResult(status -> {
+            EntityManager entityManager = EntityManagerFactoryUtils.getTransactionalEntityManager(
+                    context.getBean(EntityManagerFactory.class));
+            assertNotNull(entityManager);
+            UnitAddressRepository addresses = context.getBean(UnitAddressRepository.class);
+            UnitAddress address = addresses.findById(testUnits.addressedUnitId()).orElseThrow();
+            Unit unit = entityManager.find(Unit.class, testUnits.legacyUnitId());
+            UnitAddress created = new UnitAddress();
+            created.unit = unit;
+            created.cep = address.cep;
+            created.street = address.street;
+            created.number = address.number;
+            created.city = address.city;
+            created.neighborhood = address.neighborhood;
+            created.state = address.state;
+            created.geolocation = new UnitCoordinates(-46.63, -23.55);
+            addresses.saveAndFlush(created);
+            entityManager.clear();
+            assertEquals(new UnitCoordinates(-46.63, -23.55),
+                    addresses.findById(testUnits.legacyUnitId()).orElseThrow().geolocation);
             status.setRollbackOnly();
         });
     }

@@ -27,8 +27,12 @@ por unidade. Não há repetição automática na mesma operação.
 O [schema externo](https://github.com/Astro-Inter/banco-de-dados/blob/main/database/scripts/1_create_table.sql)
 precisa conter `unidade_endereco.geolocalizacao POINT`, já usado
 pela consulta de localização de formulários. A API não cria nem altera esse schema.
-Uma query nativa grava `point(longitude, latitude)` pelo ID do endereço já
-persistido. Não é PostGIS e não exige adicionar dependências espaciais ao JPA.
+O atributo `UnitAddress.geolocation` mapeia esse campo com `UnitCoordinatesConverter`
+e `@ColumnTransformer`. O conversor usa a ordem `(longitude, latitude)` e o Hibernate
+converte entre a representação textual e o tipo `POINT` na leitura e na escrita.
+O `save()`/`saveAll()` do repository persiste e limpa as coordenadas junto com os
+demais campos do endereço, sem queries de atualização específicas no repository.
+Não é PostGIS e não exige adicionar dependências espaciais ao JPA.
 
 Quando a busca retorna coordenadas válidas, elas são gravadas na mesma transação
 PostgreSQL do endereço. A consulta externa é somente leitura e não participa da

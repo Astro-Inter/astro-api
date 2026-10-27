@@ -2,23 +2,19 @@ package com.astro.api.unit.service;
 
 import com.astro.api.unit.dto.request.UnitRequest;
 import com.astro.api.unit.model.UnitCoordinates;
-import com.astro.api.unit.repository.UnitAddressRepository;
+import com.astro.api.unit.model.UnitAddress;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UnitGeolocationService {
     private final GeoapifyClient client;
-    private final UnitAddressRepository addresses;
 
-    public UnitGeolocationService(GeoapifyClient client, UnitAddressRepository addresses) {
+    public UnitGeolocationService(GeoapifyClient client) {
         this.client = client;
-        this.addresses = addresses;
     }
 
-    @Transactional
-    public void updateGeolocation(Long unitId, UnitRequest request, boolean addressChanged) {
+    public void updateGeolocation(UnitAddress address, UnitRequest request, boolean addressChanged) {
         Optional<UnitCoordinates> coordinates;
         try {
             coordinates = client.geocode(request);
@@ -26,12 +22,9 @@ public class UnitGeolocationService {
             coordinates = Optional.empty();
         }
         if (coordinates.isPresent()) {
-            UnitCoordinates location = coordinates.get();
-            if (addresses.updateGeolocation(unitId, location.longitude(), location.latitude()) != 1) {
-                throw new IllegalStateException("Endereço da unidade não encontrado para salvar a geolocalização");
-            }
+            address.geolocation = coordinates.get();
         } else if (addressChanged) {
-            addresses.clearGeolocation(unitId);
+            address.geolocation = null;
         }
     }
 }

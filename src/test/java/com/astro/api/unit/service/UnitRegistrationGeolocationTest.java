@@ -4,6 +4,7 @@ import com.astro.api.unit.dto.request.UnitRequest;
 import com.astro.api.unit.mapper.UnitMapper;
 import com.astro.api.unit.mapper.UnitResponseMapper;
 import com.astro.api.unit.model.Unit;
+import com.astro.api.unit.model.UnitAddress;
 import com.astro.api.unit.model.UnitCoordinates;
 import com.astro.api.unit.repository.UnitAddressRepository;
 import com.astro.api.unit.repository.UnitNrCatalogRepository;
@@ -26,7 +27,7 @@ class UnitRegistrationGeolocationTest {
         GeoapifyClient client = mock(GeoapifyClient.class);
         UnitService service = new UnitService(units, addresses, new UnitMapper(), new UnitResponseMapper(),
                 mock(UnitNrCatalogRepository.class), JsonMapper.builder().build(),
-                new UnitGeolocationService(client, addresses));
+                new UnitGeolocationService(client));
         Workspace workspace = new Workspace();
         UnitRequest first = new UnitRequest("Matriz", "01310100", "SP", "São Paulo", "Bela Vista",
                 "Avenida Paulista", "1000", null);
@@ -40,14 +41,14 @@ class UnitRegistrationGeolocationTest {
         });
         when(client.geocode(first)).thenReturn(Optional.of(new UnitCoordinates(-46.6, -23.5)));
         when(client.geocode(second)).thenThrow(new IllegalStateException("Indisponível"));
-        when(addresses.updateGeolocation(12L, -46.6, -23.5)).thenReturn(1);
 
         assertEquals(2, service.createForWorkspace(workspace, List.of(first, second)).size());
-        var order = inOrder(addresses, client);
-        order.verify(addresses).saveAll(argThat(batch -> ((List<?>) batch).size() == 2));
-        order.verify(client).geocode(first);
-        order.verify(addresses).updateGeolocation(12L, -46.6, -23.5);
-        order.verify(client).geocode(second);
-        verify(addresses, never()).updateGeolocation(eq(13L), anyDouble(), anyDouble());
+        verify(addresses).saveAll(argThat(batch -> {
+            var saved = (List<UnitAddress>) batch;
+            return saved.size() == 2
+                    && new UnitCoordinates(-46.6, -23.5).equals(saved.getFirst().geolocation)
+                    && saved.getFirst().unit.id == 12L && saved.get(1).unit.id == 13L
+                    && saved.get(1).geolocation == null;
+        }));
     }
 }
