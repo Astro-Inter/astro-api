@@ -19,6 +19,7 @@ import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventCompletionResponse;
 import com.astro.api.event.dto.response.EventEvidenceResponse;
 import com.astro.api.event.dto.response.EventResponse;
+import com.astro.api.event.dto.response.MyEventResponse;
 import com.astro.api.event.mapper.EventMapper;
 import com.astro.api.event.model.CompletionMode;
 import com.astro.api.event.model.Event;
@@ -138,6 +139,14 @@ public class EventService {
         User manager = findAuthenticatedManager(firebaseUid);
         Event event = findEventInWorkspace(eventId, getWorkspace(manager));
         return toResponse(event, eventClassRepository.findByEventOrderByStartDate(event), manager);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MyEventResponse> findMyEvents(String firebaseUid) {
+        User manager = findAuthenticatedManager(firebaseUid);
+        return eventRepository.findMyEvents(manager.getId()).stream()
+                .map(eventMapper::toMyEventResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)

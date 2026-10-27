@@ -12,18 +12,18 @@ import tools.jackson.databind.json.JsonMapper;
 public class ChatRedisMessageListener implements MessageListener {
     private static final Logger LOGGER = LoggerFactory.getLogger(ChatRedisMessageListener.class);
 
-    private final JsonMapper objectMapper;
+    private final JsonMapper jsonMapper;
     private final SimpMessagingTemplate messagingTemplate;
 
-    public ChatRedisMessageListener(JsonMapper objectMapper, SimpMessagingTemplate messagingTemplate) {
-        this.objectMapper = objectMapper;
+    public ChatRedisMessageListener(JsonMapper jsonMapper, SimpMessagingTemplate messagingTemplate) {
+        this.jsonMapper = jsonMapper;
         this.messagingTemplate = messagingTemplate;
     }
 
     @Override
     public void onMessage(Message message, byte[] pattern) {
         try {
-            ChatDeliveryEvent event = objectMapper.readValue(message.getBody(), ChatDeliveryEvent.class);
+            ChatDeliveryEvent event = jsonMapper.readValue(message.getBody(), ChatDeliveryEvent.class);
             if (event.recipientId() == null || event.message() == null) {
                 LOGGER.warn("Evento Redis de entrega do Chat sem destinatário ou mensagem");
                 return;

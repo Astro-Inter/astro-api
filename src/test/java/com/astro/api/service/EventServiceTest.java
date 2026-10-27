@@ -20,6 +20,7 @@ import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventClassResponse;
 import com.astro.api.event.dto.response.EventParticipantResponse;
 import com.astro.api.event.dto.response.EventResponse;
+import com.astro.api.event.dto.response.MyEventResponse;
 import com.astro.api.event.mapper.EventMapper;
 import com.astro.api.event.model.CompletionMode;
 import com.astro.api.event.model.Event;
@@ -31,6 +32,7 @@ import com.astro.api.event.model.EventEvidence;
 import com.astro.api.event.model.EventStatus;
 import com.astro.api.event.model.ParticipationStatus;
 import com.astro.api.event.repository.EventCalendarProjection;
+import com.astro.api.event.repository.MyEventProjection;
 import com.astro.api.event.repository.EventCandidateProjection;
 import com.astro.api.event.repository.EventCandidateRepository;
 import com.astro.api.event.repository.EventClassParticipantRepository;
@@ -169,6 +171,31 @@ class EventServiceTest {
 
         assertThrows(BusinessException.class, () -> service.create(request, "manager"));
         verifyNoInteractions(eventRepository, eventClassRepository, eventClassParticipantRepository);
+    }
+
+    @Test
+    void listsMyEventsUsingAuthenticatedManagerIdAndPreservesViewValues() {
+        MyEventProjection row = mock(MyEventProjection.class);
+        when(row.getId()).thenReturn(101L);
+        when(row.getTitle()).thenReturn("Treinamento de EPI");
+        when(row.getStatus()).thenReturn("ATIVO");
+        when(row.getCompletionMode()).thenReturn("COLABORADOR");
+        when(row.getPendingCount()).thenReturn(4L);
+        when(eventRepository.findMyEvents(1L)).thenReturn(List.of(row));
+
+        List<MyEventResponse> response = service.findMyEvents("manager");
+
+        assertEquals(List.of(new MyEventResponse(101L, "Treinamento de EPI", EventStatus.ATIVO,
+                CompletionMode.COLABORADOR, 4L)), response);
+        verify(eventRepository).findMyEvents(1L);
+    }
+
+    @Test
+    void returnsEmptyMyEventsListWhenViewHasNoRows() {
+        when(eventRepository.findMyEvents(1L)).thenReturn(List.of());
+
+        assertEquals(List.of(), service.findMyEvents("manager"));
+        verify(eventRepository).findMyEvents(1L);
     }
 
     @Test
