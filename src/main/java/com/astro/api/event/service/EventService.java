@@ -20,6 +20,7 @@ import com.astro.api.event.dto.response.EventCompletionResponse;
 import com.astro.api.event.dto.response.EventEvidenceResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.dto.response.ManagerCompletionModeEventDetailsResponse;
+import com.astro.api.event.dto.response.MyEventResponse;
 import com.astro.api.event.mapper.EventMapper;
 import com.astro.api.event.model.CompletionMode;
 import com.astro.api.event.model.Event;
@@ -154,6 +155,14 @@ public class EventService {
 
         return eventMapper.toManagerCompletionModeEventDetailsResponse(
                 eventMapper.toCommonEventDetails(event), lastClassLimitDate, participantCount);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MyEventResponse> findMyEvents(String firebaseUid) {
+        User manager = findAuthenticatedManager(firebaseUid);
+        return eventRepository.findMyEvents(manager.getId()).stream()
+                .map(eventMapper::toMyEventResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)

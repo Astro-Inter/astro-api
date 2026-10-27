@@ -14,18 +14,18 @@ public class RedisChatMessagePublisher implements ChatMessagePublisher {
     public static final String DELIVERY_CHANNEL = "astro:chat:delivery:v1";
 
     private final StringRedisTemplate redisTemplate;
-    private final JsonMapper objectMapper;
+    private final JsonMapper jsonMapper;
 
-    public RedisChatMessagePublisher(StringRedisTemplate redisTemplate, JsonMapper objectMapper) {
+    public RedisChatMessagePublisher(StringRedisTemplate redisTemplate, JsonMapper jsonMapper) {
         this.redisTemplate = redisTemplate;
-        this.objectMapper = objectMapper;
+        this.jsonMapper = jsonMapper;
     }
 
     @Override
     public void publish(Long recipientId, ChatSendResponse message) {
         String payload;
         try {
-            payload = objectMapper.writeValueAsString(new ChatDeliveryEvent(recipientId, message));
+            payload = jsonMapper.writeValueAsString(new ChatDeliveryEvent(recipientId, message));
         } catch (JacksonException exception) {
             throw new IllegalStateException("Não foi possível serializar evento de entrega do Chat", exception);
         }

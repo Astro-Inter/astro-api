@@ -10,7 +10,8 @@ Eventos inexistentes ou de outro workspace retornam 404; falta de autenticação
 | Método e rota | Contrato |
 | --- | --- |
 | `GET /events/{eventId}` | Detalhe completo, autoria, configurações, todas as turmas e participações |
-| `GET /events/manager/{eventId}` | Detalhes para o fluxo de conclusão pelo gestor; inclui participantes e prazo da última turma, sem validade |
+| `GET /events/manager/{eventId}` | Detalhes para evento com conclusão pelo gestor; inclui quantidade de participantes e prazo da última turma |
+| `GET /events/my-events` | Eventos criados pelo gestor autenticado, com pendências calculadas pela view `vw_eventos_gestor` |
 | `GET /events/collaborator/{eventId}` | Detalhes para o colaborador autenticado; consulta sem alterar estado |
 | `PATCH /events/collaborator/{eventId}/viewed` | Marca como visualizado um evento de que o usuário autenticado participa |
 | `GET /events?startDate=...&endDate=...` | Uma entrada por turma que sobrepõe o intervalo, incluindo status |
@@ -52,6 +53,22 @@ inclusiva existente: `turma.endDate >= startDate && turma.startDate <= endDate`.
 Uma turma que atravesse qualquer borda aparece no resultado. Workspace, intervalo
 e ordenação por início/ID são aplicados no repository, com projection JPQL.
 Eventos cancelados permanecem no calendário com `status = CANCELADO`.
+
+## Eventos do gestor autenticado
+
+`GET /events/my-events` exige perfil `GESTOR` ou `GESTOR_WORKSPACE` ativo e retorna
+um `ApiResult<List<MyEventResponse>>` com os eventos criados pelo próprio usuário,
+em ordem decrescente de `pendingCount`, com ID decrescente como desempate. Inclui eventos
+de todos os status e não recebe parâmetros de paginação, filtro ou pesquisa.
+Cada item contém `id`, `title`, `status`,
+`completionMode` e `pendingCount`.
+
+A consulta usa exclusivamente a view PostgreSQL `vw_eventos_gestor` e filtra
+`id_gestor` pelo `id_usuario` resolvido a partir do UID Firebase autenticado. A
+view fornece `qtd_pendencias`, mapeada diretamente para `pendingCount`; a API não
+recalcula nem altera esse valor. Se não houver eventos, `data` será `[]` no
+envelope com HTTP 200. A view ainda precisa ser criada no repositório do banco
+antes que a consulta possa ser executada no PostgreSQL.
 
 ## Candidatos
 
