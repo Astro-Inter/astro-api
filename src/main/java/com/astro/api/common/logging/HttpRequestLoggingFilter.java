@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.slf4j.spi.LoggingEventBuilder;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -44,7 +45,7 @@ public class HttpRequestLoggingFilter extends OncePerRequestFilter {
             long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
             String route = SafeExceptionLogging.route(request);
             try {
-                var event = status >= 500 ? LOGGER.atError() : status >= 400 ? LOGGER.atWarn() : LOGGER.atInfo();
+                LoggingEventBuilder event = status >= 500 ? LOGGER.atError() : status >= 400 ? LOGGER.atWarn() : LOGGER.atInfo();
                 event.addKeyValue("event", "http_request")
                         .addKeyValue("http_method", request.getMethod())
                         .addKeyValue("http_route", route)

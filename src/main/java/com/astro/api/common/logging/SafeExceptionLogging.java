@@ -3,6 +3,7 @@ package com.astro.api.common.logging;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.MDC;
+import org.slf4j.spi.LoggingEventBuilder;
 import org.springframework.web.servlet.HandlerMapping;
 
 import java.sql.SQLException;
@@ -20,7 +21,7 @@ public final class SafeExceptionLogging {
 
     public static void log(Logger logger, String code, String operation, Exception error,
                            HttpServletRequest request, boolean warning) {
-        var event = warning ? logger.atWarn() : logger.atError();
+        LoggingEventBuilder event = warning ? logger.atWarn() : logger.atError();
         event.addKeyValue("event", "operation_failed")
                 .addKeyValue("error_code", code)
                 .addKeyValue("operation", operation)
