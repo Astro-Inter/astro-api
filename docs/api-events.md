@@ -51,6 +51,13 @@ Preserva `id`, `name`, `email`, `roleId`, `roleName` e acrescenta `unitId`,
 dados ausentes não são inventados. Apenas usuários ativos do workspace aparecem;
 o solicitante é excluído e outros gestores permanecem elegíveis.
 
+Participantes incluem `COLABORADOR`, `GESTOR` e `GESTOR_WORKSPACE`. Ser elegível
+para participar não concede permissão de editar o cadastro dessa pessoa. A
+restrição cadastral `canManage` não deve ser usada para remover gestores deste
+seletor. O criador continua fora do próprio evento, tanto na função SQL quanto
+na validação do POST/PATCH. A seleção preserva status ATIVO, workspace e a
+associação cargo/NR quando houver NR informada.
+
 `nrId` é o identificador persistido do catálogo, não uma string como `NR 35`.
 NR inexistente retorna 404. O repository chama
 `fn_seleciona_candidatos_evento(firebaseUid, nrId)` e mapeia os nomes físicos para

@@ -18,8 +18,13 @@ Todas as consultas exigem também esse workspace. A view não autoriza o acesso.
 
 `GET /collaborators` retorna a lista completa, ordenada por nome e ID, incluindo
 `PRE_CADASTRADO`, `ATIVO` e `DESATIVADO`. Não exige busca, filtros ou paginação.
+Inclui usuários dos tipos `COLABORADOR`, `GESTOR` e `GESTOR_WORKSPACE`, conforme
+`vw_colaboradores`. A tela de colaboradores envia `?excludeSelf=true` para ocultar
+o próprio usuário autenticado, antes da consulta de fotos. O padrão `false`
+preserva a própria conta nos seletores de conformidades e participantes.
+O parâmetro não altera o workspace nem as unidades autorizadas.
 O resultado em `data` contém `id_usuario`, `nome`, `email`, `cargo_id`, `cargo`,
-`unidade_id`, `unidade`, `status`, `profilePhotoUrl` e `avatarInitials`.
+`unidade_id`, `unidade`, `status`, `profilePhotoUrl`, `avatarInitials` e `canManage`.
 Cada colaborador aparece uma vez. A ausência
 de colaboradores autorizados resulta em `data: []`. CPF, senha e Firebase UID
 não fazem parte desse contrato.
@@ -28,8 +33,8 @@ não fazem parte desse contrato.
 
 `GET /collaborators/{collaboratorId}` consulta a mesma view e o mesmo escopo.
 Retorna os campos da listagem e acrescenta `cpf`, `modalidade` e `workspace_id`.
-A modalidade pode ser nula para cadastros antigos. Registros inexistentes, gestores
-e colaboradores de outro workspace retornam o mesmo erro 404, sem revelar sua
+A modalidade pode ser nula para cadastros antigos. Os três tipos de usuário podem
+ser consultados. Registros inexistentes e usuários fora do escopo retornam 404, sem revelar sua
 existência. IDs não positivos retornam 400. A rota atende informações e edição,
 sem alterar o endpoint de perfil próprio `/user/me`.
 
@@ -82,7 +87,11 @@ PostgreSQL e Firebase não compartilham uma transação. Se a compensação falh
 a API tenta desativar somente o colaborador afetado em uma nova transação,
 registra o incidente para reconciliação operacional e responde 500. Se o banco
 também estiver indisponível, essa contenção não pode ser garantida; o incidente
-permanece registrado para intervenção. Não há alterações do gestor solicitante.
+permanece registrado para intervenção. A contenção afeta somente a conta editada;
+as demais contas são preservadas. A atualização de contenção usa uma query JPQL
+condicionada ao ID e ao Firebase UID, válida para os três perfis. Uma consulta
+derivada de leitura não substitui essa atualização condicional. A consulta de
+edição permanece nativa por usar `fn_seleciona_unidades` e `FOR UPDATE OF u`.
 
 ## Status — SCRUM-522
 
@@ -106,7 +115,19 @@ O filtro existente consulta `AuthorizationService` em cada requisição, que exi
 `UserStatus.ATIVO`. Assim, o mesmo token Firebase é rejeitado na próxima operação
 protegida após a desativação local. Não é necessário desativar a identidade no
 Firebase, e o colaborador pode voltar a ser ativado quando elegível.
-Gestores não são alvos destes endpoints, inclusive o próprio solicitante.
+O gestor do workspace pode editar e alterar o status dos três tipos de usuário
+no seu escopo. O gestor comum pode administrar colaboradores e a própria conta,
+mas recebe 403 ao tentar editar ou alterar o status de outro gestor ou do gestor
+do workspace. Todos continuam consultáveis no escopo, com `canManage=false`
+quando a administração não for permitida. Fora do workspace ou das unidades
+autorizadas, o retorno permanece 404. A permissão é conferida na API após a
+busca com bloqueio e antes de qualquer alteração no banco ou no Firebase.
+
+`canManage` é calculado a partir da identidade autenticada e do tipo persistido
+do alvo; não é aceito como autorização no corpo da requisição. O WEB usa esse
+campo para mostrar ou ocultar as ações de edição e status. Campo ausente é
+tratado como somente leitura. Consultar não autoriza gravar. O tipo do usuário
+é preservado, e transferência da gestão do workspace continua no fluxo próprio.
 
 ## Dependências
 

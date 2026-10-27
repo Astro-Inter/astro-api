@@ -4,6 +4,7 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
 import com.astro.api.user.mapper.CollaboratorMapper;
 import com.astro.api.user.repository.CollaboratorRepository;
+import com.astro.api.user.repository.CollaboratorSummaryProjection;
 import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ResourceNotFoundException;
@@ -33,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class CollaboratorService {
@@ -69,10 +71,17 @@ public class CollaboratorService {
 
     @Transactional(readOnly = true)
     public List<CollaboratorSummaryResponse> findAll(AuthenticatedUser principal) {
+        return findAll(principal, false);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CollaboratorSummaryResponse> findAll(AuthenticatedUser principal, boolean excludeSelf) {
         User manager = requireManager(principal);
-        var rows = collaboratorRepository.findAllInScope(principal.firebaseUid(), manager.getUnit().workspace.id);
-        var urls = userAvatarService.findUrls(rows.stream().map(row -> row.getId()).toList());
-        return rows.stream().map(row -> collaboratorMapper.toSummary(row, urls.get(row.getId()))).toList();
+        List<CollaboratorSummaryProjection> rows = collaboratorRepository.findAllInScope(principal.firebaseUid(), manager.getUnit().workspace.id)
+                .stream().filter(row -> !excludeSelf || !row.getId().equals(manager.getId())).toList();
+        Map<Long, String> urls = userAvatarService.findUrls(rows.stream().map(row -> row.getId()).toList());
+        return rows.stream().map(row -> collaboratorMapper.toSummary(row, urls.get(row.getId()),
+                canManage(manager, row.getId(), row.getUserType()))).toList();
     }
 
     private User requireManager(AuthenticatedUser principal) {
@@ -95,7 +104,8 @@ public class CollaboratorService {
         User manager = requireManager(principal);
         checkId(collaboratorId);
         return collaboratorRepository.findDetailsInScope(collaboratorId, principal.firebaseUid(), manager.getUnit().workspace.id)
-                .map(row -> collaboratorMapper.toDetails(row, userAvatarService.findUrl(row.getId())))
+                .map(row -> collaboratorMapper.toDetails(row, userAvatarService.findUrl(row.getId()),
+                        canManage(manager, row.getId(), row.getUserType())))
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
     }
 
@@ -114,7 +124,7 @@ public class CollaboratorService {
         checkConflicts(body.cpf(), body.email(), null);
         User saved = persist(collaboratorMapper.toNewUser(body, role, unit));
         eventPublisher.publishEvent(new PreRegisteredCollaboratorsCreatedEvent(List.of(saved.getEmail())));
-        return collaboratorMapper.toDetails(saved, null);
+        return collaboratorMapper.toDetails(saved, null, true);
     }
 
     private Role requireRole(Long roleId, Long workspaceId, boolean requireActive) {
@@ -185,14 +195,14 @@ public class CollaboratorService {
                 User saved = persist(collaborator);
                 if (saved.getFirebaseUid() != null && !saved.getFirebaseUid().isBlank()
                         && !body.email().equals(previousEmail)) {
-                    var previous = firebaseIdentityService.readEmailState(saved.getFirebaseUid());
+                    FirebaseIdentityService.EmailState previous = firebaseIdentityService.readEmailState(saved.getFirebaseUid());
                     if (previous.email() == null || !previousEmail.equalsIgnoreCase(previous.email())) {
                         throw new ConflictException("O e-mail da autenticação precisa ser reconciliado antes da edição");
                     }
                     emailChange[0] = new EmailChange(saved.getId(), saved.getFirebaseUid(), previous);
                     firebaseIdentityService.updateEmail(saved.getFirebaseUid(), body.email());
                 }
-                return collaboratorMapper.toDetails(saved, userAvatarService.findUrl(saved.getId()));
+                return collaboratorMapper.toDetails(saved, userAvatarService.findUrl(saved.getId()), true);
             });
         } catch (RuntimeException exception) {
             EmailChange change = emailChange[0];
@@ -205,8 +215,18 @@ public class CollaboratorService {
 
     private User requireCollaborator(Long collaboratorId, AuthenticatedUser principal, User manager) {
         checkId(collaboratorId);
-        return collaboratorRepository.findForUpdateInScope(collaboratorId, principal.firebaseUid(), manager.getUnit().workspace.id)
+        User collaborator = collaboratorRepository.findForUpdateInScope(collaboratorId, principal.firebaseUid(), manager.getUnit().workspace.id)
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
+        if (!canManage(manager, collaborator.getId(), collaborator.getType() == null ? null : collaborator.getType().name())) {
+            throw new AccessDeniedException("Somente o gestor do workspace pode administrar outros gestores");
+        }
+        return collaborator;
+    }
+
+    private boolean canManage(User manager, Long targetId, String targetType) {
+        return targetType != null && (manager.getType() == UserType.GESTOR_WORKSPACE
+                || UserType.COLABORADOR.name().equals(targetType)
+                || (UserType.GESTOR.name().equals(targetType) && manager.getId().equals(targetId)));
     }
 
     private void compensateEmail(EmailChange change, RuntimeException original) {
@@ -243,7 +263,7 @@ public class CollaboratorService {
             collaborator.setStatus(desired);
             persist(collaborator);
         }
-        return collaboratorMapper.toDetails(collaborator, userAvatarService.findUrl(collaborator.getId()));
+        return collaboratorMapper.toDetails(collaborator, userAvatarService.findUrl(collaborator.getId()), true);
     }
 
     private void validateStatus(User collaborator, UserStatus desired, Long workspaceId) {

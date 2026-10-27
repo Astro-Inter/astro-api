@@ -15,10 +15,10 @@ class CollaboratorAvatarMapperTest {
         when(row.getName()).thenReturn(name);
         when(row.getStatus()).thenReturn("ATIVO");
         var mapper = new CollaboratorMapper();
-        var withoutPhoto = mapper.toSummary(row, null);
+        var withoutPhoto = mapper.toSummary(row, null, false);
         assertNull(withoutPhoto.profilePhotoUrl());
         assertEquals(initials, withoutPhoto.avatarInitials());
-        var withPhoto = mapper.toSummary(row, "https://r2.example.com/foto.jpg");
+        var withPhoto = mapper.toSummary(row, "https://r2.example.com/foto.jpg", true);
         assertEquals("https://r2.example.com/foto.jpg", withPhoto.profilePhotoUrl());
         assertEquals(initials, withPhoto.avatarInitials());
     }

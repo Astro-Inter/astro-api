@@ -28,6 +28,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
 
+import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
+import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
+import org.mockito.InOrder;
+import org.hibernate.exception.ConstraintViolationException;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 
@@ -80,9 +85,9 @@ class CollaboratorServiceTest {
 
     @Test
     void listsAllStatusesUsingOnlyTheAuthenticatedManagersScope() {
-        var rows = List.of(row(2L, "PRE_CADASTRADO"), row(3L, "ATIVO"), row(4L, "DESATIVADO"));
+        List<CollaboratorSummaryProjection> rows = List.of(row(2L, "PRE_CADASTRADO"), row(3L, "ATIVO"), row(4L, "DESATIVADO"));
         when(repository.findAllInScope("manager", 3L)).thenReturn(rows);
-        var result = service.findAll(principal);
+        List<CollaboratorSummaryResponse> result = service.findAll(principal);
         assertEquals(List.of(UserStatus.PRE_CADASTRADO, UserStatus.ATIVO, UserStatus.DESATIVADO),
                 result.stream().map(response -> response.status()).toList());
         assertEquals(3, result.stream().map(response -> response.id()).distinct().count());
@@ -93,18 +98,29 @@ class CollaboratorServiceTest {
 
     @Test
     void includesPhotosAndFallbackInitialsOnlyForTheAuthorizedList() {
-        var first = row(2L, "ATIVO");
-        var second = row(3L, "PRE_CADASTRADO");
+        CollaboratorSummaryProjection first = row(2L, "ATIVO");
+        CollaboratorSummaryProjection second = row(3L, "PRE_CADASTRADO");
         when(first.getName()).thenReturn("Bruno Martins");
         when(second.getName()).thenReturn("Ana Silva");
         when(repository.findAllInScope("manager", 3L)).thenReturn(List.of(first, second));
         when(avatars.findUrls(List.of(2L, 3L))).thenReturn(java.util.Map.of(2L, "https://r2.example.com/photo"));
-        var result = service.findAll(principal);
+        List<CollaboratorSummaryResponse> result = service.findAll(principal);
         assertEquals("https://r2.example.com/photo", result.getFirst().profilePhotoUrl());
         assertEquals("BM", result.getFirst().avatarInitials());
         assertNull(result.get(1).profilePhotoUrl());
         assertEquals("AS", result.get(1).avatarInitials());
         verify(avatars, never()).findUrl(any());
+    }
+
+    @Test
+    void hidesSelfOnlyOnRequestBeforeLoadingAvatarsAndPreservesOtherEmployees() {
+        CollaboratorSummaryProjection self = row(1L, "ATIVO");
+        CollaboratorSummaryProjection other = row(2L, "ATIVO");
+        when(repository.findAllInScope("manager", 3L)).thenReturn(List.of(self, other));
+        assertEquals(List.of(2L), service.findAll(principal, true).stream().map(value -> value.id()).toList());
+        verify(avatars).findUrls(List.of(2L));
+        assertEquals(List.of(1L, 2L), service.findAll(principal).stream().map(value -> value.id()).toList());
+        verify(avatars).findUrls(List.of(1L, 2L));
     }
 
     @Test
@@ -128,7 +144,7 @@ class CollaboratorServiceTest {
     }
 
     private CollaboratorSummaryProjection row(Long id, String status) {
-        var row = mock(CollaboratorSummaryProjection.class);
+        CollaboratorSummaryProjection row = mock(CollaboratorSummaryProjection.class);
         when(row.getId()).thenReturn(id);
         when(row.getName()).thenReturn("Colaborador " + id);
         when(row.getEmail()).thenReturn("test" + id + "@example.com");
@@ -137,18 +153,72 @@ class CollaboratorServiceTest {
         when(row.getUnitId()).thenReturn(12L);
         when(row.getUnitName()).thenReturn("Matriz");
         when(row.getStatus()).thenReturn(status);
+        when(row.getUserType()).thenReturn("COLABORADOR");
         return row;
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = UserType.class, names = {"GESTOR", "GESTOR_WORKSPACE"})
+    void managersCannotEditOrChangeTheStatusOfOtherManagers(UserType targetType) {
+        User target = collaborator(UserStatus.ATIVO, "completed");
+        target.setType(targetType);
+        assertThrows(AccessDeniedException.class, () -> service.update(2L, updateBody(UserStatus.ATIVO), principal));
+        assertThrows(AccessDeniedException.class, () -> service.changeStatus(2L,
+                new CollaboratorStatusRequest(CollaboratorStatusRequest.Status.DESATIVADO), principal));
+        assertEquals("Nome anterior", target.getName());
+        assertEquals(UserStatus.ATIVO, target.getStatus());
+        verify(repository, never()).saveAndFlush(any());
+        verifyNoInteractions(identities, avatars);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(UserType.class)
+    void workspaceManagersCanEditAndChangeStatusOfEveryEmployeeProfileWithoutChangingItsType(UserType targetType) {
+        manager.setType(UserType.GESTOR_WORKSPACE);
+        AuthenticatedUser owner = new AuthenticatedUser("manager", "manager@example.com", Role.GESTOR_WORKSPACE);
+        User target = collaborator(UserStatus.ATIVO, "completed");
+        target.setType(targetType);
+        assertTrue(service.update(2L, updateBody(UserStatus.ATIVO), owner).canManage());
+        assertEquals(targetType, target.getType());
+        assertEquals("completed", target.getFirebaseUid());
+        assertEquals(UserStatus.DESATIVADO, service.changeStatus(2L,
+                new CollaboratorStatusRequest(CollaboratorStatusRequest.Status.DESATIVADO), owner).status());
+        assertEquals(targetType, target.getType());
+    }
+
+    @Test
+    void readPermissionsReflectTheAuthenticatedActorWhileEveryProfileRemainsVisible() {
+        CollaboratorSummaryProjection self = row(1L, "ATIVO"); when(self.getUserType()).thenReturn("GESTOR");
+        CollaboratorSummaryProjection employee = row(2L, "ATIVO");
+        CollaboratorSummaryProjection peer = row(3L, "ATIVO"); when(peer.getUserType()).thenReturn("GESTOR");
+        CollaboratorSummaryProjection owner = row(4L, "ATIVO"); when(owner.getUserType()).thenReturn("GESTOR_WORKSPACE");
+        when(repository.findAllInScope("manager", 3L)).thenReturn(List.of(self, employee, peer, owner));
+        assertEquals(List.of(true, true, false, false), service.findAll(principal).stream().map(value -> value.canManage()).toList());
+        manager.setType(UserType.GESTOR_WORKSPACE);
+        AuthenticatedUser ownerPrincipal = new AuthenticatedUser("manager", "manager@example.com", Role.GESTOR_WORKSPACE);
+        assertTrue(service.findAll(ownerPrincipal).stream().allMatch(value -> value.canManage()));
+    }
+
+    @Test
+    void workspaceManagerStillCannotWriteOutsideItsWorkspaceOrAuthorizedUnits() {
+        manager.setType(UserType.GESTOR_WORKSPACE);
+        AuthenticatedUser owner = new AuthenticatedUser("manager", "manager@example.com", Role.GESTOR_WORKSPACE);
+        assertThrows(ResourceNotFoundException.class, () -> service.update(99L, updateBody(UserStatus.ATIVO), owner));
+        assertThrows(ResourceNotFoundException.class, () -> service.changeStatus(99L,
+                new CollaboratorStatusRequest(CollaboratorStatusRequest.Status.DESATIVADO), owner));
+        verify(repository, never()).saveAndFlush(any());
+        verifyNoInteractions(identities);
     }
 
     @Test
     void loadsDetailsOnlyFromTheAuthorizedViewAndMapsNullableWorkModel() {
-        var row = mock(CollaboratorDetailsProjection.class);
+        CollaboratorDetailsProjection row = mock(CollaboratorDetailsProjection.class);
         when(row.getId()).thenReturn(2L);
         when(row.getCpf()).thenReturn("52998224725");
         when(row.getStatus()).thenReturn("PRE_CADASTRADO");
         when(row.getWorkspaceId()).thenReturn(3L);
         when(repository.findDetailsInScope(2L, "manager", 3L)).thenReturn(Optional.of(row));
-        var response = service.findById(2L, principal);
+        CollaboratorDetailsResponse response = service.findById(2L, principal);
         assertEquals("52998224725", response.cpf());
         assertEquals(3L, response.workspaceId());
         assertNull(response.workModel());
@@ -160,7 +230,7 @@ class CollaboratorServiceTest {
     void givesTheSameNotFoundResponseForMissingAndOutOfScopeDetails() {
         for (Long id : List.of(2L, 999L)) {
             when(repository.findDetailsInScope(id, "manager", 3L)).thenReturn(Optional.empty());
-            var error = assertThrows(ResourceNotFoundException.class, () -> service.findById(id, principal));
+            ResourceNotFoundException error = assertThrows(ResourceNotFoundException.class, () -> service.findById(id, principal));
             assertEquals("Colaborador não encontrado", error.getMessage());
         }
         assertThrows(BusinessException.class, () -> service.findById(0L, principal));
@@ -182,7 +252,7 @@ class CollaboratorServiceTest {
             assertNotNull(user.getCreatedAt());
             return user;
         });
-        var response = service.create(createBody(), principal);
+        CollaboratorDetailsResponse response = service.create(createBody(), principal);
         assertEquals("52998224725", response.cpf());
         assertEquals("test@example.com", response.email());
         assertEquals("Colaborador teste", response.name());
@@ -230,10 +300,10 @@ class CollaboratorServiceTest {
     @Test
     void translatesKnownDatabaseConflictsAndDoesNotQueueFailedWrites() {
         for (String constraint : List.of("uq_usuario_cpf", "uq_usuario_email")) {
-            var sqlError = new java.sql.SQLException("unique conflict", "23505");
-            var violation = new org.hibernate.exception.ConstraintViolationException("unique conflict", sqlError, constraint);
+            SQLException sqlError = new SQLException("unique conflict", "23505");
+            ConstraintViolationException violation = new ConstraintViolationException("unique conflict", sqlError, constraint);
             doThrow(new org.springframework.dao.DataIntegrityViolationException("write failed", violation)).when(repository).saveAndFlush(any());
-            var error = assertThrows(ConflictException.class, () -> service.create(createBody(), principal));
+            ConflictException error = assertThrows(ConflictException.class, () -> service.create(createBody(), principal));
             assertTrue(error.getMessage().contains(constraint.endsWith("cpf") ? "CPF" : "e-mail"));
         }
         verifyNoInteractions(events);
@@ -265,7 +335,7 @@ class CollaboratorServiceTest {
     void updatesOnlyEditableFieldsAndCoordinatesFirebaseEmailBeforeCommit() {
         User user = collaborator(UserStatus.ATIVO, "completed");
         Instant createdAt = user.getCreatedAt();
-        var response = service.update(2L, updateBody(UserStatus.ATIVO), principal);
+        CollaboratorDetailsResponse response = service.update(2L, updateBody(UserStatus.ATIVO), principal);
         assertEquals("Novo nome", response.name());
         assertEquals("new@example.com", response.email());
         assertEquals(WorkModel.REMOTO, response.workModel());
@@ -273,7 +343,7 @@ class CollaboratorServiceTest {
         assertEquals(UserType.COLABORADOR, user.getType());
         assertEquals("completed", user.getFirebaseUid());
         assertEquals(createdAt, user.getCreatedAt());
-        var order = inOrder(repository, identities, transactionManager);
+        InOrder order = inOrder(repository, identities, transactionManager);
         order.verify(repository).saveAndFlush(user);
         order.verify(identities).readEmailState("completed");
         order.verify(identities).updateEmail("completed", "new@example.com");
@@ -286,7 +356,7 @@ class CollaboratorServiceTest {
         collaborator(UserStatus.PRE_CADASTRADO, null);
         role.setActive(false);
         destination.isActive = false;
-        var response = service.update(2L, updateBody(UserStatus.PRE_CADASTRADO), principal);
+        CollaboratorDetailsResponse response = service.update(2L, updateBody(UserStatus.PRE_CADASTRADO), principal);
         assertEquals(UserStatus.PRE_CADASTRADO, response.status());
         verifyNoInteractions(identities);
     }
@@ -296,7 +366,7 @@ class CollaboratorServiceTest {
         collaborator(UserStatus.DESATIVADO, "completed");
         Unit other = new Unit(); other.id = 13L; other.workspace = workspace; other.isActive = true;
         when(units.findById(13L)).thenReturn(Optional.of(other));
-        var request = new UpdateCollaboratorRequest("Novo nome", "52998224725", "old@example.com", 5L, 13L, WorkModel.HIBRIDO, UserStatus.DESATIVADO);
+        UpdateCollaboratorRequest request = new UpdateCollaboratorRequest("Novo nome", "52998224725", "old@example.com", 5L, 13L, WorkModel.HIBRIDO, UserStatus.DESATIVADO);
         assertThrows(AccessDeniedException.class, () -> service.update(2L, request, principal));
         when(repository.canAccessUnit("manager", 13L)).thenReturn(true);
         other.isActive = false;
@@ -341,7 +411,7 @@ class CollaboratorServiceTest {
         doThrow(new IllegalStateException("Firebase unavailable")).when(identities).updateEmail(any(), any());
         doThrow(new IllegalStateException("Compensation unavailable")).when(identities).restoreEmail(any(), any());
         when(repository.deactivateAfterEmailFailure(2L, "completed")).thenReturn(1);
-        var error = assertThrows(IllegalStateException.class, () -> service.update(2L, updateBody(UserStatus.ATIVO), principal));
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> service.update(2L, updateBody(UserStatus.ATIVO), principal));
         assertEquals("Falha de sincronização da autenticação do colaborador", error.getMessage());
         verify(repository).deactivateAfterEmailFailure(2L, "completed");
         verify(transactionManager).commit(any());
@@ -350,7 +420,7 @@ class CollaboratorServiceTest {
     @Test
     void appliesExplicitStatusIdempotentlyWithoutChangingOtherFields() {
         User user = collaborator(UserStatus.ATIVO, "completed");
-        var body = new CollaboratorStatusRequest(CollaboratorStatusRequest.Status.DESATIVADO);
+        CollaboratorStatusRequest body = new CollaboratorStatusRequest(CollaboratorStatusRequest.Status.DESATIVADO);
         assertEquals(UserStatus.DESATIVADO, service.changeStatus(2L, body, principal).status());
         assertEquals(UserStatus.DESATIVADO, service.changeStatus(2L, body, principal).status());
         assertEquals("old@example.com", user.getEmail());
@@ -365,7 +435,7 @@ class CollaboratorServiceTest {
         User user = collaborator(UserStatus.DESATIVADO, "completed");
         when(repository.lockRoleActive(5L, 3L)).thenReturn(true);
         when(repository.lockUnitActive(12L, 3L)).thenReturn(false);
-        var body = new CollaboratorStatusRequest(CollaboratorStatusRequest.Status.ATIVO);
+        CollaboratorStatusRequest body = new CollaboratorStatusRequest(CollaboratorStatusRequest.Status.ATIVO);
         assertThrows(BusinessException.class, () -> service.changeStatus(2L, body, principal));
         assertEquals(UserStatus.DESATIVADO, user.getStatus());
         when(repository.lockUnitActive(12L, 3L)).thenReturn(true);
@@ -376,7 +446,7 @@ class CollaboratorServiceTest {
 
     @Test
     void rejectsAdministrativeActivationForIncompleteAccountsAndOutOfScopeUsers() {
-        var body = new CollaboratorStatusRequest(CollaboratorStatusRequest.Status.ATIVO);
+        CollaboratorStatusRequest body = new CollaboratorStatusRequest(CollaboratorStatusRequest.Status.ATIVO);
         collaborator(UserStatus.DESATIVADO, null);
         assertThrows(BusinessException.class, () -> service.changeStatus(2L, body, principal));
         collaborator(UserStatus.PRE_CADASTRADO, "completed");

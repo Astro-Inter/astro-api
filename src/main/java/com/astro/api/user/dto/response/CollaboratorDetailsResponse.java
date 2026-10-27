@@ -17,5 +17,6 @@ public record CollaboratorDetailsResponse(
         @JsonProperty("unidade") String unitName,
         @JsonProperty("workspace_id") Long workspaceId,
         String profilePhotoUrl,
-        String avatarInitials) {
+        String avatarInitials,
+        boolean canManage) {
 }
