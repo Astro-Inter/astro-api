@@ -49,6 +49,7 @@ import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.model.WorkModel;
 import com.astro.api.user.repository.UserRepository;
+import com.astro.api.user.service.UserAvatarService;
 import com.astro.api.workspace.model.Workspace;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -120,7 +121,7 @@ class EventServiceTest {
                         Instant.parse("2026-10-14T12:00:00Z"), ZoneOffset.UTC),
                 candidateRepository, viewedService,
                 eventCompletionRepository, eventEvidenceRepository,
-                storageService, conformityRepository);
+                storageService, conformityRepository, mock(UserAvatarService.class));
         workspace = new Workspace();
         workspace.id = 10L;
         manager = createUser(1L, UserStatus.ATIVO, workspace);
