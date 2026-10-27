@@ -63,7 +63,7 @@ public class HomeService {
             throw new AccessDeniedException("Gestor ativo sem acesso à Home do workspace");
         }
         try {
-            WorkspaceHomeDatabaseResponse response = objectMapper.readValue(homeJson, WorkspaceHomeDatabaseResponse.class);
+            WorkspaceHomeDatabaseResponse response = workspaceHomeMapper.fromDatabase(homeJson);
             if (response == null || response.userName() == null || response.statistics() == null) {
                 throw new IllegalStateException("Dados da Home retornados pelo banco são inválidos");
             }

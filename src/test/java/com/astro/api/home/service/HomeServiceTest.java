@@ -40,7 +40,7 @@ class HomeServiceTest {
         viewedService = mock(ViewedService.class);
         userAvatarService = mock(UserAvatarService.class);
         service = new HomeService(homeRepository, JsonMapper.builder().build(), notificationService, viewedService,
-                mock(FormService.class), userAvatarService, new WorkspaceHomeMapper(), mock(WorkspaceHomeProfileService.class));
+                mock(FormService.class), userAvatarService, new WorkspaceHomeMapper(JsonMapper.builder().build()), mock(WorkspaceHomeProfileService.class));
         HomeRepository.UserIdProjection identity = mock(HomeRepository.UserIdProjection.class);
         when(identity.getUserId()).thenReturn(42L);
         when(homeRepository.findUserIdByFirebaseUid("uid")).thenReturn(Optional.of(identity));

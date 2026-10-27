@@ -33,7 +33,7 @@ class ManagerHomeServiceTest {
     private final ViewedService viewedService = mock(ViewedService.class);
     private final UserAvatarService userAvatarService = mock(UserAvatarService.class);
     private final HomeService service = new HomeService(homeRepository, JsonMapper.builder().build(),
-            mock(NotificationService.class), viewedService, formService, userAvatarService, new WorkspaceHomeMapper(), mock(WorkspaceHomeProfileService.class));
+            mock(NotificationService.class), viewedService, formService, userAvatarService, new WorkspaceHomeMapper(JsonMapper.builder().build()), mock(WorkspaceHomeProfileService.class));
     private final AuthenticatedUser manager = new AuthenticatedUser("manager", "manager@astro.com", Role.GESTOR);
 
     @Test

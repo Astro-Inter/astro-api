@@ -38,7 +38,7 @@ class HomeControllerTest {
     @BeforeEach
     void setUp() {
         var service = new HomeService(repository, JsonMapper.builder().build(),
-                mock(NotificationService.class), mock(ViewedService.class), mock(FormService.class), mock(UserAvatarService.class), new WorkspaceHomeMapper(), profiles);
+                mock(NotificationService.class), mock(ViewedService.class), mock(FormService.class), mock(UserAvatarService.class), new WorkspaceHomeMapper(JsonMapper.builder().build()), profiles);
         mvc = MockMvcBuilders.standaloneSetup(new HomeController(service))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
@@ -67,17 +67,19 @@ class HomeControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.path").value("/home/workspace"))
-                .andExpect(jsonPath("$.data.nome_usuario").value("Kirk Hammett"))
+                .andExpect(jsonPath("$.data.userName").value("Kirk Hammett"))
+                .andExpect(jsonPath("$.data.nome_usuario").doesNotExist())
+                .andExpect(jsonPath("$.data.estatisticas").doesNotExist())
                 .andExpect(jsonPath("$.data.profilePhotoUrl").value("https://images.example.test/manager.jpg"))
-                .andExpect(jsonPath("$.data.estatisticas.quantidade_unidades").value(4))
-                .andExpect(jsonPath("$.data.estatisticas.quantidade_colaboradores").value(248))
-                .andExpect(jsonPath("$.data.estatisticas.quantidade_requisitos").value(100))
-                .andExpect(jsonPath("$.data.estatisticas.quantidade_conformes").value(85))
-                .andExpect(jsonPath("$.data.estatisticas.quantidade_proximos_vencimento").value(7))
-                .andExpect(jsonPath("$.data.estatisticas.quantidade_vencidos").value(5))
-                .andExpect(jsonPath("$.data.estatisticas.quantidade_pendentes").value(3))
-                .andExpect(jsonPath("$.data.estatisticas.percentual_conformidade_geral").value(92.0))
-                .andExpect(jsonPath("$.data.estatisticas.data_referencia").value("2026-10-12"));
+                .andExpect(jsonPath("$.data.statistics.unitCount").value(4))
+                .andExpect(jsonPath("$.data.statistics.collaboratorCount").value(248))
+                .andExpect(jsonPath("$.data.statistics.requirementCount").value(100))
+                .andExpect(jsonPath("$.data.statistics.compliantCount").value(85))
+                .andExpect(jsonPath("$.data.statistics.expiringSoonCount").value(7))
+                .andExpect(jsonPath("$.data.statistics.expiredCount").value(5))
+                .andExpect(jsonPath("$.data.statistics.pendingCount").value(3))
+                .andExpect(jsonPath("$.data.statistics.overallCompliancePercentage").value(92.0))
+                .andExpect(jsonPath("$.data.statistics.referenceDate").value("2026-10-12"));
         verify(repository).loadHome("manager");
         verifyNoMoreInteractions(repository);
     }
@@ -95,8 +97,8 @@ class HomeControllerTest {
         mvc.perform(get("/home/workspace"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.profilePhotoUrl").value(org.hamcrest.Matchers.nullValue()))
-                .andExpect(jsonPath("$.data.estatisticas.quantidade_requisitos").value(0))
-                .andExpect(jsonPath("$.data.estatisticas.percentual_conformidade_geral").value(0.0));
+                .andExpect(jsonPath("$.data.statistics.requirementCount").value(0))
+                .andExpect(jsonPath("$.data.statistics.overallCompliancePercentage").value(0.0));
     }
 
     @Test

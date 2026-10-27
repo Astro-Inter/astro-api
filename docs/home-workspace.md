@@ -12,18 +12,18 @@ Exemplo de resposta HTTP 200:
   "success": true,
   "message": "Dados da Home retornados com sucesso",
   "data": {
-    "nome_usuario": "Kirk Hammett",
+    "userName": "Kirk Hammett",
     "profilePhotoUrl": "https://arquivos.example.com/foto-assinada",
-    "estatisticas": {
-      "quantidade_unidades": 4,
-      "quantidade_colaboradores": 248,
-      "quantidade_requisitos": 100,
-      "quantidade_conformes": 85,
-      "quantidade_proximos_vencimento": 7,
-      "quantidade_vencidos": 5,
-      "quantidade_pendentes": 3,
-      "percentual_conformidade_geral": 92.00,
-      "data_referencia": "2026-10-12"
+    "statistics": {
+      "unitCount": 4,
+      "collaboratorCount": 248,
+      "requirementCount": 100,
+      "compliantCount": 85,
+      "expiringSoonCount": 7,
+      "expiredCount": 5,
+      "pendingCount": 3,
+      "overallCompliancePercentage": 92.00,
+      "referenceDate": "2026-10-12"
     }
   },
   "errors": null,
@@ -31,9 +31,9 @@ Exemplo de resposta HTTP 200:
 }
 ```
 
-Use `nome_usuario` na saudação, as quantidades de unidades e colaboradores nos
+Use `userName` na saudação, as quantidades de unidades e colaboradores nos
 cards e os indicadores de conformidade no gráfico. Os valores acima são ilustrativos.
-As quatro categorias de requisitos são exclusivas e somam `quantidade_requisitos`.
+As quatro categorias de requisitos são exclusivas e somam `requirementCount`.
 Pendentes também entram no denominador; o front deve considerá-los ao representar
 o total no gráfico. O percentual geral inclui conformes e próximos do vencimento.
 A janela de próximos do vencimento vai de hoje até 30 dias à frente, inclusive.
@@ -85,3 +85,19 @@ transacional cobrem foto presente, null, falha de armazenamento/banco,
 preservação dos indicadores e autorização. A execução completa usa JDK 21
 com `mvn --batch-mode --no-transfer-progress verify`; integrações que exigem
 serviços externos podem ser ignoradas quando suas variáveis não estão definidas.
+
+
+## Contrato sem JsonProperty
+
+Os DTOs do workspace usam nomes em inglês sem JsonProperty. O JSON público
+retorna userName, statistics e profilePhotoUrl; statistics usa unitCount,
+collaboratorCount, requirementCount, compliantCount, expiringSoonCount,
+expiredCount, pendingCount, overallCompliancePercentage e referenceDate.
+
+O JSON da função PostgreSQL continua em português. WorkspaceHomeMapper
+traduz explicitamente as chaves no limite de entrada, sem alterar o banco
+nem os contratos de home mobile e de outros módulos.
+
+Publicar primeiro o web compatível com os dois formatos (PR astro-web #64),
+e depois esta API. A troca dos nomes públicos deve ser coordenada: o web
+anterior a essa adaptação ainda depende dos campos em português.

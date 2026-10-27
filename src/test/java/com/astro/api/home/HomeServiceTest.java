@@ -24,7 +24,7 @@ class HomeServiceTest {
     private final HomeRepository repository = mock(HomeRepository.class);
     private final WorkspaceHomeProfileService profiles = mock(WorkspaceHomeProfileService.class);
     private final HomeService service = new HomeService(repository, JsonMapper.builder().build(),
-            mock(NotificationService.class), mock(ViewedService.class), mock(FormService.class), mock(UserAvatarService.class), new WorkspaceHomeMapper(), profiles);
+            mock(NotificationService.class), mock(ViewedService.class), mock(FormService.class), mock(UserAvatarService.class), new WorkspaceHomeMapper(JsonMapper.builder().build()), profiles);
 
     @Test
     void rejectsMissingIdentityBeforeQueryingTheDatabase() {
