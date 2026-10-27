@@ -6,6 +6,7 @@ import com.astro.api.event.dto.response.CollaboratorEventResponse;
 import com.astro.api.event.dto.response.EventClassResponse;
 import com.astro.api.event.dto.response.EventEvidenceResponse;
 import com.astro.api.event.dto.response.EventParticipantResponse;
+import com.astro.api.event.dto.response.EventParticipantStatusResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.dto.response.ManagerCompletionModeEventDetailsResponse;
 import com.astro.api.event.dto.response.MyEventResponse;
@@ -111,6 +112,15 @@ public class EventMapper {
                 downloadUrl,
                 evidence.getMimeType(),
                 evidence.getSizeBytes());
+    }
+
+    public EventParticipantStatusResponse toParticipantStatusResponse(
+            EventClassParticipant participation,
+            ParticipationStatus participationStatus) {
+        return new EventParticipantStatusResponse(
+                participation.getUser().getName(),
+                participation.getEventClass().getEvent().getTitle(),
+                participationStatus);
     }
 
     public CommonEventDetails toCommonEventDetails(Event event) {
