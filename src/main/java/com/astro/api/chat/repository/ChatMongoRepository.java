@@ -2,6 +2,18 @@ package com.astro.api.chat.repository;
 
 import com.astro.api.chat.model.ChatMessageDocument;
 import com.astro.api.chat.model.ConversationDocument;
+import com.astro.api.chat.model.ChatMessageIds;
+import com.astro.api.common.exception.ConflictException;
+import com.mongodb.client.ClientSession;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import com.mongodb.ReadConcern;
+import com.mongodb.TransactionOptions;
+import com.mongodb.WriteConcern;
+import java.util.Date;
+import java.util.function.Function;
+import org.bson.Document;
 import java.time.Instant;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -10,18 +22,33 @@ import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Collection;
+import java.util.ArrayList;
 import java.util.List;
 
 @Repository
 public class ChatMongoRepository {
+    private static final TransactionOptions TRANSACTION_OPTIONS = TransactionOptions.builder()
+            .readConcern(ReadConcern.SNAPSHOT)
+            .writeConcern(WriteConcern.MAJORITY)
+            .build();
     private static final String CONVERSATIONS = "conversas";
     private static final String MESSAGES = "mensagens";
     private final MongoTemplate mongoTemplate;
+    private final MongoClient mongoClient;
+    private final MongoDatabase mongoDatabase;
 
     public ChatMongoRepository(MongoTemplate mongoTemplate) {
+        this(mongoTemplate, null);
+    }
+
+    @Autowired
+    public ChatMongoRepository(MongoTemplate mongoTemplate, MongoClient mongoClient) {
         this.mongoTemplate = mongoTemplate;
+        this.mongoClient = mongoClient;
+        this.mongoDatabase = mongoTemplate.getDb();
     }
 
     public List<ConversationDocument> findConversationsFor(Long userId) {
@@ -35,6 +62,97 @@ public class ChatMongoRepository {
         query.fields().include("_id").include("participantes");
         return mongoTemplate.findOne(query, ConversationDocument.class, CONVERSATIONS);
     }
+
+    public <T> T inTransaction(Function<ClientSession, T> operation) {
+        try (ClientSession session = mongoClient.startSession()) {
+            return session.withTransaction(() -> operation.apply(session), TRANSACTION_OPTIONS);
+        }
+    }
+
+    public ConversationDocument findConversationByPair(ClientSession session, Long firstParticipantId,
+                                                        Long secondParticipantId) {
+        List<Document> matches = conversations().find(session, participantPairQuery(firstParticipantId, secondParticipantId))
+                .limit(2).into(new ArrayList<>());
+        if (matches.size() > 1) {
+            throw new ConflictException("Há mais de uma conversa para o mesmo par de participantes.");
+        }
+        return matches.isEmpty() ? null : conversation(matches.getFirst());
+    }
+
+    public ConversationDocument findConversationById(ClientSession session, String conversationId) {
+        Document found = conversations().find(session, new Document("_id", conversationId)).first();
+        return found == null ? null : conversation(found);
+    }
+
+    public ConversationDocument findConversationByPair(Long firstParticipantId, Long secondParticipantId) {
+        List<Document> matches = conversations().find(participantPairQuery(firstParticipantId, secondParticipantId))
+                .limit(2).into(new ArrayList<>());
+        if (matches.size() > 1) {
+            throw new ConflictException("Há mais de uma conversa para o mesmo par de participantes.");
+        }
+        return matches.isEmpty() ? null : conversation(matches.getFirst());
+    }
+
+    public ChatMessageDocument findMessageByIdempotency(Long senderId, String clientMessageId) {
+        Document found = messages().find(new Document("_id", ChatMessageIds.forMessage(senderId, clientMessageId))
+                .append("id_remetente", senderId)).first();
+        return found == null ? null : message(found);
+    }
+
+    public ChatMessageDocument findMessage(ClientSession session, Long senderId, String clientMessageId) {
+        Document found = messages().find(session, new Document("_id", ChatMessageIds.forMessage(senderId, clientMessageId))
+                .append("id_remetente", senderId)).first();
+        return found == null ? null : message(found);
+    }
+
+    public ChatMessageDocument findMessage(ClientSession session, String conversationId, String messageId) {
+        Document found = messages().find(session, new Document("_id", messageId)
+                .append("id_conversa", conversationId)).first();
+        return found == null ? null : message(found);
+    }
+
+    public ChatMessageDocument findMessage(String conversationId, String messageId) {
+        Document found = messages().find(new Document("_id", messageId)
+                .append("id_conversa", conversationId)).first();
+        return found == null ? null : message(found);
+    }
+
+    public void insertConversation(ClientSession session, ConversationDocument conversation) {
+        conversations().insertOne(session, new Document("_id", conversation.id())
+                .append("participantes", conversation.participants())
+                );
+    }
+
+    public void insertMessage(ClientSession session, ChatMessageDocument message) {
+        messages().insertOne(session, new Document("_id", message.id())
+                .append("id_conversa", message.conversationId())
+                .append("id_remetente", message.senderId())
+                .append("mensagem", message.content())
+                .append("resposta_mensagem_id", message.replyToMessageId())
+                .append("data", Date.from(message.createdAt())));
+    }
+
+    private ConversationDocument conversation(Document document) {
+        List<?> rawParticipants = (List<?>) document.get("participantes");
+        List<Long> participants = rawParticipants == null ? List.of() : rawParticipants.stream()
+                .map(value -> ((Number) value).longValue()).toList();
+        return new ConversationDocument(document.getString("_id"), participants);
+    }
+
+    private ChatMessageDocument message(Document document) {
+        Date date = document.getDate("data");
+        return new ChatMessageDocument(document.getString("_id"), document.getString("id_conversa"),
+                ((Number) document.get("id_remetente")).longValue(), document.getString("mensagem"),
+                document.getString("resposta_mensagem_id"), date.toInstant());
+    }
+
+    private static Document participantPairQuery(Long firstParticipantId, Long secondParticipantId) {
+        return new Document("participantes", new Document("$all", List.of(firstParticipantId, secondParticipantId))
+                .append("$size", 2));
+    }
+
+    private MongoCollection<Document> conversations() { return mongoDatabase.getCollection(CONVERSATIONS); }
+    private MongoCollection<Document> messages() { return mongoDatabase.getCollection(MESSAGES); }
 
     public List<ChatMessageDocument> findMessagesBefore(String conversationId, Instant cursorDate,
                                                         String cursorMessageId, int limit) {

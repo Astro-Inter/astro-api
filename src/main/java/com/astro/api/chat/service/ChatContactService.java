@@ -15,11 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ChatContactService {
-    private static final List<UserType> ALL_CHAT_TYPES = List.of(
-            UserType.COLABORADOR, UserType.GESTOR, UserType.GESTOR_WORKSPACE);
-    private static final List<UserType> MANAGER_TYPES = List.of(
-            UserType.GESTOR, UserType.GESTOR_WORKSPACE);
-
     private final UserRepository userRepository;
     private final ChatContactMapper chatContactMapper;
 
@@ -37,8 +32,9 @@ public class ChatContactService {
 
         User currentUser = userRepository.findByFirebaseUid(authenticatedUser.firebaseUid())
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário autenticado não encontrado"));
-        if (currentUser.getId() == null || currentUser.getStatus() == UserStatus.DESATIVADO
+        if (currentUser.getId() == null || currentUser.getStatus() != UserStatus.ATIVO
                 || currentUser.getType() == null || currentUser.getUnit() == null
+                || !currentUser.getUnit().isActive
                 || currentUser.getUnit().workspace == null
                 || currentUser.getUnit().workspace.id == null
                 || authenticatedUser.role() == null
@@ -47,10 +43,9 @@ public class ChatContactService {
         }
 
         Long workspaceId = currentUser.getUnit().workspace.id;
-        List<UserType> allowedTypes = currentUser.getType() == UserType.COLABORADOR
-                ? MANAGER_TYPES : ALL_CHAT_TYPES;
+        List<UserType> allowedTypes = ChatCommunicationPolicy.allowedRecipients(currentUser.getType());
 
-        return userRepository.findChatContacts(workspaceId, currentUser.getId(), UserStatus.DESATIVADO, allowedTypes)
+        return userRepository.findChatContacts(workspaceId, currentUser.getId(), UserStatus.ATIVO, allowedTypes)
                 .stream()
                 .map(chatContactMapper::toResponse)
                 .toList();

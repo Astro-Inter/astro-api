@@ -127,6 +127,8 @@ class ChatStompAuthInterceptorTest {
 
         Message<?> subscription = frame(StompCommand.SUBSCRIBE, null, "/user/queue/messages", user);
         assertSame(subscription, interceptor.preSend(subscription, channel));
+        Message<?> errors = frame(StompCommand.SUBSCRIBE, null, "/user/queue/errors", user);
+        assertSame(errors, interceptor.preSend(errors, channel));
 
         for (String destination : new String[]{"/queue/messages", "/topic/messages", "/user/25/queue/messages"}) {
             assertThrows(AccessDeniedException.class,
@@ -135,12 +137,14 @@ class ChatStompAuthInterceptorTest {
     }
 
     @Test
-    void rejectsSendAndFramesWithoutAuthenticatedSession() {
+    void acceptsOnlyChatSendAndRejectsFramesWithoutAuthenticatedSession() {
         assertThrows(AccessDeniedException.class,
                 () -> interceptor.preSend(frame(StompCommand.SUBSCRIBE, null, "/user/queue/messages", null), channel));
         ChatPrincipal principal = new ChatPrincipal(25L, 7L, Role.COLABORADOR, "firebase-uid");
+        Message<?> send = frame(StompCommand.SEND, null, "/app/chat.send", principal);
+        assertSame(send, interceptor.preSend(send, channel));
         assertThrows(AccessDeniedException.class,
-                () -> interceptor.preSend(frame(StompCommand.SEND, null, "/app/chat.send", principal), channel));
+                () -> interceptor.preSend(frame(StompCommand.SEND, null, "/app/other", principal), channel));
         assertThrows(AccessDeniedException.class,
                 () -> interceptor.preSend(frame(StompCommand.SEND, null, "/queue/messages", principal), channel));
     }

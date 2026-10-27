@@ -51,7 +51,8 @@ class ChatServiceTest {
         when(redis.opsForValue()).thenReturn(values);
         current = user(1L, "João", UserType.COLABORADOR, 10L);
         when(users.findChatUserByFirebaseUid("uid")).thenReturn(Optional.of(current));
-        service = new ChatService(users, mongo, redis, avatars, new ChatMessageMapper());
+        service = new ChatService(users, mongo, redis, avatars, new ChatMessageMapper(),
+                mock(ChatMessagePublisher.class));
     }
 
     @Test
@@ -315,6 +316,8 @@ class ChatServiceTest {
         when(projection.getName()).thenReturn(name);
         when(projection.getRole()).thenReturn(role);
         when(projection.getWorkspaceId()).thenReturn(workspaceId);
+        when(projection.getStatus()).thenReturn(com.astro.api.user.model.UserStatus.ATIVO);
+        when(projection.getUnitActive()).thenReturn(true);
         return projection;
     }
 }

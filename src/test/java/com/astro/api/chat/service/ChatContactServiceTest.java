@@ -29,6 +29,7 @@ class ChatContactServiceTest {
         workspace.id = 47L;
         Unit unit = new Unit();
         unit.workspace = workspace;
+        unit.isActive = true;
         currentUser = new User();
         currentUser.setId(8L);
         currentUser.setStatus(UserStatus.ATIVO);
