@@ -7,6 +7,7 @@ import com.astro.api.form.model.Form;
 import com.astro.api.form.service.FormService;
 import com.astro.api.home.dto.response.*;
 import com.astro.api.home.repository.HomeRepository;
+import com.astro.api.home.mapper.WorkspaceHomeMapper;
 import com.astro.api.notification.model.Notification;
 import com.astro.api.notification.service.NotificationService;
 import com.astro.api.user.service.UserAvatarService;
@@ -36,15 +37,20 @@ public class HomeService {
     private final ViewedService viewedService;
     private final FormService formService;
     private final UserAvatarService userAvatarService;
+    private final WorkspaceHomeMapper workspaceHomeMapper;
+    private final WorkspaceHomeProfileService workspaceHomeProfileService;
 
     public HomeService(HomeRepository homeRepository, JsonMapper objectMapper, NotificationService notificationService,
-                       ViewedService viewedService, FormService formService, UserAvatarService userAvatarService) {
+                       ViewedService viewedService, FormService formService, UserAvatarService userAvatarService,
+                       WorkspaceHomeMapper workspaceHomeMapper, WorkspaceHomeProfileService workspaceHomeProfileService) {
         this.homeRepository = homeRepository;
         this.objectMapper = objectMapper;
         this.notificationService = notificationService;
         this.viewedService = viewedService;
         this.formService = formService;
         this.userAvatarService = userAvatarService;
+        this.workspaceHomeMapper = workspaceHomeMapper;
+        this.workspaceHomeProfileService = workspaceHomeProfileService;
     }
 
     @Transactional(readOnly = true)
@@ -57,11 +63,11 @@ public class HomeService {
             throw new AccessDeniedException("Gestor ativo sem acesso à Home do workspace");
         }
         try {
-            WorkspaceHomeResponse response = objectMapper.readValue(homeJson, WorkspaceHomeResponse.class);
+            WorkspaceHomeDatabaseResponse response = objectMapper.readValue(homeJson, WorkspaceHomeDatabaseResponse.class);
             if (response == null || response.userName() == null || response.statistics() == null) {
                 throw new IllegalStateException("Dados da Home retornados pelo banco são inválidos");
             }
-            return response;
+            return workspaceHomeMapper.toResponse(response, workspaceHomeProfileService.findPhotoUrl(user.firebaseUid()));
         } catch (JacksonException exception) {
             throw new IllegalStateException("Não foi possível interpretar os dados da Home", exception);
         }

@@ -1,5 +1,8 @@
 package com.astro.api.home;
 
+import com.astro.api.home.mapper.WorkspaceHomeMapper;
+import com.astro.api.home.service.WorkspaceHomeProfileService;
+
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.security.Role;
 import com.astro.api.common.handler.GlobalExceptionHandler;
@@ -30,11 +33,12 @@ class HomeControllerTest {
     private final HomeRepository repository = mock(HomeRepository.class);
     private final AuthenticatedUser user = new AuthenticatedUser("manager", "manager@astro.com", Role.GESTOR);
     private MockMvc mvc;
+    private final WorkspaceHomeProfileService profiles = mock(WorkspaceHomeProfileService.class);
 
     @BeforeEach
     void setUp() {
         var service = new HomeService(repository, JsonMapper.builder().build(),
-                mock(NotificationService.class), mock(ViewedService.class), mock(FormService.class), mock(UserAvatarService.class));
+                mock(NotificationService.class), mock(ViewedService.class), mock(FormService.class), mock(UserAvatarService.class), new WorkspaceHomeMapper(), profiles);
         mvc = MockMvcBuilders.standaloneSetup(new HomeController(service))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
@@ -58,11 +62,13 @@ class HomeControllerTest {
                   "quantidade_pendentes":3,"percentual_conformidade_geral":92.00,
                   "data_referencia":"2026-10-12"}}
                 """);
+        when(profiles.findPhotoUrl("manager")).thenReturn("https://images.example.test/manager.jpg");
         mvc.perform(get("/home/workspace").param("firebase_uid", "another-manager").param("workspace_id", "999"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.path").value("/home/workspace"))
                 .andExpect(jsonPath("$.data.nome_usuario").value("Kirk Hammett"))
+                .andExpect(jsonPath("$.data.profilePhotoUrl").value("https://images.example.test/manager.jpg"))
                 .andExpect(jsonPath("$.data.estatisticas.quantidade_unidades").value(4))
                 .andExpect(jsonPath("$.data.estatisticas.quantidade_colaboradores").value(248))
                 .andExpect(jsonPath("$.data.estatisticas.quantidade_requisitos").value(100))
@@ -88,6 +94,7 @@ class HomeControllerTest {
                 """);
         mvc.perform(get("/home/workspace"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.profilePhotoUrl").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.data.estatisticas.quantidade_requisitos").value(0))
                 .andExpect(jsonPath("$.data.estatisticas.percentual_conformidade_geral").value(0.0));
     }

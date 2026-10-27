@@ -42,6 +42,27 @@ class HomeAuthorizationTest {
         }
     }
 
+    @Test
+    void workspaceHomeRemainsRestrictedToManagers() {
+        try (var context = new AnnotationConfigApplicationContext(Config.class)) {
+            var controller = context.getBean(HomeController.class);
+            for (String role : List.of("GESTOR", "GESTOR_WORKSPACE")) {
+                authenticate(role);
+                assertDoesNotThrow(() -> controller.loadHome(principal(), new MockHttpServletRequest()));
+            }
+            for (String role : List.of("COLABORADOR", "ADMIN")) {
+                authenticate(role);
+                assertThrows(AccessDeniedException.class,
+                        () -> controller.loadHome(principal(), new MockHttpServletRequest()));
+            }
+            SecurityContextHolder.clearContext();
+            assertThrows(AuthenticationCredentialsNotFoundException.class,
+                    () -> controller.loadHome(principal(), new MockHttpServletRequest()));
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
     private void authenticate(String role) {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                 "user", null, List.of(new SimpleGrantedAuthority("ROLE_" + role))));
