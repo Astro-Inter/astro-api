@@ -3,39 +3,42 @@ package com.astro.api.event.mapper;
 import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventCalendarResponse;
 import com.astro.api.event.dto.response.CollaboratorEventResponse;
-import com.astro.api.event.dto.response.EventEvidenceResponse;
 import com.astro.api.event.dto.response.EventClassResponse;
+import com.astro.api.event.dto.response.EventEvidenceResponse;
 import com.astro.api.event.dto.response.EventParticipantResponse;
 import com.astro.api.event.dto.response.EventResponse;
+import com.astro.api.event.dto.response.ManagerCompletionModeEventDetailsResponse;
+import com.astro.api.event.model.CompletionMode;
 import com.astro.api.event.model.Event;
 import com.astro.api.event.model.EventClass;
 import com.astro.api.event.model.EventClassParticipant;
 import com.astro.api.event.model.EventEvidence;
 import com.astro.api.event.model.ParticipationStatus;
+import com.astro.api.event.repository.EventCalendarProjection;
+import com.astro.api.event.repository.EventCandidateProjection;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.WorkModel;
-import com.astro.api.event.repository.EventCandidateProjection;
-import com.astro.api.event.repository.EventCalendarProjection;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
+import java.time.LocalDateTime;
 import java.util.Comparator;
-import java.util.Set;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
 public class EventMapper {
+    private static final Comparator<EventClassParticipant> PARTICIPANT_ORDER = Comparator
+            .comparing((EventClassParticipant participant) -> participant.getUser().getName())
+            .thenComparing(participant -> participant.getUser().getId());
 
     public EventResponse toResponse(
             Event event,
             List<EventClass> eventClasses,
             List<EventClassParticipant> classParticipants,
             boolean canEdit, boolean canCancel, boolean detailsEditable, Set<Long> editableClassIds) {
-        Comparator<EventClassParticipant> participantOrder = Comparator
-                .comparing((EventClassParticipant participant) -> participant.getUser().getName())
-                .thenComparing(participant -> participant.getUser().getId());
-        Map<Long, List<EventParticipantResponse>> participantsByClassId = classParticipants.stream().sorted(participantOrder)
+        Map<Long, List<EventParticipantResponse>> participantsByClassId = classParticipants.stream().sorted(PARTICIPANT_ORDER)
                 .collect(Collectors.groupingBy(
                         classParticipant -> classParticipant.getEventClass().getId(),
                         Collectors.mapping(this::toParticipantResponse, Collectors.toList())));
@@ -100,6 +103,47 @@ public class EventMapper {
                 downloadUrl,
                 evidence.getMimeType(),
                 evidence.getSizeBytes());
+    }
+
+    public CommonEventDetails toCommonEventDetails(Event event) {
+        return new CommonEventDetails(
+                event.getId(),
+                event.getTitle(),
+                event.getDescription(),
+                event.getExternalLink(),
+                event.getCompletionMode(),
+                event.getManager().getId(),
+                event.getManager().getName());
+    }
+
+    public ManagerCompletionModeEventDetailsResponse toManagerCompletionModeEventDetailsResponse(
+            CommonEventDetails commonDetails,
+            LocalDateTime lastClassLimitDate,
+            List<EventClassParticipant> classParticipants) {
+        List<EventParticipantResponse> participants = classParticipants.stream()
+                .sorted(PARTICIPANT_ORDER)
+                .map(this::toParticipantResponse)
+                .toList();
+        return new ManagerCompletionModeEventDetailsResponse(
+                commonDetails.eventId(),
+                commonDetails.eventTitle(),
+                commonDetails.eventDescription(),
+                commonDetails.externalLink(),
+                participants,
+                lastClassLimitDate,
+                commonDetails.completionMode(),
+                commonDetails.managerId(),
+                commonDetails.managerName());
+    }
+
+    public record CommonEventDetails(
+            Long eventId,
+            String eventTitle,
+            String eventDescription,
+            String externalLink,
+            CompletionMode completionMode,
+            Long managerId,
+            String managerName) {
     }
 
     private EventParticipantResponse toParticipantResponse(EventClassParticipant classParticipant) {
