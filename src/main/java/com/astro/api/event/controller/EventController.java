@@ -11,6 +11,7 @@ import com.astro.api.event.dto.response.CollaboratorEventDetailsResponse;
 import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.dto.response.EventCompletionResponse;
+import com.astro.api.event.dto.response.MyEventResponse;
 import com.astro.api.event.service.EventService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -47,6 +48,25 @@ public class EventController {
 
     public EventController(EventService eventService) {
         this.eventService = eventService;
+    }
+
+    @GetMapping("/my-events")
+    @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
+    @Operation(summary = "Lista os eventos criados pelo gestor autenticado",
+            description = "Retorna todos os status em ordem decrescente de pendências, com ID decrescente como desempate. Os dados e pendências vêm da view vw_eventos_gestor; o gestor é identificado pela autenticação Firebase.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista de eventos no envelope ApiResult, ou lista vazia",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(ref = "#/components/schemas/ApiResultListMyEventResponse"))),
+            @ApiResponse(responseCode = "401", description = "Não autenticado"),
+            @ApiResponse(responseCode = "403", description = "Acesso permitido somente a gestores")
+    })
+    public ResponseEntity<ApiResult<List<MyEventResponse>>> findMyEvents(
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            HttpServletRequest request) {
+        List<MyEventResponse> events = eventService.findMyEvents(authenticatedUser.firebaseUid());
+        return ResponseEntity.ok(ApiResult.success(
+                "Eventos do gestor retornados com sucesso", events, request.getRequestURI()));
     }
 
     @GetMapping

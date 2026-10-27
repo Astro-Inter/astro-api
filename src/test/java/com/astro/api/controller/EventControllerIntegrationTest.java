@@ -16,6 +16,7 @@ import com.astro.api.event.dto.response.EventCalendarResponse;
 import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventCompletionResponse;
 import com.astro.api.event.dto.response.EventResponse;
+import com.astro.api.event.dto.response.MyEventResponse;
 import com.astro.api.event.model.CompletionMode;
 import com.astro.api.event.model.EventCompletionStatus;
 import com.astro.api.event.model.EventStatus;
@@ -53,6 +54,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -98,6 +100,30 @@ class EventControllerIntegrationTest {
                 .andExpect(jsonPath("$.data[0].participants").doesNotExist());
 
         verify(eventService).findAll(any(), any(), anyString());
+    }
+
+    @Test
+    void listsMyEventsAsDirectArrayAndReturnsAnEmptyArrayWhenThereAreNone() throws Exception {
+        when(eventService.findMyEvents("integration-manager")).thenReturn(List.of(
+                new MyEventResponse(101L, "Treinamento de EPI", EventStatus.ATIVO,
+                        CompletionMode.COLABORADOR, 4L)));
+
+        mockMvc.perform(get("/events/my-events"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].id").value(101))
+                .andExpect(jsonPath("$.data[0].title").value("Treinamento de EPI"))
+                .andExpect(jsonPath("$.data[0].status").value("ATIVO"))
+                .andExpect(jsonPath("$.data[0].completionMode").value("COLABORADOR"))
+                .andExpect(jsonPath("$.data[0].pendingCount").value(4));
+
+        when(eventService.findMyEvents("integration-manager")).thenReturn(List.of());
+        mockMvc.perform(get("/events/my-events"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(content().json("{\"success\":true,\"message\":\"Eventos do gestor retornados com sucesso\",\"data\":[],\"errors\":null,\"path\":\"/events/my-events\"}"));
+
+        verify(eventService, Mockito.times(2)).findMyEvents("integration-manager");
     }
 
     @Test

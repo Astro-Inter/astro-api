@@ -37,6 +37,9 @@ class EventOpenApiTest {
                     .andExpect(jsonPath("$.paths['/events/eligible-candidates'].get.responses['404']").exists())
                     .andExpect(jsonPath("$.paths['/events/{eventId}'].patch.responses['401']").exists())
                     .andExpect(jsonPath("$.paths['/events/{eventId}/cancellation'].patch.responses['401']").exists())
+                    .andExpect(jsonPath("$.paths['/events/my-events'].get.responses['200']").exists())
+                    .andExpect(jsonPath("$.paths['/events/my-events'].get.parameters").doesNotExist())
+                    .andExpect(jsonPath("$.components.schemas.MyEventResponse.properties.pendingCount.type").value("integer"))
                     .andExpect(jsonPath("$.components.schemas.EventResponse.properties.managerId").exists())
                     .andExpect(jsonPath("$.components.schemas.EventResponse.properties.canEdit.type").value("boolean"))
                     .andExpect(jsonPath("$.components.schemas.EventClassResponse.properties.editable.type").value("boolean"))
@@ -55,6 +58,12 @@ class EventOpenApiTest {
             assertEquals("Treinamento NR 10",root.path("components").path("schemas").path("CreateEventRequest").path("properties").path("title").path("example").asText());
             assertEquals("2026-11-05T08:00:00",root.path("components").path("schemas").path("CreateEventClassRequest").path("properties").path("startDate").path("example").asText());
             assertEquals("Treinamento reagendado",root.path("components").path("schemas").path("CancelEventRequest").path("properties").path("reason").path("example").asText());
+            JsonNode myEventsResponse = root.path("paths").path("/events/my-events").path("get")
+                    .path("responses").path("200").path("content").path("application/json").path("schema");
+            assertTrue(myEventsResponse.path("$ref").asText().endsWith("/ApiResultListMyEventResponse"));
+            assertEquals("#/components/schemas/MyEventResponse", root.path("components").path("schemas")
+                    .path("ApiResultListMyEventResponse").path("properties").path("data").path("items")
+                    .path("$ref").asText());
             JsonNode required=root.path("components").path("schemas").path("UpdateEventRequest").path("required");
             assertTrue(required.toString().contains("eventClasses"));
             JsonNode properties=root.path("components").path("schemas").path("UpdateEventRequest").path("properties");

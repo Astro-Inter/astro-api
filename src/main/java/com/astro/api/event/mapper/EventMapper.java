@@ -7,7 +7,10 @@ import com.astro.api.event.dto.response.EventEvidenceResponse;
 import com.astro.api.event.dto.response.EventClassResponse;
 import com.astro.api.event.dto.response.EventParticipantResponse;
 import com.astro.api.event.dto.response.EventResponse;
+import com.astro.api.event.dto.response.MyEventResponse;
 import com.astro.api.event.model.Event;
+import com.astro.api.event.model.CompletionMode;
+import com.astro.api.event.model.EventStatus;
 import com.astro.api.event.model.EventClass;
 import com.astro.api.event.model.EventClassParticipant;
 import com.astro.api.event.model.EventEvidence;
@@ -16,6 +19,7 @@ import com.astro.api.user.model.User;
 import com.astro.api.user.model.WorkModel;
 import com.astro.api.event.repository.EventCandidateProjection;
 import com.astro.api.event.repository.EventCalendarProjection;
+import com.astro.api.event.repository.MyEventProjection;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -26,6 +30,11 @@ import java.util.stream.Collectors;
 
 @Component
 public class EventMapper {
+
+    public MyEventResponse toMyEventResponse(MyEventProjection row) {
+        return new MyEventResponse(row.getId(), row.getTitle(), EventStatus.valueOf(row.getStatus()),
+                CompletionMode.valueOf(row.getCompletionMode()), row.getPendingCount());
+    }
 
     public EventResponse toResponse(
             Event event,
