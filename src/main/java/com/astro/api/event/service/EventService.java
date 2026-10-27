@@ -22,6 +22,7 @@ import com.astro.api.event.dto.response.EventParticipantStatusResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.dto.response.ManagerCompletionModeEventDetailsResponse;
 import com.astro.api.event.dto.response.MyEventResponse;
+import com.astro.api.event.dto.response.ManagerEventParticipantDetailsResponse;
 import com.astro.api.event.mapper.EventMapper;
 import com.astro.api.event.model.CompletionMode;
 import com.astro.api.event.model.Event;
@@ -43,6 +44,7 @@ import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.UserRepository;
+import com.astro.api.user.service.UserAvatarService;
 import com.astro.api.workspace.model.Workspace;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.access.AccessDeniedException;
@@ -85,6 +87,7 @@ public class EventService {
     private final EventEvidenceRepository eventEvidenceRepository;
     private final R2StorageService storageService;
     private final ConformityRepository conformityRepository;
+    private final UserAvatarService userAvatarService;
 
     public EventService(
             EventRepository eventRepository,
@@ -98,7 +101,8 @@ public class EventService {
             EventCompletionRepository eventCompletionRepository,
             EventEvidenceRepository eventEvidenceRepository,
             R2StorageService storageService,
-            ConformityRepository conformityRepository) {
+            ConformityRepository conformityRepository,
+            UserAvatarService userAvatarService) {
         this.eventRepository = eventRepository;
         this.eventClassRepository = eventClassRepository;
         this.eventClassParticipantRepository = eventClassParticipantRepository;
@@ -113,6 +117,7 @@ public class EventService {
         this.conformityRepository = conformityRepository;
         this.eventEvidenceRepository = eventEvidenceRepository;
         this.storageService = storageService;
+        this.userAvatarService = userAvatarService;
     }
 
     @Transactional
@@ -177,13 +182,30 @@ public class EventService {
                         completion -> completion.getParticipation().getId(),
                         completion -> toParticipationStatus(completion.getStatus())));
 
+        Map<Long, String> profilePhotoUrls = userAvatarService.findUrls(participations.stream()
+                .map(participation -> participation.getUser().getId())
+                .toList());
+
         return participations.stream()
                 .sorted(Comparator.comparing((EventClassParticipant participation) -> participation.getUser().getName())
                         .thenComparing(participation -> participation.getUser().getId()))
                 .map(participation -> eventMapper.toParticipantStatusResponse(
                         participation,
-                        statuses.getOrDefault(participation.getId(), ParticipationStatus.PENDENTE)))
+                        statuses.getOrDefault(participation.getId(), ParticipationStatus.PENDENTE),
+                        profilePhotoUrls.get(participation.getUser().getId())))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ManagerEventParticipantDetailsResponse findParticipantDetailsForManager(
+            Long eventId, Long participantId, String firebaseUid) {
+        User manager = findAuthenticatedManager(firebaseUid);
+        findEventInWorkspace(eventId, getWorkspace(manager));
+        EventClassParticipant participation = eventClassParticipantRepository
+                .findFirstByEventClass_Event_IdAndUser_IdOrderByEventClass_EndDateDesc(eventId, participantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Participante não encontrado no evento"));
+        String profilePhotoUrl = userAvatarService.findUrl(participantId);
+        return eventMapper.toManagerEventParticipantDetailsResponse(participation, profilePhotoUrl);
     }
 
     @Transactional(readOnly = true)

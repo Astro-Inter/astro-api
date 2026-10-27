@@ -7,6 +7,7 @@ import com.astro.api.event.dto.response.EventClassResponse;
 import com.astro.api.event.dto.response.EventEvidenceResponse;
 import com.astro.api.event.dto.response.EventParticipantResponse;
 import com.astro.api.event.dto.response.EventParticipantStatusResponse;
+import com.astro.api.event.dto.response.ManagerEventParticipantDetailsResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.dto.response.ManagerCompletionModeEventDetailsResponse;
 import com.astro.api.event.dto.response.MyEventResponse;
@@ -116,11 +117,27 @@ public class EventMapper {
 
     public EventParticipantStatusResponse toParticipantStatusResponse(
             EventClassParticipant participation,
-            ParticipationStatus participationStatus) {
+            ParticipationStatus participationStatus,
+            String profilePhotoUrl) {
         return new EventParticipantStatusResponse(
+                participation.getUser().getId(),
                 participation.getUser().getName(),
                 participation.getEventClass().getEvent().getTitle(),
-                participationStatus);
+                participationStatus,
+                profilePhotoUrl);
+    }
+
+    public ManagerEventParticipantDetailsResponse toManagerEventParticipantDetailsResponse(
+            EventClassParticipant participation,
+            String profilePhotoUrl) {
+        return new ManagerEventParticipantDetailsResponse(
+                participation.getUser().getId(),
+                profilePhotoUrl,
+                participation.getEventClass().getEvent().getTitle(),
+                participation.getUser().getName(),
+                participation.getUser().getRole() == null ? null : participation.getUser().getRole().getName(),
+                participation.getUser().getUnit() == null ? null : participation.getUser().getUnit().name,
+                participation.getEventClass().getEndDate());
     }
 
     public CommonEventDetails toCommonEventDetails(Event event) {
