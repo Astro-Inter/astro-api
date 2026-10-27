@@ -11,6 +11,7 @@ Eventos inexistentes ou de outro workspace retornam 404; falta de autenticação
 | --- | --- |
 | `GET /events/{eventId}` | Detalhe completo, autoria, configurações, todas as turmas e participações |
 | `GET /events/manager/{eventId}` | Detalhes para evento com conclusão pelo gestor; inclui quantidade de participantes e prazo da última turma |
+| `GET /events/{eventId}/participants` | Lista participantes do evento, título e status de conclusão individual |
 | `GET /events/my-events` | Eventos criados pelo gestor autenticado, com pendências calculadas pela view `vw_eventos_gestor` |
 | `GET /events/collaborator/{eventId}` | Detalhes para o colaborador autenticado; consulta sem alterar estado |
 | `PATCH /events/collaborator/{eventId}/viewed` | Marca como visualizado um evento de que o usuário autenticado participa |
@@ -44,6 +45,14 @@ pelo gestor e não altera o contrato de `GET /events/{eventId}`. Retorna `eventI
 `participantCount` é a quantidade de usuários distintos participantes;
 `lastClassLimitDate` é a maior data de término entre as turmas. Quando não houver
 turmas, o prazo é `null`. A validade não faz parte desta resposta.
+
+`GET /events/{eventId}/participants` exige perfil `GESTOR` ou `GESTOR_WORKSPACE`
+ativo e consulta o evento no workspace autenticado. Retorna uma lista no envelope
+`ApiResult`, ordenada por nome e ID do usuário. Cada item contém `name`, `title`
+(título do evento) e `participationStatus`: `PENDENTE` quando ainda não há
+solicitação de conclusão, `EM_ANALISE` após envio, `CONCLUIDO` após aprovação e
+`REJEITADO` quando devolvido para correção. Eventos inexistentes ou fora do
+workspace retornam 404; evento sem participantes retorna lista vazia.
 
 ## Calendário
 

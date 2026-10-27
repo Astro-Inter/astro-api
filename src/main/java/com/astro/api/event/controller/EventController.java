@@ -11,6 +11,7 @@ import com.astro.api.event.dto.response.CollaboratorEventDetailsResponse;
 import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.dto.response.EventCompletionResponse;
+import com.astro.api.event.dto.response.EventParticipantStatusResponse;
 import com.astro.api.event.dto.response.ManagerCompletionModeEventDetailsResponse;
 import com.astro.api.event.dto.response.MyEventResponse;
 import com.astro.api.event.service.EventService;
@@ -118,6 +119,28 @@ public class EventController {
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Evento retornado com sucesso",
                 eventService.findById(eventId, authenticatedUser.firebaseUid()), request.getRequestURI()));
+    }
+
+    @GetMapping("/{eventId}/participants")
+    @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
+    @Operation(summary = "Lista participantes de um evento e o status de conclusão de cada um",
+            description = "Consulta no workspace autenticado. O status é PENDENTE quando ainda não houve solicitação, EM_ANALISE após envio, CONCLUIDO após aprovação e REJEITADO quando devolvido para correção.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Participantes retornados no envelope ApiResult"),
+            @ApiResponse(responseCode = "400", description = "Identificador inválido"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado"),
+            @ApiResponse(responseCode = "403", description = "Gestor ativo necessário"),
+            @ApiResponse(responseCode = "404", description = "Evento não encontrado no workspace")
+    })
+    public ResponseEntity<ApiResult<List<EventParticipantStatusResponse>>> findParticipantsWithStatus(
+            @Parameter(description = "ID persistido do evento no workspace autenticado", example = "1", schema = @Schema(minimum = "1"))
+            @PathVariable Long eventId,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            HttpServletRequest request) {
+        List<EventParticipantStatusResponse> participants = eventService.findParticipantsWithStatus(
+                eventId, authenticatedUser.firebaseUid());
+        return ResponseEntity.ok(ApiResult.success(
+                "Participantes retornados com sucesso", participants, request.getRequestURI()));
     }
 
     @GetMapping("/manager/{eventId}")

@@ -18,6 +18,7 @@ import com.astro.api.event.dto.response.EventCalendarResponse;
 import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventCompletionResponse;
 import com.astro.api.event.dto.response.EventEvidenceResponse;
+import com.astro.api.event.dto.response.EventParticipantStatusResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.dto.response.ManagerCompletionModeEventDetailsResponse;
 import com.astro.api.event.dto.response.MyEventResponse;
@@ -57,6 +58,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -155,6 +157,33 @@ public class EventService {
 
         return eventMapper.toManagerCompletionModeEventDetailsResponse(
                 eventMapper.toCommonEventDetails(event), lastClassLimitDate, participantCount);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EventParticipantStatusResponse> findParticipantsWithStatus(Long eventId, String firebaseUid) {
+        User manager = findAuthenticatedManager(firebaseUid);
+        Event event = findEventInWorkspace(eventId, getWorkspace(manager));
+        List<EventClass> eventClasses = eventClassRepository.findByEventOrderByStartDate(event);
+        List<EventClassParticipant> participations = eventClassParticipantRepository
+                .findByEventClassIn(eventClasses);
+        if (participations.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, ParticipationStatus> statuses = eventCompletionRepository
+                .findByParticipation_IdIn(participations.stream().map(EventClassParticipant::getId).toList())
+                .stream()
+                .collect(Collectors.toMap(
+                        completion -> completion.getParticipation().getId(),
+                        completion -> toParticipationStatus(completion.getStatus())));
+
+        return participations.stream()
+                .sorted(Comparator.comparing((EventClassParticipant participation) -> participation.getUser().getName())
+                        .thenComparing(participation -> participation.getUser().getId()))
+                .map(participation -> eventMapper.toParticipantStatusResponse(
+                        participation,
+                        statuses.getOrDefault(participation.getId(), ParticipationStatus.PENDENTE)))
+                .toList();
     }
 
     @Transactional(readOnly = true)
