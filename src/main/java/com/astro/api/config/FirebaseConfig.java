@@ -1,7 +1,6 @@
 package com.astro.api.config;
 
 import com.google.auth.oauth2.GoogleCredentials;
-import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.auth.FirebaseAuth;
@@ -22,9 +21,6 @@ public class FirebaseConfig {
     @Value("${FIREBASE_PROJECT_ID}")
     private String firebaseProjectId;
 
-    @Value("${astro.firebase.http1-transport:false}")
-    private boolean http1Transport;
-
     @Bean
     public FirebaseApp firebaseApp() throws IOException {
 
@@ -38,14 +34,12 @@ public class FirebaseConfig {
                 new ByteArrayInputStream(credentialsJson)
         );
 
-        FirebaseOptions.Builder options = FirebaseOptions.builder()
+        FirebaseOptions options = FirebaseOptions.builder()
                 .setCredentials(credentials)
-                .setProjectId(firebaseProjectId);
-        if (http1Transport) {
-            options.setHttpTransport(new NetHttpTransport());
-        }
+                .setProjectId(firebaseProjectId)
+                .build();
 
-        return FirebaseApp.initializeApp(options.build());
+        return FirebaseApp.initializeApp(options);
     }
 
     @Bean
