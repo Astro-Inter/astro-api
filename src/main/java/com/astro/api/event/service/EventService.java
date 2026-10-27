@@ -19,6 +19,7 @@ import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventCompletionResponse;
 import com.astro.api.event.dto.response.EventEvidenceResponse;
 import com.astro.api.event.dto.response.EventResponse;
+import com.astro.api.event.dto.response.ManagerCompletionModeEventDetailsResponse;
 import com.astro.api.event.dto.response.MyEventResponse;
 import com.astro.api.event.mapper.EventMapper;
 import com.astro.api.event.model.CompletionMode;
@@ -142,6 +143,21 @@ public class EventService {
     }
 
     @Transactional(readOnly = true)
+    public ManagerCompletionModeEventDetailsResponse findDetailsForManager(Long eventId, String firebaseUid) {
+        User manager = findAuthenticatedManager(firebaseUid);
+        Event event = findEventInWorkspace(eventId, getWorkspace(manager));
+        List<EventClass> eventClasses = eventClassRepository.findByEventOrderByStartDate(event);
+        long participantCount = eventClassParticipantRepository.countDistinctParticipantsByEventId(eventId);
+        LocalDateTime lastClassLimitDate = eventClasses.stream()
+                .map(EventClass::getEndDate)
+                .max(LocalDateTime::compareTo)
+                .orElse(null);
+
+        return eventMapper.toManagerCompletionModeEventDetailsResponse(
+                eventMapper.toCommonEventDetails(event), lastClassLimitDate, participantCount);
+    }
+
+    @Transactional(readOnly = true)
     public List<MyEventResponse> findMyEvents(String firebaseUid) {
         User manager = findAuthenticatedManager(firebaseUid);
         return eventRepository.findMyEvents(manager.getId()).stream()
@@ -223,23 +239,23 @@ public class EventService {
                                 evidence, storageService.getEventEvidenceDownloadUrl(evidence.getObjectPath())))
                         .toList();
 
-        User manager = event.getManager();
+        EventMapper.CommonEventDetails commonDetails = eventMapper.toCommonEventDetails(event);
         return new CollaboratorEventDetailsResponse(
-                event.getId(),
-                event.getTitle(),
+                commonDetails.eventId(),
+                commonDetails.eventTitle(),
                 eventClass.getEndDate(),
                 conclusion == null
                         ? ParticipationStatus.PENDENTE
                         : toParticipationStatus(conclusion.getStatus()),
                 event.getStatus(),
                 classStatus(eventClass, LocalDateTime.now()),
-                event.getDescription(),
+                commonDetails.eventDescription(),
                 validity,
-                event.getExternalLink(),
-                manager.getId(),
-                manager.getName(),
+                commonDetails.externalLink(),
+                commonDetails.managerId(),
+                commonDetails.managerName(),
                 event.isMandatoryEvidence(),
-                event.getCompletionMode(),
+                commonDetails.completionMode(),
                 evidences);
     }
 

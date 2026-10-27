@@ -10,6 +10,7 @@ Eventos inexistentes ou de outro workspace retornam 404; falta de autenticação
 | Método e rota | Contrato |
 | --- | --- |
 | `GET /events/{eventId}` | Detalhe completo, autoria, configurações, todas as turmas e participações |
+| `GET /events/manager/{eventId}` | Detalhes para evento com conclusão pelo gestor; inclui quantidade de participantes e prazo da última turma |
 | `GET /events/my-events` | Eventos criados pelo gestor autenticado, com pendências calculadas pela view `vw_eventos_gestor` |
 | `GET /events/collaborator/{eventId}` | Detalhes para o colaborador autenticado; consulta sem alterar estado |
 | `PATCH /events/collaborator/{eventId}/viewed` | Marca como visualizado um evento de que o usuário autenticado participa |
@@ -35,6 +36,14 @@ participantes, por nome e ID do usuário. Listas vazias são `[]`.
 
 Cancelados e concluídos continuam consultáveis com todas essas permissões falsas.
 As flags orientam a interface; a autorização é reaplicada nas escritas.
+
+`GET /events/manager/{eventId}` é uma resposta própria para o fluxo de conclusão
+pelo gestor e não altera o contrato de `GET /events/{eventId}`. Retorna `eventId`,
+`eventTitle`, `eventDescription`, `externalLink`, `participantCount`,
+`lastClassLimitDate`, `completionMode`, `managerId` e `managerName`.
+`participantCount` é a quantidade de usuários distintos participantes;
+`lastClassLimitDate` é a maior data de término entre as turmas. Quando não houver
+turmas, o prazo é `null`. A validade não faz parte desta resposta.
 
 ## Calendário
 

@@ -25,4 +25,8 @@ public interface EventClassParticipantRepository extends JpaRepository<EventClas
     Optional<EventClassParticipant> findFirstByEventClass_Event_IdAndUser_Id(Long eventId, Long userId);
 
     Optional<EventClassParticipant> findByEventClass_Event_IdAndUser_Id(Long eventId, Long userId);
+
+    @Query("select count(distinct participation.user.id) from EventClassParticipant participation "
+            + "where participation.eventClass.event.id = :eventId")
+    long countDistinctParticipantsByEventId(@Param("eventId") Long eventId);
 }
