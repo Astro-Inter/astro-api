@@ -88,7 +88,7 @@ class HttpRequestLoggingFilterTest {
         mvc.perform(get("/items/42")).andExpect(status().isForbidden());
         assertThat(appender.list).hasSize(1);
         assertThat(appender.list.getFirst().getLevel()).isEqualTo(Level.WARN);
-        assertThat(appender.list.getFirst().getFormattedMessage()).contains("route=/items/42", "status=403");
+        assertThat(appender.list.getFirst().getFormattedMessage()).contains("route=unmatched", "status=403");
     }
 
     @Test
@@ -99,8 +99,8 @@ class HttpRequestLoggingFilterTest {
         assertThatThrownBy(() -> filter.doFilter(request, response, (req, res) -> {
             throw new ServletException("segredo-interno");
         })).isInstanceOf(ServletException.class);
-        assertThat(appender.list).hasSize(1);
-        assertThat(appender.list.getFirst().getFormattedMessage()).contains("status=500")
+        assertThat(appender.list).hasSize(2);
+        assertThat(appender.list.getLast().getFormattedMessage()).contains("status=500")
                 .doesNotContain("segredo-interno");
     }
 
