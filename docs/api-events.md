@@ -38,9 +38,9 @@ As flags orientam a interface; a autorização é reaplicada nas escritas.
 
 `GET /events/manager/{eventId}` é uma resposta própria para o fluxo de conclusão
 pelo gestor e não altera o contrato de `GET /events/{eventId}`. Retorna `eventId`,
-`eventTitle`, `eventDescription`, `externalLink`, `participants`,
-`lastClassLimitDate`, `completionMode`, `managerId` e `managerName`. `participants`
-é uma lista ordenada por nome e ID, com `id`, `name`, `email` e `participationId`;
+`eventTitle`, `eventDescription`, `externalLink`, `participantCount`,
+`lastClassLimitDate`, `completionMode`, `managerId` e `managerName`.
+`participantCount` é a quantidade de usuários distintos participantes;
 `lastClassLimitDate` é a maior data de término entre as turmas. Quando não houver
 turmas, o prazo é `null`. A validade não faz parte desta resposta.
 

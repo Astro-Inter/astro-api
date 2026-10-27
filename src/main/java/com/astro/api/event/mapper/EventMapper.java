@@ -119,17 +119,13 @@ public class EventMapper {
     public ManagerCompletionModeEventDetailsResponse toManagerCompletionModeEventDetailsResponse(
             CommonEventDetails commonDetails,
             LocalDateTime lastClassLimitDate,
-            List<EventClassParticipant> classParticipants) {
-        List<EventParticipantResponse> participants = classParticipants.stream()
-                .sorted(PARTICIPANT_ORDER)
-                .map(this::toParticipantResponse)
-                .toList();
+            long participantCount) {
         return new ManagerCompletionModeEventDetailsResponse(
                 commonDetails.eventId(),
                 commonDetails.eventTitle(),
                 commonDetails.eventDescription(),
                 commonDetails.externalLink(),
-                participants,
+                participantCount,
                 lastClassLimitDate,
                 commonDetails.completionMode(),
                 commonDetails.managerId(),

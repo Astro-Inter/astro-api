@@ -146,16 +146,14 @@ public class EventService {
         User manager = findAuthenticatedManager(firebaseUid);
         Event event = findEventInWorkspace(eventId, getWorkspace(manager));
         List<EventClass> eventClasses = eventClassRepository.findByEventOrderByStartDate(event);
-        List<EventClassParticipant> participants = eventClasses.isEmpty()
-                ? List.of()
-                : eventClassParticipantRepository.findByEventClassIn(eventClasses);
+        long participantCount = eventClassParticipantRepository.countDistinctParticipantsByEventId(eventId);
         LocalDateTime lastClassLimitDate = eventClasses.stream()
                 .map(EventClass::getEndDate)
                 .max(LocalDateTime::compareTo)
                 .orElse(null);
 
         return eventMapper.toManagerCompletionModeEventDetailsResponse(
-                eventMapper.toCommonEventDetails(event), lastClassLimitDate, participants);
+                eventMapper.toCommonEventDetails(event), lastClassLimitDate, participantCount);
     }
 
     @Transactional(readOnly = true)
