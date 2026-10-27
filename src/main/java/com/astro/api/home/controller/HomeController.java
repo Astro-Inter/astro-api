@@ -44,7 +44,9 @@ public class HomeController {
     }
 
     @GetMapping("/workspace")
-    @Operation(summary = "Consulta nome do gestor e indicadores da Home do seu workspace")
+    @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
+    @Operation(summary = "Consulta nome, foto e indicadores da Home do seu workspace",
+            description = "profilePhotoUrl contém a URL temporária da foto da própria conta. Ausência ou falha da foto retorna null sem impedir os indicadores.")
     public ResponseEntity<ApiResult<WorkspaceHomeResponse>> loadHome(
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Dados da Home retornados com sucesso",
