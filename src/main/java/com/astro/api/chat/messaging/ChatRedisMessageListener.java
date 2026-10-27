@@ -1,6 +1,5 @@
 package com.astro.api.chat.messaging;
 
-import com.astro.api.chat.dto.response.ChatSendResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.connection.Message;
