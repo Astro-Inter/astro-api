@@ -6,7 +6,10 @@ import com.astro.api.chat.dto.response.ChatLastMessageResponse;
 import com.astro.api.chat.dto.response.ChatMessagePageResponse;
 import com.astro.api.chat.dto.response.ChatParticipantResponse;
 import com.astro.api.chat.dto.response.ChatResponse;
+import com.astro.api.chat.dto.response.ChatSendResponse;
+import com.astro.api.chat.dto.request.ChatSendRequest;
 import com.astro.api.chat.model.ChatMessageDocument;
+import com.astro.api.chat.model.ChatMessageIds;
 import com.astro.api.chat.model.ConversationDocument;
 import com.astro.api.chat.mapper.ChatMessageMapper;
 import com.astro.api.chat.repository.ChatMongoRepository;
@@ -15,12 +18,15 @@ import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.user.mapper.UserAvatarMapper;
 import com.astro.api.user.repository.UserChatProjection;
+import com.astro.api.user.repository.ChatSendUserProjection;
 import com.astro.api.user.repository.UserRepository;
 import com.astro.api.user.service.UserAvatarService;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataAccessException;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,23 +41,35 @@ import java.util.Base64;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.Objects;
+import com.mongodb.MongoException;
+import com.astro.api.chat.security.ChatPrincipal;
+import com.astro.api.user.model.UserStatus;
 
 @Service
 public class ChatService {
+    private static final DefaultRedisScript<Long> INCREMENT_UNREAD_ONCE = new DefaultRedisScript<>(
+            "if redis.call('SISMEMBER', KEYS[2], ARGV[1]) == 1 then return 0 end; "
+                    + "local count = redis.call('INCR', KEYS[1]); "
+                    + "redis.call('SADD', KEYS[2], ARGV[1]); return count", Long.class);
+    private static final int MAX_MESSAGE_LENGTH = 4000;
     private final UserRepository userRepository;
     private final ChatMongoRepository chatMongoRepository;
     private final StringRedisTemplate redisTemplate;
     private final UserAvatarService userAvatarService;
     private final ChatMessageMapper chatMessageMapper;
+    private final ChatMessagePublisher messagePublisher;
+    private static final String UNREAD_PROCESSED_KEY_PREFIX = "chat:unread:processed:";
 
     public ChatService(UserRepository userRepository, ChatMongoRepository chatMongoRepository,
                        StringRedisTemplate redisTemplate, UserAvatarService userAvatarService,
-                       ChatMessageMapper chatMessageMapper) {
+                       ChatMessageMapper chatMessageMapper, ChatMessagePublisher messagePublisher) {
         this.userRepository = userRepository;
         this.chatMongoRepository = chatMongoRepository;
         this.redisTemplate = redisTemplate;
         this.userAvatarService = userAvatarService;
         this.chatMessageMapper = chatMessageMapper;
+        this.messagePublisher = messagePublisher;
     }
 
     @Transactional(readOnly = true)
@@ -98,18 +116,7 @@ public class ChatService {
     }
 
     private UserChatProjection authorizeConversation(AuthenticatedUser authenticatedUser, String conversationId) {
-        String uid = authenticatedUser == null ? null : authenticatedUser.firebaseUid();
-        if (uid == null || uid.isBlank()) {
-            throw new AccessDeniedException("Usuário autenticado necessário para acessar a conversa");
-        }
-        if (authenticatedUser.role() == Role.ADMIN) {
-            throw new AccessDeniedException("Usuários ADMIN não participam do Chat operacional");
-        }
-        UserChatProjection currentUser = userRepository.findChatUserByFirebaseUid(uid)
-                .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
-        if (currentUser.getWorkspaceId() == null) {
-            throw new AccessDeniedException("Colaborador autenticado sem Workspace associado");
-        }
+        UserChatProjection currentUser = authorizeCurrentUser(authenticatedUser);
         ConversationDocument conversation = chatMongoRepository.findConversation(conversationId);
         if (conversation == null) {
             throw new ResourceNotFoundException("Conversa não encontrada");
@@ -160,15 +167,7 @@ public class ChatService {
 
     @Transactional(readOnly = true)
     public List<ChatResponse> findChats(AuthenticatedUser authenticatedUser) {
-        String uid = authenticatedUser == null ? null : authenticatedUser.firebaseUid();
-        if (uid == null || uid.isBlank()) {
-            throw new AccessDeniedException("Usuário autenticado necessário para consultar conversas");
-        }
-        UserChatProjection currentUser = userRepository.findChatUserByFirebaseUid(uid)
-                .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
-        if (currentUser.getWorkspaceId() == null) {
-            throw new AccessDeniedException("Colaborador autenticado sem Workspace associado");
-        }
+        UserChatProjection currentUser = authorizeCurrentUser(authenticatedUser);
 
         List<ConversationDocument> conversations = chatMongoRepository.findConversationsFor(currentUser.getId());
         if (conversations.isEmpty()) {
@@ -265,4 +264,195 @@ public class ChatService {
             throw new IllegalStateException("Contador Redis de mensagens não lidas inválido", exception);
         }
     }
+
+    public ChatSendResponse send(ChatPrincipal principal, ChatSendRequest request) {
+        validatePayload(request);
+        Long senderId = principal.collaboratorId();
+        String conversationId = normalizeOptionalUuid(request.getConversationId(), "conversationId");
+        String replyId = normalizeOptionalUuid(request.getReplyToMessageId(), "replyToMessageId");
+        String clientMessageId = normalizeOptionalUuid(request.getClientMessageId(), "clientMessageId");
+        Long recipientId = request.getRecipientId();
+        if (conversationId != null) {
+            ConversationDocument conversation = chatMongoRepository.findConversation(conversationId);
+            if (conversation == null) throw new ResourceNotFoundException("Conversa não encontrada");
+            if (conversation.participants() == null || conversation.participants().size() != 2
+                    || !conversation.participants().contains(senderId)) {
+                throw new AccessDeniedException("Usuário não participa desta conversa");
+            }
+            recipientId = conversation.participants().stream().filter(id -> !senderId.equals(id)).findFirst()
+                    .orElseThrow(() -> new AccessDeniedException("Conversa inválida"));
+        }
+        validateParticipants(principal, recipientId);
+        String selectedConversationId = conversationId;
+        ChatMessageDocument message;
+        try {
+            message = persistSend(senderId, recipientId, selectedConversationId,
+                    request.getContent(), replyId, clientMessageId);
+        } catch (MongoException exception) {
+            if (exception.getCode() != 11000 && exception.getCode() != 112) throw exception;
+            message = recoverOrRetry(senderId, recipientId, selectedConversationId,
+                    request.getContent(), replyId, clientMessageId);
+        }
+        String unreadKey = unreadKey(message.conversationId(), recipientId);
+        String processedKey = UNREAD_PROCESSED_KEY_PREFIX + message.conversationId();
+        Long incremented;
+        try {
+            incremented = redisTemplate.execute(INCREMENT_UNREAD_ONCE,
+                    List.of(unreadKey, processedKey), message.id());
+        } catch (DataAccessException exception) {
+            throw new ChatUnreadCounterException(exception);
+        }
+        if (incremented == null) throw new ChatUnreadCounterException(null);
+        ChatSendResponse response = new ChatSendResponse(clientMessageId, message.id(), message.conversationId(),
+                message.senderId(), message.content(), message.replyToMessageId(), message.createdAt());
+        messagePublisher.publish(recipientId, response);
+        return response;
+    }
+
+    private UserChatProjection authorizeCurrentUser(AuthenticatedUser authenticatedUser) {
+        String uid = authenticatedUser == null ? null : authenticatedUser.firebaseUid();
+        if (uid == null || uid.isBlank()) {
+            throw new AccessDeniedException("Usuário autenticado necessário para acessar o Chat");
+        }
+        if (authenticatedUser.role() == null || authenticatedUser.role() == Role.ADMIN) {
+            throw new AccessDeniedException("Usuários ADMIN não participam do Chat operacional");
+        }
+        UserChatProjection currentUser = userRepository.findChatUserByFirebaseUid(uid)
+                .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
+        if (currentUser.getStatus() != UserStatus.ATIVO || !Boolean.TRUE.equals(currentUser.getUnitActive())) {
+            throw new AccessDeniedException("Usuário sem acesso ativo ao Chat");
+        }
+        if (currentUser.getWorkspaceId() == null) {
+            throw new AccessDeniedException("Colaborador autenticado sem Workspace associado");
+        }
+        if (currentUser.getRole() == null || !authenticatedUser.role().name().equals(currentUser.getRole().name())) {
+            throw new AccessDeniedException("Perfil autenticado não corresponde ao cadastro atual");
+        }
+        return currentUser;
+    }
+
+    private ChatMessageDocument persistSend(Long senderId, Long recipientId, String requestedConversationId,
+                                           String content, String replyId, String clientMessageId) {
+        return chatMongoRepository.inTransaction(session -> {
+            ChatMessageDocument duplicate = chatMongoRepository.findMessage(session, senderId, clientMessageId);
+            ConversationDocument conversation = requestedConversationId == null
+                    ? chatMongoRepository.findConversationByPair(session, senderId, recipientId)
+                    : chatMongoRepository.findConversationById(session, requestedConversationId);
+            if (conversation == null) {
+                if (requestedConversationId != null) throw new ResourceNotFoundException("Conversa não encontrada");
+                conversation = new ConversationDocument(ChatMessageIds.forConversation(senderId, recipientId),
+                        List.of(senderId, recipientId));
+                chatMongoRepository.insertConversation(session, conversation);
+            }
+            if (conversation.participants() == null || conversation.participants().size() != 2
+                    || !conversation.participants().contains(senderId)
+                    || !conversation.participants().contains(recipientId)) {
+                throw new AccessDeniedException("Usuário não participa desta conversa");
+            }
+            if (duplicate != null) {
+                if (!sameOperation(duplicate, conversation.id(), content, replyId)) {
+                    throw new BusinessException("clientMessageId já utilizado para outro envio");
+                }
+                return duplicate;
+            }
+            if (replyId != null && chatMongoRepository.findMessage(session, conversation.id(), replyId) == null) {
+                throw new ResourceNotFoundException("Mensagem respondida não encontrada nesta conversa");
+            }
+            ChatMessageDocument message = new ChatMessageDocument(ChatMessageIds.forMessage(senderId, clientMessageId), conversation.id(),
+                    senderId, content, replyId, Instant.now());
+            chatMongoRepository.insertMessage(session, message);
+            return message;
+        });
+    }
+
+    private ChatMessageDocument recoverOrRetry(Long senderId, Long recipientId,
+                                               String requestedConversationId, String content, String replyId,
+                                               String clientMessageId) {
+        ChatMessageDocument existing = chatMongoRepository.findMessageByIdempotency(senderId, clientMessageId);
+        if (existing != null) {
+            ConversationDocument existingConversation = chatMongoRepository.findConversationByPair(
+                    senderId, recipientId);
+            if (existingConversation == null || !existing.conversationId().equals(existingConversation.id())
+                    || !sameOperation(existing, requestedConversationId == null
+                    ? existing.conversationId() : requestedConversationId, content, replyId)) {
+                throw new BusinessException("clientMessageId já utilizado para outro envio");
+            }
+            return existing;
+        }
+        try {
+            return persistSend(senderId, recipientId, requestedConversationId,
+                    content, replyId, clientMessageId);
+        } catch (MongoException retryException) {
+            ChatMessageDocument raced = chatMongoRepository.findMessageByIdempotency(senderId, clientMessageId);
+            ConversationDocument racedConversation = raced == null ? null
+                    : chatMongoRepository.findConversationByPair(senderId, recipientId);
+            if (raced != null && racedConversation != null && raced.conversationId().equals(racedConversation.id())
+                    && sameOperation(raced, requestedConversationId == null
+                    ? raced.conversationId() : requestedConversationId, content, replyId)) return raced;
+            throw retryException;
+        }
+    }
+
+    private static boolean sameOperation(ChatMessageDocument message, String conversationId,
+                                         String content, String replyId) {
+        return Objects.equals(message.conversationId(), conversationId)
+                && Objects.equals(message.content(), content)
+                && Objects.equals(message.replyToMessageId(), replyId);
+    }
+
+    private void validateParticipants(ChatPrincipal principal, Long recipientId) {
+        if (recipientId == null || recipientId <= 0) throw new BusinessException("recipientId inválido");
+        if (principal == null || principal.collaboratorId() == null || principal.collaboratorId().equals(recipientId)) {
+            throw new BusinessException("Não é permitido enviar mensagem para si mesmo");
+        }
+        List<ChatSendUserProjection> users = userRepository.findChatSendUsers(principal.firebaseUid(),
+                List.of(principal.collaboratorId(), recipientId));
+        ChatSendUserProjection sender = users.stream().filter(user -> principal.collaboratorId().equals(user.getId()))
+                .findFirst().orElseThrow(() -> new ResourceNotFoundException("Remetente não encontrado"));
+        ChatSendUserProjection recipient = users.stream().filter(user -> recipientId.equals(user.getId()))
+                .findFirst().orElseThrow(() -> new ResourceNotFoundException("Destinatário não encontrado"));
+        if (!Boolean.TRUE.equals(sender.getAuthenticatedSender())
+                || sender.getStatus() != UserStatus.ATIVO || !Boolean.TRUE.equals(sender.getUnitActive())
+                || sender.getWorkspaceId() == null || sender.getType() == null
+                || principal.role() == null || !principal.role().name().equals(sender.getType().name())) {
+            throw new AccessDeniedException("Remetente sem acesso atual ao Chat");
+        }
+        if (recipient.getStatus() != UserStatus.ATIVO || !Boolean.TRUE.equals(recipient.getUnitActive())
+                || recipient.getWorkspaceId() == null) {
+            throw new AccessDeniedException("Destinatário sem acesso atual ao Chat");
+        }
+        if (!sender.getWorkspaceId().equals(recipient.getWorkspaceId())) {
+            throw new AccessDeniedException("Usuários pertencem a Workspaces diferentes");
+        }
+        if (!ChatCommunicationPolicy.canCommunicate(sender.getType(), recipient.getType())) {
+            throw new AccessDeniedException("Comunicação entre estes perfis não é permitida");
+        }
+    }
+
+    private static void validatePayload(ChatSendRequest request) {
+        if (request == null) throw new BusinessException("Payload inválido");
+        boolean hasRecipient = request.getRecipientId() != null;
+        boolean hasConversation = request.getConversationId() != null;
+        if (hasRecipient == hasConversation) throw new BusinessException("Informe recipientId ou conversationId");
+        if (request.getContent() == null || request.getContent().isBlank()) {
+            throw new BusinessException("content não pode ser vazio");
+        }
+        if (request.getContent().length() > MAX_MESSAGE_LENGTH) {
+            throw new BusinessException("content excede o limite de 4000 caracteres");
+        }
+        if (request.getClientMessageId() == null) throw new BusinessException("clientMessageId é obrigatório");
+        normalizeOptionalUuid(request.getClientMessageId(), "clientMessageId");
+    }
+
+    private static String normalizeOptionalUuid(String value, String field) {
+        if (value == null) return null;
+        try {
+            UUID uuid = UUID.fromString(value);
+            if (!uuid.toString().equalsIgnoreCase(value)) throw new IllegalArgumentException();
+            return uuid.toString();
+        } catch (RuntimeException exception) {
+            throw new BusinessException("Identificador inválido: " + field);
+        }
+    }
+
 }

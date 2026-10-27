@@ -36,18 +36,121 @@ destination:/user/queue/messages
 
 ```
 
-O broker simples atende somente `/queue`; `/app` está reservado para futuros
-handlers e `/user` identifica a fila privada resolvida pelo Spring a partir do
-principal da conexão. Nesta etapa, todas as operações `SEND` são recusadas,
-inclusive `/app/chat.send`. Assinaturas a `/queue/**`, `/topic/**` e caminhos
-diretos de outros usuários também são recusadas. O envio será liberado junto
-com a implementação e as validações da Etapa 2.
+Cada instância mantém um broker simples para as conexões WebSocket locais.
+Eventos destinados a outras instâncias passam pelo canal Redis Pub/Sub
+`astro:chat:delivery:v1`; cada instância encaminha o evento somente às sessões
+locais do usuário destinatário. Todas as instâncias precisam usar o mesmo Redis
+e ter permissão de publicação e assinatura nesse canal. O Pub/Sub não armazena
+eventos para clientes desconectados; nesses casos, o histórico REST permite
+recuperar mensagens persistidas. O broker simples atende somente `/queue`;
+`/app` recebe o handler autenticado
+`/app/chat.send` e `/user` identifica a fila privada resolvida pelo Spring a
+partir do principal da conexão. Assinaturas permitidas são
+`/user/queue/messages` e `/user/queue/errors`. Assinaturas a `/queue/**`,
+`/topic/**` e caminhos diretos de outros usuários continuam recusadas. O único
+destino de publicação permitido é `/app/chat.send`.
 
 O broker negocia heartbeats de 10 segundos e usa o agendador Spring para a
 manutenção do broker simples. Uma autenticação bem-sucedida no `CONNECT` não
 revalida periodicamente o Firebase ID Token; uma conexão longa permanece
 autenticada até encerrar. O Android deve reconectar após desconexões e enviar
 um token Firebase válido em cada novo `CONNECT`. Não há controle de presença.
+
+## Enviar mensagem por STOMP
+
+O destino é `/app/chat.send`. O JSON deve conter exatamente um entre
+`recipientId` e `conversationId`, além de `content` e `clientMessageId`.
+`recipientId` é o ID numérico interno PostgreSQL e só é usado na primeira
+mensagem ou quando o Android ainda não recebeu o ID da conversa. Conversa só é
+inserida junto com a primeira mensagem na transação MongoDB; abrir a tela,
+listar contatos ou conectar não altera `conversas`.
+
+```text
+SEND
+destination:/app/chat.send
+content-type:application/json
+
+{"recipientId":25,"content":"Olá!","replyToMessageId":null,"clientMessageId":"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"}
+```
+
+Para mensagens seguintes, envie `conversationId` no lugar de `recipientId`.
+`senderId`, timestamps e workspace não são aceitos do cliente. O conteúdo deve
+ter de 1 a 4000 caracteres e não pode conter apenas espaços; quebras de linha e
+espaços internos são preservados. UUIDs são exigidos para IDs de operação,
+conversa e reply. Um reply precisa existir na mesma conversa.
+
+O servidor resolve remetente pelo Principal STOMP e revalida no PostgreSQL o
+estado ativo, tipo, unidade ativa e Workspace dos dois participantes em cada
+envio. COLABORADOR só pode enviar a GESTOR ou GESTOR_WORKSPACE. GESTOR e
+GESTOR_WORKSPACE podem enviar aos três tipos operacionais. ADMIN, usuários
+desativados, comunicação entre Workspaces e envio para si mesmo são recusados.
+
+A mensagem persistida e a conversa são gravadas em uma transação MongoDB. O
+MongoDB configurado deve ser replica set ou cluster que suporte transações;
+em standalone a operação falha sem confirmar envio. A aplicação lê
+`MONGODB_URI` do ambiente e não consegue inferir pela configuração local se o
+servidor remoto oferece esse recurso. A API não cria índices personalizados.
+Para impedir duplicações concorrentes, gera o `_id` da conversa a partir do par
+ordenado de participantes e o `_id` da mensagem a partir do remetente e do
+`clientMessageId`. O MongoDB já mantém `_id` único em cada collection. Os IDs
+resultantes continuam sendo UUIDs gerados pelo backend. Conversas antigas são
+localizadas pelos participantes e reutilizadas. Se houver mais de uma conversa
+antiga para o mesmo par, o envio é recusado para esse par; nenhum histórico é
+removido automaticamente.
+
+Reenvios precisam manter o mesmo `clientMessageId` e o mesmo conteúdo/reply.
+Um UUID reutilizado para outra operação é rejeitado ao comparar a mensagem
+persistida. A consulta de pares existentes não tem índice personalizado e
+pode percorrer a collection `conversas`.
+
+Após persistir, o backend executa um script Lua no Redis que consulta o ID da
+mensagem em `chat:unread:processed:{conversationId}`, faz `INCR`
+`chat:unread:{conversationId}:{recipientId}` e registra o ID processado com
+`SADD`, numa única execução atômica. O incremento é repetido
+com o mesmo ID não conta de novo. Se o Redis estiver indisponível após a
+gravação MongoDB, o servidor retorna erro correlacionado; o Android deve
+reenviar a operação com o mesmo ID. O marcador idempotente Redis não tem TTL e
+cresce por mensagem, pois sua expiração permitiria contagem duplicada em
+reenvios tardios. MongoDB, Redis e entrega WebSocket não compartilham uma
+transação distribuída. A contagem exata entre reinicializações depende da
+política de persistência e eviction configurada para Redis; a aplicação não
+define essas opções.
+
+A validação de acesso à listagem, leitura e marcação como lida exige que a conta
+atual esteja `ATIVO`, sua unidade esteja ativa e o papel no token corresponda ao
+tipo atual cadastrado. Contas `PRE_CADASTRADO` e `DESATIVADO` não acessam as
+conversas nem a lista de contatos.
+
+Após a persistência e o incremento Redis, o evento é publicado pelo Redis Pub/Sub e
+encaminhado às conexões locais do destinatário em `/user/queue/messages`, e a confirmação da própria mensagem é devolvida ao
+remetente na mesma fila privada. Uma repetição pode reenviar o evento, portanto
+o Android deve deduplicar pela propriedade `id`. A confirmação significa que a
+mensagem foi persistida, contabilizada no Redis e publicada no canal Pub/Sub;
+não confirma que o dispositivo destinatário recebeu o frame.
+
+Resposta/entrega de sucesso:
+
+```json
+{
+  "clientMessageId": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+  "id": "22222222-3333-4444-8555-666666666666",
+  "conversationId": "11111111-2222-4333-8444-555555555555",
+  "senderId": 1,
+  "content": "Olá!",
+  "replyToMessageId": null,
+  "createdAt": "2026-10-26T18:30:00Z"
+}
+```
+
+Erros de negócio e infraestrutura são enviados apenas ao remetente em
+`/user/queue/errors`, com `clientMessageId`, código e mensagem segura. Em
+`UNREAD_COUNTER_UNAVAILABLE`, `DELIVERY_UNAVAILABLE`,
+`PERSISTENCE_UNAVAILABLE` ou `SEND_FAILED`, repita com o mesmo ID; não gere uma
+nova operação se a confirmação não chegou.
+
+```json
+{"clientMessageId":"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee","code":"FORBIDDEN","message":"Comunicação entre estes perfis não é permitida"}
+```
 
 ## Consultar histórico de mensagens
 
@@ -143,15 +246,7 @@ pode deixar de ser contabilizada como não lida. O modelo atual não registra
 leituras por mensagem; esta operação não oferece garantia absoluta de leitura
 nesse cenário concorrente.
 
-### Índice MongoDB
-
-A consulta depende do índice composto abaixo para manter o filtro, a ordenação e
-a continuação do cursor eficientes em históricos grandes:
-
-```javascript
-db.mensagens.createIndex({ id_conversa: 1, data: -1, _id: -1 })
-```
-
-Antes de provisioná-lo, confira os índices reais da collection `mensagens` e
-reutilize um índice com as mesmas chaves e ordem. O repositório da aplicação não
-declara índices para essa collection e não cria índices automaticamente.
+O histórico e a busca de conversas por participantes não dependem de índices
+personalizados criados pela API. Sem índices apropriados já existentes no
+MongoDB, essas consultas podem ficar mais lentas conforme as collections
+crescem.

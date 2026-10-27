@@ -31,6 +31,7 @@ public class ChatStompAuthInterceptor implements ChannelInterceptor {
     private static final Logger LOGGER = LoggerFactory.getLogger(ChatStompAuthInterceptor.class);
     private static final Pattern BEARER_TOKEN = Pattern.compile("(?i)^Bearer ([^\\s]+)$");
     private static final String PRIVATE_MESSAGES_DESTINATION = "/user/queue/messages";
+    private static final String PRIVATE_ERRORS_DESTINATION = "/user/queue/errors";
     private static final Set<String> INVALID_TOKEN_ERRORS = Set.of(
             "INVALID_ID_TOKEN", "EXPIRED_ID_TOKEN", "REVOKED_ID_TOKEN", "USER_DISABLED", "USER_NOT_FOUND");
 
@@ -60,7 +61,8 @@ public class ChatStompAuthInterceptor implements ChannelInterceptor {
 
         ChatPrincipal principal = authenticatedPrincipal(accessor);
         if (command == StompCommand.SUBSCRIBE) {
-            if (PRIVATE_MESSAGES_DESTINATION.equals(accessor.getDestination())) {
+            if (PRIVATE_MESSAGES_DESTINATION.equals(accessor.getDestination())
+                    || PRIVATE_ERRORS_DESTINATION.equals(accessor.getDestination())) {
                 return message;
             }
             LOGGER.warn("Assinatura STOMP negada para colaborador {} e destino {}", principal.getName(), accessor.getDestination());
@@ -72,7 +74,8 @@ public class ChatStompAuthInterceptor implements ChannelInterceptor {
         }
 
         if (command == StompCommand.SEND) {
-            throw denied("Envio de mensagens ainda não está disponível");
+            if ("/app/chat.send".equals(accessor.getDestination())) return message;
+            throw denied("Destino de envio não autorizado");
         }
 
         throw denied("Frame STOMP não autorizado");

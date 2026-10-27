@@ -33,7 +33,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByFirebaseUid(String firebaseUid);
 
     @Query("""
-            select u.id as id, u.name as name, u.type as role, workspace.id as workspaceId
+            select u.id as id, u.name as name, u.type as role, workspace.id as workspaceId,
+                   u.status as status, unit.isActive as unitActive
             from User u join u.unit unit join unit.workspace workspace
             where u.firebaseUid = :firebaseUid
             """)
@@ -50,11 +51,22 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<ChatConnectionProjection> findChatConnectionByFirebaseUid(@Param("firebaseUid") String firebaseUid);
 
     @Query("""
-            select u.id as id, u.name as name, u.type as role, workspace.id as workspaceId
+            select u.id as id, u.name as name, u.type as role, workspace.id as workspaceId,
+                   u.status as status, unit.isActive as unitActive
             from User u join u.unit unit join unit.workspace workspace
             where u.id in :ids
             """)
     List<UserChatProjection> findChatUsersByIds(@Param("ids") Collection<Long> ids);
+
+    @Query("""
+            select u.id as id, u.type as type, u.status as status,
+                   unit.isActive as unitActive, workspace.id as workspaceId,
+                   (u.firebaseUid = :firebaseUid) as authenticatedSender
+            from User u join u.unit unit join unit.workspace workspace
+            where u.firebaseUid = :firebaseUid or u.id in :ids
+            """)
+    List<ChatSendUserProjection> findChatSendUsers(@Param("firebaseUid") String firebaseUid,
+                                                    @Param("ids") Collection<Long> ids);
 
 
     @Query("""
@@ -63,13 +75,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
             join contact.unit contactUnit
             where contactUnit.workspace.id = :workspaceId
               and contact.id <> :currentUserId
-              and (contact.status is null or contact.status <> :deactivatedStatus)
+              and contact.status = :activeStatus
+              and contactUnit.isActive = true
               and contact.type in :allowedTypes
             order by contact.name asc, contact.id asc
             """)
     List<ChatContactProjection> findChatContacts(@Param("workspaceId") Long workspaceId,
                                                  @Param("currentUserId") Long currentUserId,
-                                                 @Param("deactivatedStatus") UserStatus deactivatedStatus,
+                                                 @Param("activeStatus") UserStatus activeStatus,
                                                  @Param("allowedTypes") Collection<UserType> allowedTypes);
 
     @Query("""
