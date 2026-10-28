@@ -4,6 +4,7 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.response.ApiResult;
 import com.astro.api.event.dto.request.CancelEventRequest;
 import com.astro.api.event.dto.request.CreateEventRequest;
+import com.astro.api.event.dto.request.CompletionRejectionRequest;
 import com.astro.api.event.dto.request.UpdateEventRequest;
 import com.astro.api.event.dto.response.EventCalendarResponse;
 import com.astro.api.event.dto.response.CollaboratorEventResponse;
@@ -217,6 +218,30 @@ public class EventController {
                 eventId, participantId, authenticatedUser.firebaseUid());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResult.success(
                 "Conclusão do participante registrada", completion, request.getRequestURI()));
+    }
+
+    @PatchMapping("/{eventId}/participants/{participantId}/rejection")
+    @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
+    @Operation(summary = "Rejeita a conclusão enviada por um colaborador",
+            description = "Exige justificativa não vazia e gestor criador do evento. Disponível para conclusão pendente em evento no modo COLABORADOR, mesmo após o término da turma.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Conclusão rejeitada no envelope ApiResult"),
+            @ApiResponse(responseCode = "400", description = "Justificativa ausente ou conclusão não pendente"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado"),
+            @ApiResponse(responseCode = "403", description = "Gestor ativo e criador do evento necessários"),
+            @ApiResponse(responseCode = "404", description = "Evento, participante ou conclusão não encontrada"),
+            @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
+    })
+    public ResponseEntity<ApiResult<EventCompletionResponse>> rejectCollaboratorCompletion(
+            @PathVariable Long eventId,
+            @PathVariable Long participantId,
+            @Valid @RequestBody CompletionRejectionRequest body,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            HttpServletRequest request) {
+        EventCompletionResponse completion = eventService.rejectCollaboratorCompletionByManager(
+                eventId, participantId, body.rejectionReason(), authenticatedUser.firebaseUid());
+        return ResponseEntity.ok(ApiResult.success(
+                "Conclusão do colaborador rejeitada", completion, request.getRequestURI()));
     }
 
     @GetMapping("/details/{eventId}/manager-conclusion")
