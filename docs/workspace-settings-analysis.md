@@ -163,7 +163,7 @@ unidades, já confirmado pelo usuário.
 O limite da interface é 10 MB; `SpreadsheetImportService.read` limita a 5 MB.
 Alinhar ambos. O limite global de multipart é maior e não elimina essa validação.
 O modelo pode continuar sendo um arquivo estático; seu download não exige,
-por si só, uma rota nova. `POST /conformities/import` importa outro domínio e
+por si só, uma rota nova. `POST /conformities/collaborators/import` importa outro domínio e
 não atende esta tela.
 
 O cadastro documenta HTTP 422 para erros de planilha, mas

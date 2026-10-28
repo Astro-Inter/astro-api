@@ -77,7 +77,7 @@ public interface ConformityRepository extends JpaRepository<Conformity, Long> {
                    v.nr_id AS "nrId", v.titulo_nr AS "nrTitle", v.data_validade AS "expiresAt",
                    v.origem AS origin, v.aplicavel AS applicable,
                    v.conclusao_evento_id AS "eventCompletionId", v.status
-            FROM vw_conformidades v
+            FROM vw_conformidade_colaborador v
             JOIN usuario u ON u.id_usuario = v.usuario_id AND u.tipo IN ('COLABORADOR', 'GESTOR', 'GESTOR_WORKSPACE')
             WHERE v.workspace_id = :workspaceId AND v.aplicavel = TRUE
               AND v.unidade_id IN (SELECT id_unidade FROM fn_seleciona_unidades(:firebaseUid))

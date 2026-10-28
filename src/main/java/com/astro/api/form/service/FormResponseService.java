@@ -42,11 +42,12 @@ public class FormResponseService {
     private final Validator validator;
     private final FormLocationService formLocationService;
     private final ViewedService viewedService;
+    private final com.astro.api.conformity.service.FormConformityService formConformityService;
 
     public FormResponseService(FormRepository formRepository, FormAccessService formAccessService,
             FormAnswerValidationService formAnswerValidationService, FormAnswerMapper formAnswerMapper,
             FormResponseMapper formResponseMapper, FormImageStorageService formImageStorageService,
-            UserRepository userRepository, UnitRepository unitRepository, Validator validator, FormLocationService formLocationService, ViewedService viewedService) {
+            UserRepository userRepository, UnitRepository unitRepository, Validator validator, FormLocationService formLocationService, ViewedService viewedService, com.astro.api.conformity.service.FormConformityService formConformityService) {
         this.formRepository = formRepository;
         this.formAccessService = formAccessService;
         this.formAnswerValidationService = formAnswerValidationService;
@@ -58,6 +59,7 @@ public class FormResponseService {
         this.validator = validator;
         this.formLocationService = formLocationService;
         this.viewedService = viewedService;
+        this.formConformityService = formConformityService;
     }
 
     public FormReceivedPageResponse findReceived(AuthenticatedUser principal, String search, Integer nrCode,
@@ -156,7 +158,6 @@ public class FormResponseService {
         Form form = requireForm(formId, formAccessService.readFilter(scope));
         formAccessService.requireManagement(form, scope);
         requireCompleted(form);
-        if (form.getReview() != null) throw new ConflictException("Este formulário já possui uma análise definitiva");
         if (request == null || !validator.validate(request).isEmpty()) throw new BusinessException("Informe uma análise válida");
         String description = request.description() == null ? null : request.description().strip();
         if (request.status() == FormReviewStatus.REJECTED && (description == null || description.isEmpty())) {
@@ -165,10 +166,18 @@ public class FormResponseService {
         if (request.status() == FormReviewStatus.APPROVED && description != null) {
             throw new BusinessException("A descrição só deve ser enviada na reprovação");
         }
+        if (form.getReview() != null) {
+            if (form.getReview().status() == FormReviewStatus.APPROVED && request.status() == FormReviewStatus.APPROVED) {
+                formConformityService.synchronizeApproved(form, principal);
+                return details(form, scope);
+            }
+            throw new ConflictException("Este formulário já possui uma análise definitiva");
+        }
         FormReview review = new FormReview(request.status(), scope.managerId(),
                 Instant.now().truncatedTo(ChronoUnit.MILLIS), description);
         Form saved = formRepository.review(formAccessService.writeCondition(form, scope), review)
                 .orElseThrow(() -> new ConflictException("O formulário foi alterado ou já analisado; consulte novamente"));
+        formConformityService.synchronizeApproved(saved, principal);
         return details(saved, scope);
     }
 

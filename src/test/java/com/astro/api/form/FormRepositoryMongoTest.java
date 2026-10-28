@@ -534,7 +534,7 @@ class FormRepositoryMongoTest {
                             new OptionAnswerStrategy(), new PhotoAnswerStrategy()), factory.getValidator());
             FormResponseService service = new FormResponseService(repository,
                     new FormAccessService(users), validation, new FormAnswerMapper(),
-                    new FormResponseMapper(new FormMapper()), storage, users, units, factory.getValidator(), new FormLocationService(units), viewedService);
+                    new FormResponseMapper(new FormMapper()), storage, users, units, factory.getValidator(), new FormLocationService(units), viewedService, mock(com.astro.api.conformity.service.FormConformityService.class));
             MockMvc mvc = MockMvcBuilders
                     .standaloneSetup(new FormResponseController(service))
                     .setControllerAdvice(new GlobalExceptionHandler())
