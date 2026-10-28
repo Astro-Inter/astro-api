@@ -10,7 +10,7 @@ Eventos inexistentes ou de outro workspace retornam 404; falta de autenticação
 | Método e rota | Contrato |
 | --- | --- |
 | `GET /events/{eventId}` | Detalhe completo, autoria, configurações, todas as turmas e participações |
-| `GET /events/details/{eventId}/manager-conclusion/` | Detalhes para evento com conclusão pelo gestor; inclui quantidade de participantes e prazo da última turma |
+| `GET /events/details/{eventId}/manager-conclusion` | Detalhes para evento com conclusão pelo gestor; inclui quantidade de participantes e prazo da última turma |
 | `GET /events/details/{eventId}/collaborator-conclusion` | Detalhes para o gestor acompanhar conclusão pelo colaborador, com métricas de validação e envio |
 | `GET /events/{eventId}/participants` | Lista participantes do evento, título e status de conclusão individual |
 | `GET /events/{eventId}/participants/{participantId}` | Consulta os dados de um participante para conclusão pelo gestor |
@@ -41,7 +41,7 @@ participantes, por nome e ID do usuário. Listas vazias são `[]`.
 Cancelados e concluídos continuam consultáveis com todas essas permissões falsas.
 As flags orientam a interface; a autorização é reaplicada nas escritas.
 
-`GET /events/details/{eventId}/manager-conclusion/` é uma resposta própria para o fluxo de conclusão
+`GET /events/details/{eventId}/manager-conclusion` é uma resposta própria para o fluxo de conclusão
 pelo gestor e não altera o contrato de `GET /events/{eventId}`. Retorna `eventId`,
 `eventTitle`, `eventDescription`, `externalLink`, `participantCount`,
 `lastClassLimitDate`, `completionMode`, `managerId` e `managerName`.
@@ -50,7 +50,7 @@ pelo gestor e não altera o contrato de `GET /events/{eventId}`. Retorna `eventI
 turmas, o prazo é `null`. A validade não faz parte desta resposta.
 
 A rota anterior `GET /events/manager/{eventId}` foi substituída por
-`GET /events/details/{eventId}/manager-conclusion/`; clientes devem atualizar a URL.
+`GET /events/details/{eventId}/manager-conclusion`; clientes devem atualizar a URL.
 
 `GET /events/details/{eventId}/collaborator-conclusion` é a visão do gestor para
 eventos com `completionMode = COLABORADOR`. Exige gestor ativo (`GESTOR` ou

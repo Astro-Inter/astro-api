@@ -38,7 +38,7 @@ class EventOpenApiTest {
                     .andExpect(jsonPath("$.paths['/events/{eventId}'].patch.responses['401']").exists())
                     .andExpect(jsonPath("$.paths['/events/{eventId}/cancellation'].patch.responses['401']").exists())
                     .andExpect(jsonPath("$.paths['/events/my-events'].get.responses['200']").exists())
-                    .andExpect(jsonPath("$.paths['/events/details/{eventId}/manager-conclusion/'].get.responses['200']").exists())
+                    .andExpect(jsonPath("$.paths['/events/details/{eventId}/manager-conclusion'].get.responses['200']").exists())
                     .andExpect(jsonPath("$.paths['/events/details/{eventId}/collaborator-conclusion'].get.responses['400']").exists())
                     .andExpect(jsonPath("$.paths['/events/manager/{eventId}']").doesNotExist())
                     .andExpect(jsonPath("$.components.schemas.CollaboratorCompletionModeEventDetailsResponse.properties.pendingValidationCount.type").value("integer"))

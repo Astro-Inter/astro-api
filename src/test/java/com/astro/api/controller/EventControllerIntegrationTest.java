@@ -90,10 +90,10 @@ class EventControllerIntegrationTest {
                 .thenReturn(new CollaboratorCompletionModeEventDetailsResponse(2L, "Event", "Description",
                         "https://example.com", 4, deadline, CompletionMode.COLABORADOR, 9L, "Manager", 1, 2, 1));
 
-        mockMvc.perform(get("/events/details/1/manager-conclusion/"))
+        mockMvc.perform(get("/events/details/1/manager-conclusion"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.path").value("/events/details/1/manager-conclusion/"))
+                .andExpect(jsonPath("$.path").value("/events/details/1/manager-conclusion"))
                 .andExpect(jsonPath("$.data.eventId").value(1))
                 .andExpect(jsonPath("$.data.participantCount").value(4))
                 .andExpect(jsonPath("$.data.completionMode").value("GESTOR"))
