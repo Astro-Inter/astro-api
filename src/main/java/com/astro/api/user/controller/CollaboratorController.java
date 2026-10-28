@@ -3,6 +3,7 @@ package com.astro.api.user.controller;
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
 import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
+import com.astro.api.user.dto.response.CollaboratorPendingCountResponse;
 import com.astro.api.user.dto.request.CreateCollaboratorRequest;
 import com.astro.api.user.dto.request.UpdateCollaboratorRequest;
 import com.astro.api.user.dto.request.CollaboratorStatusRequest;
@@ -46,6 +47,19 @@ public class CollaboratorController {
             @RequestParam(defaultValue = "false") boolean excludeSelf, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Colaboradores retornados com sucesso",
                 service.findAll(user, excludeSelf), request.getRequestURI()));
+    }
+
+    @GetMapping("/pending-count")
+    @Operation(summary = "Lista colaboradores do workspace com a contagem de eventos pendentes",
+            description = "Inclui COLABORADOR, GESTOR e GESTOR_WORKSPACE das unidades autorizadas no workspace do gestor autenticado; exclui o próprio gestor. Retorna id, name, profilePhotoUrl, roleName e pendingCount. A contagem considera cada evento uma vez, eventos cancelados e prazos expirados são ignorados, e eventos em análise não contam como pendentes. Usuários inativos ou pré-cadastrados retornam contagem zero.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Resumo dos colaboradores, possivelmente vazio"),
+            @ApiResponse(responseCode = "403", description = "Solicitante não é gestor ativo")
+    })
+    public ResponseEntity<ApiResult<List<CollaboratorPendingCountResponse>>> pendingCount(
+            @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
+        return ResponseEntity.ok(ApiResult.success("Resumo dos colaboradores retornado com sucesso",
+                service.findPendingCount(user), request.getRequestURI()));
     }
 
     @GetMapping("/{collaboratorId}")

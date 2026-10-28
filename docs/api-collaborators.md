@@ -29,6 +29,42 @@ Cada colaborador aparece uma vez. A ausência
 de colaboradores autorizados resulta em `data: []`. CPF, senha e Firebase UID
 não fazem parte desse contrato.
 
+## Resumo para a Home do gestor
+
+`GET /collaborators/pending-count` retorna os dados compactos dos colaboradores
+para a Home do gestor autenticado. A identidade e o workspace vêm do token e dos
+relacionamentos no banco; não aceite ID de usuário ou workspace enviado pelo
+cliente para compor o escopo. Inclui `COLABORADOR`, `GESTOR` e
+`GESTOR_WORKSPACE` das unidades autorizadas e exclui o próprio gestor. Mantém
+os status presentes na listagem normal; usuários inativos ou pré-cadastrados
+recebem contagem zero.
+
+Exemplo de `data`:
+
+```json
+[
+  {
+    "id": 12,
+    "name": "Ana Silva",
+    "profilePhotoUrl": "https://arquivos.example.com/foto-assinada",
+    "roleName": "Engenheira",
+    "pendingCount": 2
+  }
+]
+```
+
+`pendingCount` conta eventos distintos por colaborador com a mesma
+regra da Home mobile: eventos cancelados e participações com prazo expirado são
+ignorados; pendência em qualquer turma do evento prevalece sobre envio em
+análise ou conclusão validada. Eventos em análise não entram na contagem. A
+lista é ordenada por nome e ID e pode ser vazia. A resposta usa o envelope
+`ApiResult`; a foto pode ser nula.
+
+A contagem e os dados do colaborador vêm de `fn_carrega_colaboradores(TEXT)` no
+Banco de Dados, provisionada externamente a este repositório. Garanta que a
+função esteja instalada no banco antes de implantar esta versão da API; a URL da
+foto continua sendo resolvida pela API.
+
 ## Detalhes — SCRUM-519
 
 `GET /collaborators/{collaboratorId}` consulta a mesma view e o mesmo escopo.
