@@ -12,8 +12,8 @@ Eventos inexistentes ou de outro workspace retornam 404; falta de autenticação
 | `GET /events/{eventId}` | Detalhe completo, autoria, configurações, todas as turmas e participações |
 | `GET /events/manager/{eventId}` | Detalhes para evento com conclusão pelo gestor; inclui quantidade de participantes e prazo da última turma |
 | `GET /events/{eventId}/participants` | Lista participantes do evento, título e status de conclusão individual |
-| `GET /events/{eventId}/participants/{participantId}` | Consulta os dados de um participante para conclusão pelo gestor |
-| `GET /events/{eventId}/participants/{participantId}/completion` | Consulta os detalhes enviados pelo colaborador para validação do gestor |
+| `GET /events/details/{participationId}/manager-conclusion/{eventId}` | Consulta os dados de um participante para conclusão pelo gestor |
+| `GET /events/details/{participationId}/collaborator-conclusion/{eventId}` | Consulta os detalhes enviados pelo colaborador para validação do gestor |
 | `POST /events/{eventId}/participants/{participantId}/completion` | Registra a conclusão do participante pelo gestor |
 | `GET /events/my-events` | Eventos criados pelo gestor autenticado, com pendências calculadas pela view `vw_eventos_gestor` |
 | `GET /events/collaborator/{eventId}` | Detalhes para o colaborador autenticado; consulta sem alterar estado |
@@ -60,17 +60,19 @@ usuário, para consulta individual) e `profilePhotoUrl` com URL temporária da f
 ou `null` quando ausente. Eventos inexistentes ou fora do workspace retornam
 404; evento sem participantes retorna lista vazia.
 
-`GET /events/{eventId}/participants/{participantId}` exige o mesmo perfil e
-escopo de workspace. `participantId` é o ID do usuário participante. Retorna
+`GET /events/details/{participationId}/manager-conclusion/{eventId}` exige o
+mesmo perfil e escopo de workspace. `participationId` é o ID do vínculo do
+colaborador com a turma. Retorna
 `participantId`, `profilePhotoUrl`, `eventTitle`, `participantName`, `roleName`,
 `unitName` e `endDate` (término da turma associada), usando `null` quando cargo,
 unidade ou foto não estiverem cadastrados. Evento fora do workspace ou usuário
 sem participação no evento retorna 404.
 
-`GET /events/{eventId}/participants/{participantId}/completion` é uma consulta
-separada para o fluxo de validação da conclusão enviada pelo colaborador. Exige
-gestor ativo e evento no workspace autenticado, configurado no modo
-`COLABORADOR`, além de conclusão registrada para o participante. Retorna
+`GET /events/details/{participationId}/collaborator-conclusion/{eventId}` é uma
+consulta separada para o fluxo de validação da conclusão enviada pelo
+colaborador. Exige gestor ativo e evento no workspace autenticado, configurado
+no modo `COLABORADOR`, além de conclusão registrada para a participação.
+Retorna
 `profilePhotoUrl`, `participantName`, `roleName`, `unitName`, `completionDate`,
 `endDate`, `evidenceMandatory`, `evidences` (zero a três itens com URL temporária
 de download) e `eventTitle`. Foto, cargo ou unidade podem ser nulos; evento,
