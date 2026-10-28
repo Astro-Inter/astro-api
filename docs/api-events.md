@@ -16,6 +16,7 @@ Eventos inexistentes ou de outro workspace retornam 404; falta de autenticação
 | `GET /events/participant/{participantId}/manager-conclusion/{eventId}` | Consulta os dados de um participante para conclusão pelo gestor |
 | `GET /events/participant/{participantId}/collaborator-conclusion/{eventId}` | Consulta os detalhes enviados pelo colaborador para validação do gestor |
 | `POST /events/{eventId}/participants/{participantId}/completion` | Registra a conclusão do participante pelo gestor |
+| `PATCH /events/{eventId}/participants/{participantId}/rejection` | Rejeita a conclusão enviada pelo colaborador |
 | `GET /events/my-events` | Eventos criados pelo gestor autenticado, com pendências calculadas pela view `vw_eventos_gestor` |
 | `GET /events/collaborator/{eventId}` | Detalhes para o colaborador autenticado; consulta sem alterar estado |
 | `PATCH /events/collaborator/{eventId}/viewed` | Marca como visualizado um evento de que o usuário autenticado participa |
@@ -139,6 +140,13 @@ Sem NR, a validade é `null`. Documento da NR ausente retorna 404; período ause
 ou não positivo retorna 400. Nessas situações a conclusão não é gravada. Uma
 falha de conexão ao banco retorna 503. A validade é persistida na conclusão e não
 integra a resposta `EventCompletionResponse`.
+
+`PATCH /events/{eventId}/participants/{participantId}/rejection`
+rejeita uma conclusão pendente de evento no modo `COLABORADOR`. Recebe
+`rejectionReason` obrigatório e não vazio; exige gestor ativo, criador do evento
+no workspace autenticado e pode ser usado após o término da turma. Grava o
+status `REJEITADO`, a data de validação e o motivo. Retorna `200` com
+`EventCompletionResponse` no envelope `ApiResult`.
 
 ## Calendário
 
