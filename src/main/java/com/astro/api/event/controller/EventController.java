@@ -145,7 +145,7 @@ public class EventController {
                 "Participantes retornados com sucesso", participants, request.getRequestURI()));
     }
 
-    @GetMapping("/details/{participantId}/manager-conclusion/{eventId}")
+    @GetMapping("/participant/{participantId}/manager-conclusion/{eventId}")
     @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
     @Operation(summary = "Consulta os dados de um participante para conclusão pelo gestor",
             description = "Exige gestor ativo e evento no workspace autenticado. participantId é o ID do usuário participante.")
@@ -169,7 +169,7 @@ public class EventController {
                 "Dados do participante retornados com sucesso", participant, request.getRequestURI()));
     }
 
-    @GetMapping("/details/{participantId}/collaborator-conclusion/{eventId}")
+    @GetMapping("/participant/{participantId}/collaborator-conclusion/{eventId}")
     @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
     @Operation(summary = "Consulta os detalhes da conclusão enviada pelo colaborador",
             description = "Exige gestor ativo e evento no workspace autenticado, em modo COLABORADOR, com conclusão registrada. Retorna a foto do participante e URLs temporárias das evidências.")
