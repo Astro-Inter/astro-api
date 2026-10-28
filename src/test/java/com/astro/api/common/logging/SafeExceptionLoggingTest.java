@@ -26,8 +26,8 @@ class SafeExceptionLoggingTest {
     void compartilhaIdDentroDaRequisicaoERestauraContextoAposErro() {
         MDC.put("request_id", "previous");
         try {
-            var request = new MockHttpServletRequest("GET", "/private/42");
-            var response = new MockHttpServletResponse();
+            MockHttpServletRequest request = new MockHttpServletRequest("GET", "/private/42");
+            MockHttpServletResponse response = new MockHttpServletResponse();
             assertThatThrownBy(() -> new HttpRequestLoggingFilter().doFilter(request, response, (req, res) -> {
                 assertThat(MDC.get("request_id")).isEqualTo(response.getHeader("X-Request-ID"));
                 throw new IllegalStateException("private");

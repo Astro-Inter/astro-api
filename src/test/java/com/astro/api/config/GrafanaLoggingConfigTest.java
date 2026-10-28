@@ -16,8 +16,11 @@ import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
+import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -44,14 +47,14 @@ class GrafanaLoggingConfigTest {
 
     @Test
     void enviaLogPorHttpComAutenticacaoEServico() throws Exception {
-        try (var server = new ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"));
-                var executor = Executors.newSingleThreadExecutor()) {
+        try (ServerSocket server = new ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"));
+                ExecutorService executor = Executors.newSingleThreadExecutor()) {
             server.setSoTimeout(10000);
-            var request = executor.submit(() -> {
-                try (var socket = server.accept()) {
+            Future<String> request = executor.submit(() -> {
+                try (Socket socket = server.accept()) {
                     socket.setSoTimeout(10000);
-                    var input = new BufferedInputStream(socket.getInputStream());
-                    var headerBytes = new ByteArrayOutputStream();
+                    BufferedInputStream input = new BufferedInputStream(socket.getInputStream());
+                    ByteArrayOutputStream headerBytes = new ByteArrayOutputStream();
                     int previous = 0;
                     int current;
                     while ((current = input.read()) != -1) {
@@ -81,7 +84,7 @@ class GrafanaLoggingConfigTest {
                         LoggerContext loggerContext = new LoggerContext();
                         loggerContext.setMDCAdapter(new ch.qos.logback.classic.util.LogbackMDCAdapter());
                         try {
-                            var appender = new OpenTelemetryAppender();
+                            OpenTelemetryAppender appender = new OpenTelemetryAppender();
                             appender.setContext(loggerContext);
                             appender.setOpenTelemetry(context.getBean(OpenTelemetry.class));
                             appender.setCaptureKeyValuePairAttributes(true);
