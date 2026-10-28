@@ -173,7 +173,7 @@ public class EventController {
     @GetMapping("/participant/{participantId}/collaborator-conclusion/{eventId}")
     @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
     @Operation(summary = "Consulta os detalhes da conclusão enviada pelo colaborador",
-            description = "Exige gestor ativo e evento no workspace autenticado, em modo COLABORADOR, com conclusão registrada. Retorna a foto do participante e URLs temporárias das evidências.")
+            description = "Exige gestor ativo e evento no workspace autenticado, em modo COLABORADOR, com conclusão registrada. Retorna o status da conclusão, a foto do participante e URLs temporárias das evidências.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Detalhes da conclusão retornados no envelope ApiResult"),
             @ApiResponse(responseCode = "400", description = "Evento não permite conclusão pelo colaborador"),
