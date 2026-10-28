@@ -8,6 +8,7 @@ import com.astro.api.conformity.service.ConformityImportService;
 import com.astro.api.conformity.dto.response.ConformityImportResponse;
 import org.springframework.web.multipart.MultipartFile;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,8 +23,9 @@ import com.astro.api.conformity.dto.request.CreateConformityRequest;
 import com.astro.api.conformity.dto.request.UpdateConformityRequest;
 import com.astro.api.conformity.dto.request.ConformityApplicabilityRequest;
 
+@Tag(name = "collaborator-conformity-controller")
 @RestController
-@RequestMapping("/conformities")
+@RequestMapping("/conformities/collaborators")
 @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
 @ApiResponses({@ApiResponse(responseCode = "400", description = "Requisição inválida"),
         @ApiResponse(responseCode = "401", description = "Autenticação ausente ou inválida"),
@@ -83,7 +85,7 @@ public class ConformityController {
     public ResponseEntity<ApiResult<ConformityResponse>> create(@Valid @RequestBody CreateConformityRequest body,
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         ConformityResponse conformityResponse = conformityService.create(body, principal);
-        return ResponseEntity.created(URI.create("/conformities/" + conformityResponse.id()))
+        return ResponseEntity.created(URI.create("/conformities/collaborators/" + conformityResponse.id()))
                 .body(ApiResult.success("Conformidade criada com sucesso", conformityResponse, request.getRequestURI()));
     }
 
@@ -100,7 +102,7 @@ public class ConformityController {
 
     @GetMapping
     @Operation(summary = "Lista conformidades aplicáveis no escopo autorizado",
-            description = "Consulta vw_conformidades: uma linha por colaborador/NR, priorizando aplicáveis, maior validade (nulos por último) e maior ID. Inclui histórico de colaboradores inativos e NRs revogadas. Lista completa ordenada por nome, colaborador, NR e ID. Status segue CURRENT_DATE da sessão PostgreSQL; data nula significa Sem validade.")
+            description = "Consulta vw_conformidade_colaborador: uma linha por colaborador/NR, priorizando aplicáveis, maior validade (nulos por último) e maior ID. Inclui histórico de colaboradores inativos e NRs revogadas. Lista completa ordenada por nome, colaborador, NR e ID. Status segue CURRENT_DATE da sessão PostgreSQL; data nula significa Sem validade.")
     @ApiResponse(responseCode = "200", description = "Lista de conformidades, possivelmente vazia")
     public ResponseEntity<ApiResult<List<ConformityResponse>>> findAll(
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {

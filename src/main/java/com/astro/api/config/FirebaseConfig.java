@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.util.Base64;
 
 @Configuration
+@org.springframework.context.annotation.Profile("!conformity-local")
 public class FirebaseConfig {
 
     @Value("${FIREBASE_CREDENTIALS_BASE64}")

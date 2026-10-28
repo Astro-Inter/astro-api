@@ -36,6 +36,13 @@ public class GlobalExceptionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler({org.springframework.web.servlet.resource.NoResourceFoundException.class,
+            org.springframework.web.servlet.NoHandlerFoundException.class})
+    public ResponseEntity<ApiResult<Void>> handleRouteNotFound(Exception exception, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResult.error(
+                "Recurso não encontrado", List.of("O endereço solicitado não existe"), request.getRequestURI()));
+    }
+
     @ExceptionHandler(SpreadsheetImportException.class)
     public ResponseEntity<ApiResult<List<SpreadsheetImportMessage>>> handleSpreadsheet(
             SpreadsheetImportException exception, HttpServletRequest request) {

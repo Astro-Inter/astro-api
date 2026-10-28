@@ -151,7 +151,7 @@ Reprovar: mesmo endpoint com
 Reprovação exige descrição não vazia de até 1000 caracteres. Aprovação recusa
 o campo `description` se vier preenchido ou como string vazia. Omita-o.
 Apenas respostas concluídas podem ser analisadas. Decisão anterior ou corrida
-perdida retorna 409. A reprovação encerra o fluxo, sem novo envio.
+perdida retorna 409. Repetir a mesma aprovação retorna 200 e reconcilia a conformidade de unidade sem duplicar; trocar a decisão continua retornando 409. A reprovação encerra o fluxo, sem novo envio.
 O status principal permanece `CONCLUIDO`; a decisão fica em `review.status`.
 
 ### Imagens privadas
@@ -292,3 +292,6 @@ PostgreSQL local descartável. Ela cria a coluna POINT apenas no schema próprio
 teste e verifica a ordem longitude/latitude, valores nulos e o isolamento do workspace.
 
 A revisão de organização e aderência à skill está em [forms-skill-review.md](forms-skill-review.md).
+
+
+A aprovação de formulário com NR gera conformidade de unidade conforme [unit-conformities.md](unit-conformities.md), incluindo unidade de fallback, validade e recuperação entre MongoDB e PostgreSQL (SCRUM-657).

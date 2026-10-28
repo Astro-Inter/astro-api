@@ -34,7 +34,7 @@ class ConformityControllerTest {
     }
     @Test void listsTheAuthenticatedScopeWithoutExposingCredentials() throws Exception {
         when(service.findAll(principal)).thenReturn(List.of(response()));
-        mvc.perform(get("/conformities").param("workspaceId", "999").param("firebaseUid", "fake"))
+        mvc.perform(get("/conformities/collaborators").param("workspaceId", "999").param("firebaseUid", "fake"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].id").value(2))
                 .andExpect(jsonPath("$.data[0].origin").value("CONCLUSAO_EVENTO"))
                 .andExpect(jsonPath("$.data[0].status").value("Sem validade"))
@@ -49,7 +49,7 @@ class ConformityControllerTest {
 
     @Test void returnsDetailsAndStandardNotFoundAndMalformedIdErrors() throws Exception {
         when(service.findById(2L, principal)).thenReturn(response());
-        mvc.perform(get("/conformities/2")).andExpect(status().isOk())
+        mvc.perform(get("/conformities/collaborators/2")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.eventCompletionId").value(42))
                 .andExpect(jsonPath("$.data.profilePhotoUrl").value("https://example.com/profile-photo"))
                 .andExpect(jsonPath("$.data.avatarInitials").value("C"))
@@ -57,62 +57,62 @@ class ConformityControllerTest {
                 .andExpect(jsonPath("$.data.firebaseUid").doesNotExist());
         when(service.findById(99L, principal)).thenThrow(
                 new com.astro.api.common.exception.ResourceNotFoundException("Conformidade não encontrada"));
-        mvc.perform(get("/conformities/99")).andExpect(status().isNotFound())
+        mvc.perform(get("/conformities/collaborators/99")).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Conformidade não encontrada"));
-        mvc.perform(get("/conformities/invalid")).andExpect(status().isBadRequest());
+        mvc.perform(get("/conformities/collaborators/invalid")).andExpect(status().isBadRequest());
     }
 
     @Test void createsWithLocationAndRejectsInvalidRequests() throws Exception {
         when(service.create(any(), eq(principal))).thenReturn(response());
-        mvc.perform(post("/conformities").contentType("application/json")
+        mvc.perform(post("/conformities/collaborators").contentType("application/json")
                         .content("{\"collaboratorId\":3,\"nrId\":10,\"expiresAt\":null,\"origin\":\"FAKE\",\"workspaceId\":999}"))
-                .andExpect(status().isCreated()).andExpect(header().string("Location", "/conformities/2"));
+                .andExpect(status().isCreated()).andExpect(header().string("Location", "/conformities/collaborators/2"));
         verify(service).create(new com.astro.api.conformity.dto.request.CreateConformityRequest(3L, 10, null), principal);
         clearInvocations(service);
         for (String body : List.of("{}", "{\"collaboratorId\":0,\"nrId\":10}",
                 "{\"collaboratorId\":3,\"nrId\":-1}", "{\"collaboratorId\":3,\"nrId\":10,\"expiresAt\":\"bad\"}")) {
-            mvc.perform(post("/conformities").contentType("application/json").content(body)).andExpect(status().isBadRequest());
+            mvc.perform(post("/conformities/collaborators").contentType("application/json").content(body)).andExpect(status().isBadRequest());
         }
         verifyNoInteractions(service);
     }
 
     @Test void putRequiresBothFieldsAndNullExplicitlyRemovesValidity() throws Exception {
         when(service.update(eq(2L), any(), eq(principal))).thenReturn(response());
-        mvc.perform(put("/conformities/2").contentType("application/json").content("{\"nrId\":10,\"expiresAt\":null}"))
+        mvc.perform(put("/conformities/collaborators/2").contentType("application/json").content("{\"nrId\":10,\"expiresAt\":null}"))
                 .andExpect(status().isOk());
         verify(service).update(2L, new com.astro.api.conformity.dto.request.UpdateConformityRequest(10, null), principal);
         clearInvocations(service);
         for (String body : List.of("{}", "{\"nrId\":10}", "{\"expiresAt\":null}", "{\"nrId\":0,\"expiresAt\":null}")) {
-            mvc.perform(put("/conformities/2").contentType("application/json").content(body)).andExpect(status().isBadRequest());
+            mvc.perform(put("/conformities/collaborators/2").contentType("application/json").content(body)).andExpect(status().isBadRequest());
         }
         verifyNoInteractions(service);
     }
 
     @Test void patchRequiresAnExplicitBooleanAndMapsConflicts() throws Exception {
         when(service.changeApplicability(eq(2L), any(), eq(principal))).thenReturn(response());
-        mvc.perform(patch("/conformities/2/applicability").contentType("application/json").content("{\"applicable\":false}"))
+        mvc.perform(patch("/conformities/collaborators/2/applicability").contentType("application/json").content("{\"applicable\":false}"))
                 .andExpect(status().isOk());
         verify(service).changeApplicability(2L, new com.astro.api.conformity.dto.request.ConformityApplicabilityRequest(false), principal);
         clearInvocations(service);
         for (String body : List.of("{}", "{\"applicable\":null}", "{\"applicable\":\"invalid\"}",
                 "{\"applicable\":\"true\"}", "{\"applicable\":1}")) {
-            mvc.perform(patch("/conformities/2/applicability").contentType("application/json").content(body)).andExpect(status().isBadRequest());
+            mvc.perform(patch("/conformities/collaborators/2/applicability").contentType("application/json").content(body)).andExpect(status().isBadRequest());
         }
         verifyNoInteractions(service);
         when(service.changeApplicability(eq(2L), any(), eq(principal))).thenThrow(
                 new com.astro.api.common.exception.ConflictException("Já existe uma conformidade aplicável para este colaborador e NR"));
-        mvc.perform(patch("/conformities/2/applicability").contentType("application/json").content("{\"applicable\":true}"))
+        mvc.perform(patch("/conformities/collaborators/2/applicability").contentType("application/json").content("{\"applicable\":true}"))
                 .andExpect(status().isConflict());
     }
 
     @Test void importsMultipartWithTotalsAndRequiresTheFilePart() throws Exception {
-        var file = ConformityTestSpreadsheets.file(false, new Object[]{"00000000002", 10, "2030-01-01"});
+        org.springframework.mock.web.MockMultipartFile file = ConformityTestSpreadsheets.file(false, new Object[]{"00000000002", 10, "2030-01-01"});
         when(importer.importFile(any(), eq(principal))).thenReturn(
                 new com.astro.api.conformity.dto.response.ConformityImportResponse(1,1,0,0,List.of()));
-        mvc.perform(multipart("/conformities/import").file(file)).andExpect(status().isOk())
+        mvc.perform(multipart("/conformities/collaborators/import").file(file)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.processed").value(1)).andExpect(jsonPath("$.data.inserted").value(1));
-        mvc.perform(multipart("/conformities/import")).andExpect(status().isBadRequest());
+        mvc.perform(multipart("/conformities/collaborators/import")).andExpect(status().isBadRequest());
         when(importer.importFile(any(), eq(principal))).thenThrow(new org.springframework.web.multipart.MaxUploadSizeExceededException(10L*1024*1024));
-        mvc.perform(multipart("/conformities/import").file(file)).andExpect(status().isPayloadTooLarge());
+        mvc.perform(multipart("/conformities/collaborators/import").file(file)).andExpect(status().isPayloadTooLarge());
     }
 }

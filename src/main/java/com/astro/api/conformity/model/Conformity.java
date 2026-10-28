@@ -16,7 +16,13 @@ public class Conformity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id_conformidade")
     private Long id;
-    @Column(name = "usuario_id", nullable = false)
+    @Column(name = "tipo", nullable = false)
+    private String type = "COLABORADOR";
+    @Column(name = "unidade_id")
+    private Long unitId;
+    @Column(name = "formulario_resposta_id")
+    private String formResponseId;
+    @Column(name = "usuario_id")
     private Long collaboratorId;
     @Column(name = "nr_id", nullable = false)
     private Integer nrId;

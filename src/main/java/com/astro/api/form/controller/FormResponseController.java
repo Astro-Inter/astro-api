@@ -110,7 +110,7 @@ public class FormResponseController {
 
     @ApiResponse(responseCode = "409", description = "Formulário não respondido, já analisado ou alterado")
     @PostMapping("/{id}/review")
-    @Operation(summary = "Registra análise definitiva do remetente ou gestor do workspace: approved ou rejected")
+    @Operation(summary = "Registra análise definitiva do remetente ou gestor do workspace: approved ou rejected", description = "Aprovar formulário com NR gera conformidade da unidade indicada ou da unidade do destinatário. Validade: data da resposta mais meses de reciclagem. Repetir approved reconcilia sem duplicar; trocar decisão retorna 409. MongoDB e PostgreSQL têm transações separadas.")
     public ResponseEntity<ApiResult<FormResponseDetailsResponse>> review(@PathVariable("id") String id,
             @Valid @RequestBody FormReviewRequest review, @AuthenticationPrincipal AuthenticatedUser principal,
             HttpServletRequest request) {
