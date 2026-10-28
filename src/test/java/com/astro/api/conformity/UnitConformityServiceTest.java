@@ -37,7 +37,7 @@ class UnitConformityServiceTest {
         verify(records,never()).saveAndFlush(any());
     }
     @Test void manualCreationRejectsExistingApplicablePair() {
-        setup(); when(records.hasApplicableConflict(2L,1,null)).thenReturn(true);
+        setup(); when(records.existsByTypeAndUnitIdAndNrIdAndApplicableTrue("UNIDADE",2L,1)).thenReturn(true);
         assertThrows(ConflictException.class,()->service.create(new CreateUnitConformityRequest(2L,1,null),principal));
         verify(records,never()).saveAndFlush(any());
     }
@@ -46,5 +46,27 @@ class UnitConformityServiceTest {
         when(records.findRecordInScope(7L,1L,"manager")).thenReturn(Optional.of(record));
         assertThrows(BusinessException.class,()->service.update(7L,new UpdateConformityRequest(6,null),principal));
         verify(records,never()).saveAndFlush(any());
+    }
+
+    @Test void changingNrRejectsAnotherApplicableRecordAndExcludesTheEditedRecord() {
+        setup();
+        Conformity record = new Conformity();
+        record.setUnitId(2L); record.setNrId(6); record.setApplicable(true);
+        when(records.findRecordInScope(7L,1L,"manager")).thenReturn(Optional.of(record));
+        when(records.existsByTypeAndUnitIdAndNrIdAndApplicableTrueAndIdNot("UNIDADE",2L,1,7L)).thenReturn(true);
+        assertThrows(ConflictException.class, () -> service.update(7L,new UpdateConformityRequest(1,null),principal));
+        verify(records,never()).saveAndFlush(any());
+        verify(records,never()).existsByTypeAndUnitIdAndNrIdAndApplicableTrue(anyString(),anyLong(),anyInt());
+    }
+
+    @Test void reactivatingRejectsAnotherApplicableRecordWithoutSaving() {
+        setup();
+        Conformity record = new Conformity();
+        record.setUnitId(2L); record.setNrId(1); record.setApplicable(false);
+        when(records.findRecordInScope(7L,1L,"manager")).thenReturn(Optional.of(record));
+        when(records.existsByTypeAndUnitIdAndNrIdAndApplicableTrueAndIdNot("UNIDADE",2L,1,7L)).thenReturn(true);
+        assertThrows(ConflictException.class, () -> service.changeApplicability(7L,new ConformityApplicabilityRequest(true),principal));
+        verify(records,never()).saveAndFlush(any());
+        assertFalse(record.isApplicable());
     }
 }

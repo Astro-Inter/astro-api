@@ -39,7 +39,7 @@ public class FormConformityService {
             throw new BusinessException("Formulário aprovado sem resposta concluída");
         }
         writes.lockWrites();
-        if (repository.findByFormResponseId(form.getId()).isPresent()) {
+        if (repository.existsByFormResponseId(form.getId())) {
             return;
         }
         Long unitId = form.getUnitId();

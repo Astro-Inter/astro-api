@@ -122,7 +122,13 @@ public class UnitConformityService {
         }
     }
     private void conflict(Long unitId, Integer nrId, Long excludedId) {
-        if (repository.hasApplicableConflict(unitId, nrId, excludedId)) {
+        boolean hasConflict;
+        if (excludedId == null) {
+            hasConflict = repository.existsByTypeAndUnitIdAndNrIdAndApplicableTrue("UNIDADE", unitId, nrId);
+        } else {
+            hasConflict = repository.existsByTypeAndUnitIdAndNrIdAndApplicableTrueAndIdNot("UNIDADE", unitId, nrId, excludedId);
+        }
+        if (hasConflict) {
             throw new ConflictException("Já existe uma conformidade aplicável para esta unidade e NR");
         }
     }

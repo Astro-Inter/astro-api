@@ -24,10 +24,12 @@ public interface UnitConformityRepository extends JpaRepository<Conformity, Long
     Optional<Conformity> findRecordInScope(@Param("id") Long id, @Param("workspaceId") Long workspaceId,
                                          @Param("uid") String uid);
 
-    @Query("SELECT COUNT(c) > 0 FROM Conformity c WHERE c.type = 'UNIDADE' AND c.unitId = :unitId AND c.nrId = :nrId AND c.applicable = true AND (:excludedId IS NULL OR c.id <> :excludedId)")
-    boolean hasApplicableConflict(@Param("unitId") Long unitId, @Param("nrId") Integer nrId, @Param("excludedId") Long excludedId);
+    boolean existsByTypeAndUnitIdAndNrIdAndApplicableTrue(String type, Long unitId, Integer nrId);
 
-    Optional<Conformity> findByFormResponseId(String formResponseId);
+    boolean existsByTypeAndUnitIdAndNrIdAndApplicableTrueAndIdNot(
+            String type, Long unitId, Integer nrId, Long excludedId);
+
+    boolean existsByFormResponseId(String formResponseId);
 
     @Query(value = """
             SELECT v.id_conformidade AS id, v.unidade_id AS "unitId", v.nome_unidade AS "unitName",

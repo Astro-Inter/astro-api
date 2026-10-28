@@ -54,7 +54,7 @@ class FormConformityServiceTest {
         verify(records).saveAndFlush(argThat(value -> value.getUnitId().equals(5L)));
     }
     @Test void repeatedApprovalNeverCreatesDuplicateOrReactivatesHistoricalRecord() {
-        when(records.findByFormResponseId("form-657")).thenReturn(Optional.of(new Conformity()));
+        when(records.existsByFormResponseId("form-657")).thenReturn(true);
         service.synchronizeApproved(form(), principal); verify(records,never()).saveAndFlush(any()); verifyNoInteractions(users,nrs);
     }
     @Test void rejectedOrUnlinkedFormDoesNotWrite() {
