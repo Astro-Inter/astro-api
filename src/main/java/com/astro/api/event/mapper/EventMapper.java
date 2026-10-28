@@ -161,6 +161,7 @@ public class EventMapper {
                 participation.getUser().getName(),
                 participation.getUser().getRole() == null ? null : participation.getUser().getRole().getName(),
                 participation.getUser().getUnit() == null ? null : participation.getUser().getUnit().name,
+                completion.getStatus(),
                 completion.getCompletionDate(),
                 participation.getEventClass().getEndDate(),
                 event.isMandatoryEvidence(),
