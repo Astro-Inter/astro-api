@@ -20,6 +20,7 @@ import com.astro.api.user.dto.request.CollaboratorStatusRequest;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 import java.time.Instant;
+import java.time.LocalDate;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.user.model.*;
 import com.astro.api.user.repository.UserRepository;
@@ -30,6 +31,8 @@ import org.springframework.security.access.AccessDeniedException;
 
 import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
 import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
+import com.astro.api.user.dto.response.CollaboratorProfileResponse;
+import com.astro.api.user.dto.response.UserProfileResponse;
 import org.mockito.InOrder;
 import org.hibernate.exception.ConstraintViolationException;
 import java.sql.SQLException;
@@ -225,6 +228,48 @@ class CollaboratorServiceTest {
         assertNull(response.workModel());
         when(row.getWorkModel()).thenReturn("HIBRIDO");
         assertEquals(WorkModel.HIBRIDO, service.findById(2L, principal).workModel());
+    }
+
+    @Test
+    void returnsScopedProfileWithPendingEventsAvatarAndTheSameNrFieldsAsOwnProfile() {
+        CollaboratorDetailsProjection row = mock(CollaboratorDetailsProjection.class);
+        when(row.getId()).thenReturn(2L);
+        when(row.getName()).thenReturn("Ana Silva");
+        when(row.getEmail()).thenReturn("ana@example.com");
+        when(row.getRoleName()).thenReturn("Operadora");
+        when(row.getUnitName()).thenReturn("Matriz");
+        when(row.getWorkModel()).thenReturn("HIBRIDO");
+        when(repository.findDetailsInScope(2L, "manager", 3L)).thenReturn(Optional.of(row));
+        when(avatars.findUrl(2L)).thenReturn("https://r2.example.com/ana.jpg");
+        when(repository.findPendingCountById("manager", 2L)).thenReturn(3L);
+        List<UserProfileResponse.NrProfileResponse> nrs = List.of(new UserProfileResponse.NrProfileResponse(
+                10, LocalDate.of(2027, 4, 30), "Segurança", "Prevenir acidentes", "Trabalho industrial"));
+        when(userService.findNrsByUserId(2L)).thenReturn(nrs);
+
+        CollaboratorProfileResponse response = service.findProfileById(2L, principal);
+
+        assertEquals(2L, response.id());
+        assertEquals("Ana Silva", response.name());
+        assertEquals("Operadora", response.roleName());
+        assertEquals("https://r2.example.com/ana.jpg", response.profilePhotoUrl());
+        assertEquals("Matriz", response.unitName());
+        assertEquals(WorkModel.HIBRIDO, response.workModel());
+        assertEquals("ana@example.com", response.email());
+        assertEquals(3L, response.pendingCount());
+        assertEquals(nrs, response.nrs());
+        verify(repository).findDetailsInScope(2L, "manager", 3L);
+        verify(repository).findPendingCountById("manager", 2L);
+        verify(userService).findNrsByUserId(2L);
+    }
+
+    @Test
+    void doesNotLoadProfileDataForInvalidOrOutOfScopeCollaboratorIds() {
+        assertThrows(BusinessException.class, () -> service.findProfileById(0L, principal));
+        when(repository.findDetailsInScope(999L, "manager", 3L)).thenReturn(Optional.empty());
+        assertThrows(ResourceNotFoundException.class, () -> service.findProfileById(999L, principal));
+        verify(repository, never()).findPendingCountById(anyString(), anyLong());
+        verify(userService, never()).findNrsByUserId(anyLong());
+        verifyNoInteractions(avatars);
     }
 
     @Test
