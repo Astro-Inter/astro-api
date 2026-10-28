@@ -11,6 +11,7 @@ import com.astro.api.event.dto.response.EventParticipantStatusResponse;
 import com.astro.api.event.dto.response.ManagerEventParticipantDetailsResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.dto.response.ManagerCompletionModeEventDetailsResponse;
+import com.astro.api.event.dto.response.CollaboratorCompletionModeEventDetailsResponse;
 import com.astro.api.event.dto.response.MyEventResponse;
 import com.astro.api.event.model.Event;
 import com.astro.api.event.model.CompletionMode;
@@ -21,6 +22,7 @@ import com.astro.api.event.model.EventCompletion;
 import com.astro.api.event.model.EventEvidence;
 import com.astro.api.event.model.ParticipationStatus;
 import com.astro.api.event.repository.EventCalendarProjection;
+import com.astro.api.event.repository.EventCompletionMetricsProjection;
 import com.astro.api.event.repository.EventCandidateProjection;
 import com.astro.api.event.repository.MyEventProjection;
 import com.astro.api.user.model.User;
@@ -172,6 +174,24 @@ public class EventMapper {
                 commonDetails.completionMode(),
                 commonDetails.managerId(),
                 commonDetails.managerName());
+    }
+
+    public CollaboratorCompletionModeEventDetailsResponse toCollaboratorCompletionModeEventDetailsResponse(
+            ManagerCompletionModeEventDetailsResponse details,
+            EventCompletionMetricsProjection metrics) {
+        return new CollaboratorCompletionModeEventDetailsResponse(
+                details.eventId(),
+                details.eventTitle(),
+                details.eventDescription(),
+                details.externalLink(),
+                details.participantCount(),
+                details.lastClassLimitDate(),
+                details.completionMode(),
+                details.managerId(),
+                details.managerName(),
+                metrics.getPendingValidationCount(),
+                metrics.getValidatedCount(),
+                metrics.getNotSubmittedCount());
     }
 
     public record CommonEventDetails(
