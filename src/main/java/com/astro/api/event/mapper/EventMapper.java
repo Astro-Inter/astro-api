@@ -9,7 +9,6 @@ import com.astro.api.event.dto.response.EventEvidenceResponse;
 import com.astro.api.event.dto.response.EventParticipantResponse;
 import com.astro.api.event.dto.response.EventParticipantStatusResponse;
 import com.astro.api.event.dto.response.ManagerEventParticipantDetailsResponse;
-import com.astro.api.event.dto.response.ManagerCollaboratorCompletionDetailsResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.dto.response.ManagerCompletionModeEventDetailsResponse;
 import com.astro.api.event.dto.response.MyEventResponse;
@@ -137,31 +136,21 @@ public class EventMapper {
 
     public ManagerEventParticipantDetailsResponse toManagerEventParticipantDetailsResponse(
             EventClassParticipant participation,
-            String profilePhotoUrl) {
-        return new ManagerEventParticipantDetailsResponse(
-                participation.getUser().getId(),
-                profilePhotoUrl,
-                participation.getEventClass().getEvent().getTitle(),
-                participation.getUser().getName(),
-                participation.getUser().getRole() == null ? null : participation.getUser().getRole().getName(),
-                participation.getUser().getUnit() == null ? null : participation.getUser().getUnit().name,
-                participation.getEventClass().getEndDate());
-    }
-
-    public ManagerCollaboratorCompletionDetailsResponse toManagerCollaboratorCompletionDetailsResponse(
-            EventClassParticipant participation,
+            String profilePhotoUrl,
             EventCompletion completion,
             List<EventEvidenceResponse> evidences) {
         Event event = participation.getEventClass().getEvent();
-        return new ManagerCollaboratorCompletionDetailsResponse(
+        return new ManagerEventParticipantDetailsResponse(
+                participation.getUser().getId(),
+                profilePhotoUrl,
+                event.getTitle(),
                 participation.getUser().getName(),
                 participation.getUser().getRole() == null ? null : participation.getUser().getRole().getName(),
                 participation.getUser().getUnit() == null ? null : participation.getUser().getUnit().name,
-                completion.getCompletionDate(),
                 participation.getEventClass().getEndDate(),
+                completion == null ? null : completion.getCompletionDate(),
                 event.isMandatoryEvidence(),
-                evidences,
-                event.getTitle());
+                evidences);
     }
 
     public CommonEventDetails toCommonEventDetails(Event event) {

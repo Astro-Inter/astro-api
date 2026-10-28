@@ -23,7 +23,6 @@ import com.astro.api.event.dto.response.EventEvidenceResponse;
 import com.astro.api.event.dto.response.EventParticipantStatusResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.dto.response.ManagerCompletionModeEventDetailsResponse;
-import com.astro.api.event.dto.response.ManagerCollaboratorCompletionDetailsResponse;
 import com.astro.api.event.dto.response.MyEventResponse;
 import com.astro.api.event.dto.response.ManagerEventParticipantDetailsResponse;
 import com.astro.api.event.mapper.EventMapper;
@@ -211,29 +210,16 @@ public class EventService {
                 .findFirstByEventClass_Event_IdAndUser_IdOrderByEventClass_EndDateDesc(eventId, participantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Participante não encontrado no evento"));
         String profilePhotoUrl = userAvatarService.findUrl(participantId);
-        return eventMapper.toManagerEventParticipantDetailsResponse(participation, profilePhotoUrl);
-    }
-
-    @Transactional(readOnly = true)
-    public ManagerCollaboratorCompletionDetailsResponse findCollaboratorCompletionDetailsForManager(
-            Long eventId, Long participantId, String firebaseUid) {
-        User manager = findAuthenticatedManager(firebaseUid);
-        findEventInWorkspace(eventId, getWorkspace(manager));
-        EventClassParticipant participation = eventClassParticipantRepository
-                .findFirstByEventClass_Event_IdAndUser_IdOrderByEventClass_EndDateDesc(eventId, participantId)
-                .orElseThrow(() -> new ResourceNotFoundException("Participante não encontrado no evento"));
-        Event event = participation.getEventClass().getEvent();
-        if (event.getCompletionMode() != CompletionMode.COLABORADOR) {
-            throw new BusinessException("Este evento não permite conclusão pelo colaborador");
-        }
         EventCompletion completion = eventCompletionRepository.findByParticipation_Id(participation.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Conclusão do participante não encontrada"));
-        List<EventEvidenceResponse> evidences = eventEvidenceRepository
-                .findByCompletion_IdOrderById(completion.getId()).stream()
-                .map(evidence -> eventMapper.toEvidenceResponse(
-                        evidence, storageService.getEventEvidenceDownloadUrl(evidence.getObjectPath())))
-                .toList();
-        return eventMapper.toManagerCollaboratorCompletionDetailsResponse(participation, completion, evidences);
+                .orElse(null);
+        List<EventEvidenceResponse> evidences = completion == null
+                ? List.of()
+                : eventEvidenceRepository.findByCompletion_IdOrderById(completion.getId()).stream()
+                        .map(evidence -> eventMapper.toEvidenceResponse(
+                                evidence, storageService.getEventEvidenceDownloadUrl(evidence.getObjectPath())))
+                        .toList();
+        return eventMapper.toManagerEventParticipantDetailsResponse(
+                participation, profilePhotoUrl, completion, evidences);
     }
 
     @Transactional
