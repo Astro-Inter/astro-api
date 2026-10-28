@@ -4,6 +4,7 @@ import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventCalendarResponse;
 import com.astro.api.event.dto.response.CollaboratorEventResponse;
 import com.astro.api.event.dto.response.EventClassResponse;
+import com.astro.api.event.dto.response.EventCompletionResponse;
 import com.astro.api.event.dto.response.EventEvidenceResponse;
 import com.astro.api.event.dto.response.EventParticipantResponse;
 import com.astro.api.event.dto.response.EventParticipantStatusResponse;
@@ -16,6 +17,7 @@ import com.astro.api.event.model.CompletionMode;
 import com.astro.api.event.model.EventStatus;
 import com.astro.api.event.model.EventClass;
 import com.astro.api.event.model.EventClassParticipant;
+import com.astro.api.event.model.EventCompletion;
 import com.astro.api.event.model.EventEvidence;
 import com.astro.api.event.model.ParticipationStatus;
 import com.astro.api.event.repository.EventCalendarProjection;
@@ -41,6 +43,11 @@ public class EventMapper {
     public MyEventResponse toMyEventResponse(MyEventProjection row) {
         return new MyEventResponse(row.getId(), row.getTitle(), EventStatus.valueOf(row.getStatus()),
                 CompletionMode.valueOf(row.getCompletionMode()), row.getPendingCount());
+    }
+
+    public EventCompletionResponse toCompletionResponse(EventCompletion completion) {
+        return new EventCompletionResponse(
+                completion.getId(), completion.getStatus(), completion.getCompletionDate());
     }
 
     public EventResponse toResponse(

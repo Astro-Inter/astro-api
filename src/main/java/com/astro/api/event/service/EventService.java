@@ -5,8 +5,10 @@ import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.service.ViewedService;
 import com.astro.api.common.storage.R2StorageService;
 import com.astro.api.conformity.model.Conformity;
+import com.astro.api.conformity.model.NrDocument;
 import com.astro.api.conformity.repository.ConformityRepository;
 import com.astro.api.conformity.repository.NrCatalogRepository;
+import com.astro.api.conformity.repository.NrDocumentRepository;
 import com.astro.api.event.dto.request.CancelEventRequest;
 import com.astro.api.event.dto.request.CreateEventClassRequest;
 import com.astro.api.event.dto.request.CreateEventRequest;
@@ -79,6 +81,7 @@ public class EventService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final NrCatalogRepository nrCatalogRepository;
+    private final NrDocumentRepository nrDocumentRepository;
     private final EventMapper eventMapper;
     private final Clock clock;
     private final EventCandidateRepository candidateRepository;
@@ -96,6 +99,7 @@ public class EventService {
             UserRepository userRepository,
             RoleRepository roleRepository,
             NrCatalogRepository nrCatalogRepository,
+            NrDocumentRepository nrDocumentRepository,
             EventMapper eventMapper, @Qualifier("eventClock") Clock clock,
             EventCandidateRepository candidateRepository, ViewedService viewedService,
             EventCompletionRepository eventCompletionRepository,
@@ -109,6 +113,7 @@ public class EventService {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.nrCatalogRepository = nrCatalogRepository;
+        this.nrDocumentRepository = nrDocumentRepository;
         this.eventMapper = eventMapper;
         this.clock = clock;
         this.candidateRepository = candidateRepository;
@@ -206,6 +211,50 @@ public class EventService {
                 .orElseThrow(() -> new ResourceNotFoundException("Participante não encontrado no evento"));
         String profilePhotoUrl = userAvatarService.findUrl(participantId);
         return eventMapper.toManagerEventParticipantDetailsResponse(participation, profilePhotoUrl);
+    }
+
+    @Transactional
+    public EventCompletionResponse markParticipantCompletionByManager(
+            Long eventId, Long participantId, String firebaseUid) {
+        User manager = findAuthenticatedManager(firebaseUid);
+        Event event = findLockedEventInWorkspace(eventId, getWorkspace(manager));
+        ensureManagerAndEditable(event, manager);
+        if (event.getCompletionMode() != CompletionMode.GESTOR) {
+            throw new BusinessException("Este evento não permite conclusão pelo gestor");
+        }
+        if (participantId == null || participantId <= 0) {
+            throw new BusinessException("Identificador do participante deve ser positivo");
+        }
+
+        EventClassParticipant participation = eventClassParticipantRepository
+                .findByEventClass_Event_IdAndUser_Id(eventId, participantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Participante não encontrado no evento"));
+        if (eventCompletionRepository.findByParticipation_Id(participation.getId()).isPresent()) {
+            throw new BusinessException("A conclusão deste participante já foi registrada");
+        }
+
+        EventCompletion completion = new EventCompletion();
+        completion.setParticipation(participation);
+        completion.setStatus(EventCompletionStatus.CONCLUIDO);
+        LocalDateTime completionDate = LocalDateTime.now(clock);
+        completion.setCompletionDate(completionDate);
+        completion.setValidationDate(completionDate);
+        completion.setExpirationDate(calculateCompletionExpiration(event.getNrId(), completionDate.toLocalDate()));
+        EventCompletion savedCompletion = eventCompletionRepository.save(completion);
+        return eventMapper.toCompletionResponse(savedCompletion);
+    }
+
+    private LocalDate calculateCompletionExpiration(Integer nrId, LocalDate completionDate) {
+        if (nrId == null) {
+            return null;
+        }
+        NrDocument nr = nrDocumentRepository.findById(nrId)
+                .orElseThrow(() -> new ResourceNotFoundException("NR não encontrada no catálogo MongoDB"));
+        Integer months = nr.getRefresherFrequencyMonths();
+        if (months == null || months <= 0) {
+            throw new BusinessException("Tempo de reciclagem da NR inválido ou não informado");
+        }
+        return completionDate.plusMonths(months);
     }
 
     @Transactional(readOnly = true)
@@ -353,7 +402,7 @@ public class EventService {
         eventEvidenceRepository.saveAll(evidence);
         scheduleEvidenceObjectCleanup(previousEvidence, evidence);
 
-        return new EventCompletionResponse(completion.getId(), completion.getStatus(), completion.getCompletionDate());
+        return eventMapper.toCompletionResponse(completion);
     }
 
     @Transactional

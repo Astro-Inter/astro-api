@@ -168,6 +168,29 @@ public class EventController {
                 "Dados do participante retornados com sucesso", participant, request.getRequestURI()));
     }
 
+    @PostMapping("/{eventId}/participants/{participantId}/completion")
+    @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
+    @Operation(summary = "Marca a conclusão de um participante pelo gestor",
+            description = "Disponível ao criador do evento ativo no modo GESTOR. A validade é a data de conclusão mais os meses de reciclagem da NR no MongoDB; sem NR, fica nula.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Conclusão registrada no envelope ApiResult"),
+            @ApiResponse(responseCode = "400", description = "Evento inativo, modo incompatível, conclusão já registrada ou tempo de reciclagem inválido"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado"),
+            @ApiResponse(responseCode = "403", description = "Gestor ativo e criador do evento necessários"),
+            @ApiResponse(responseCode = "404", description = "Evento fora do workspace, participante não vinculado ou NR ausente no MongoDB"),
+            @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
+    })
+    public ResponseEntity<ApiResult<EventCompletionResponse>> markParticipantCompletionByManager(
+            @PathVariable Long eventId,
+            @PathVariable Long participantId,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            HttpServletRequest request) {
+        EventCompletionResponse completion = eventService.markParticipantCompletionByManager(
+                eventId, participantId, authenticatedUser.firebaseUid());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResult.success(
+                "Conclusão do participante registrada", completion, request.getRequestURI()));
+    }
+
     @GetMapping("/manager/{eventId}")
     @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
     @Operation(summary = "Retorna os detalhes de um evento para conclusão pelo gestor",

@@ -1,6 +1,6 @@
 # Administração web de eventos — SCRUM-422
 
-Os seis endpoints usam Firebase e `ApiResult<T>`. Exigem usuário ativo com perfil
+Os endpoints usam Firebase e `ApiResult<T>`. Exigem usuário ativo com perfil
 `GESTOR` ou `GESTOR_WORKSPACE`. O servidor determina usuário e workspace.
 As leituras permitem consultar eventos de outros gestores do mesmo workspace;
 escritas exigem o criador, inclusive quando o solicitante é `GESTOR_WORKSPACE`.
@@ -13,6 +13,7 @@ Eventos inexistentes ou de outro workspace retornam 404; falta de autenticação
 | `GET /events/manager/{eventId}` | Detalhes para evento com conclusão pelo gestor; inclui quantidade de participantes e prazo da última turma |
 | `GET /events/{eventId}/participants` | Lista participantes do evento, título e status de conclusão individual |
 | `GET /events/{eventId}/participants/{participantId}` | Consulta os dados de um participante para conclusão pelo gestor |
+| `POST /events/{eventId}/participants/{participantId}/completion` | Registra a conclusão do participante pelo gestor |
 | `GET /events/my-events` | Eventos criados pelo gestor autenticado, com pendências calculadas pela view `vw_eventos_gestor` |
 | `GET /events/collaborator/{eventId}` | Detalhes para o colaborador autenticado; consulta sem alterar estado |
 | `PATCH /events/collaborator/{eventId}/viewed` | Marca como visualizado um evento de que o usuário autenticado participa |
@@ -64,6 +65,23 @@ escopo de workspace. `participantId` é o ID do usuário participante. Retorna
 `unitName` e `endDate` (término da turma associada), usando `null` quando cargo,
 unidade ou foto não estiverem cadastrados. Evento fora do workspace ou usuário
 sem participação no evento retorna 404.
+
+`POST /events/{eventId}/participants/{participantId}/completion` é a operação
+seguinte ao detalhe individual. Exige gestor ativo, criador do evento e evento
+ativo no workspace autenticado, configurado com `completionMode = GESTOR`. Pode
+ser executado em qualquer momento enquanto o evento estiver ativo. Registra a
+participação com status `CONCLUIDO`, `completionDate` atual e `data_validacao`
+no mesmo instante, sem evidência ou validação posterior; a resposta é `201` com `EventCompletionResponse` no envelope
+`ApiResult`. Evento em outro workspace ou participante sem vínculo retornam 404;
+modo incompatível, evento inativo ou conclusão já registrada retornam 400.
+
+Para evento com NR, `conclusao_evento.data_validade` é a data da conclusão mais
+`tempo_reciclagem_meses` do documento publicado da NR no MongoDB. A soma usa meses
+de calendário; se o dia não existir no mês de destino, usa o último dia do mês.
+Sem NR, a validade é `null`. Documento da NR ausente retorna 404; período ausente
+ou não positivo retorna 400. Nessas situações a conclusão não é gravada. Uma
+falha de conexão ao banco retorna 503. A validade é persistida na conclusão e não
+integra a resposta `EventCompletionResponse`.
 
 ## Calendário
 

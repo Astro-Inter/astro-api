@@ -5,8 +5,10 @@ import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.service.ViewedService;
 import com.astro.api.common.storage.R2StorageService;
 import com.astro.api.conformity.model.Conformity;
+import com.astro.api.conformity.model.NrDocument;
 import com.astro.api.conformity.repository.ConformityRepository;
 import com.astro.api.conformity.repository.NrCatalogRepository;
+import com.astro.api.conformity.repository.NrDocumentRepository;
 import com.astro.api.event.dto.request.CancelEventRequest;
 import com.astro.api.event.dto.request.CreateEventClassRequest;
 import com.astro.api.event.dto.request.CreateEventRequest;
@@ -56,6 +58,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.ArgumentCaptor;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.time.Clock;
@@ -86,6 +89,7 @@ class EventServiceTest {
     private UserRepository userRepository;
     private RoleRepository roleRepository;
     private NrCatalogRepository nrCatalogRepository;
+    private NrDocumentRepository nrDocumentRepository;
     private ViewedService viewedService;
     private EventCompletionRepository eventCompletionRepository;
     private EventEvidenceRepository eventEvidenceRepository;
@@ -104,6 +108,7 @@ class EventServiceTest {
         userRepository = mock(UserRepository.class);
         roleRepository = mock(RoleRepository.class);
         nrCatalogRepository = mock(NrCatalogRepository.class);
+        nrDocumentRepository = mock(NrDocumentRepository.class);
         candidateRepository = mock(EventCandidateRepository.class);
         viewedService = mock(ViewedService.class);
         eventCompletionRepository = mock(EventCompletionRepository.class);
@@ -117,6 +122,7 @@ class EventServiceTest {
                 userRepository,
                 roleRepository,
                 nrCatalogRepository,
+                nrDocumentRepository,
                 new EventMapper(), Clock.fixed(
                         Instant.parse("2026-10-14T12:00:00Z"), ZoneOffset.UTC),
                 candidateRepository, viewedService,
@@ -580,6 +586,83 @@ class EventServiceTest {
         assertEquals(EventCompletionStatus.PENDENTE, response.status());
         assertNotNull(response.completionDate());
         verifyNoInteractions(storageService);
+    }
+
+    @Test
+    void managerCompletionUsesMongoRefresherMonthsForExpiration() {
+        prepareManagerCompletion(10);
+        NrDocument nr = new NrDocument();
+        nr.setRefresherFrequencyMonths(18);
+        when(nrDocumentRepository.findById(10)).thenReturn(Optional.of(nr));
+        when(eventCompletionRepository.save(any(EventCompletion.class))).thenAnswer(invocation -> {
+            EventCompletion completion = invocation.getArgument(0);
+            completion.setId(70L);
+            return completion;
+        });
+
+        EventCompletionResponse response = service.markParticipantCompletionByManager(30L, 2L, "manager");
+
+        ArgumentCaptor<EventCompletion> captured = ArgumentCaptor.forClass(EventCompletion.class);
+        verify(eventCompletionRepository).save(captured.capture());
+        assertEquals(LocalDateTime.of(2026, 10, 14, 12, 0), captured.getValue().getCompletionDate());
+        assertEquals(captured.getValue().getCompletionDate(), captured.getValue().getValidationDate());
+        assertEquals(LocalDate.of(2028, 4, 14), captured.getValue().getExpirationDate());
+        assertEquals(EventCompletionStatus.CONCLUIDO, captured.getValue().getStatus());
+        assertEquals(new EventCompletionResponse(70L, EventCompletionStatus.CONCLUIDO,
+                LocalDateTime.of(2026, 10, 14, 12, 0)), response);
+    }
+
+    @Test
+    void managerCompletionWithoutNrHasNoExpirationAndDoesNotReadMongo() {
+        prepareManagerCompletion(null);
+        when(eventCompletionRepository.save(any(EventCompletion.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.markParticipantCompletionByManager(30L, 2L, "manager");
+
+        ArgumentCaptor<EventCompletion> captured = ArgumentCaptor.forClass(EventCompletion.class);
+        verify(eventCompletionRepository).save(captured.capture());
+        assertEquals(captured.getValue().getCompletionDate(), captured.getValue().getValidationDate());
+        Assertions.assertNull(captured.getValue().getExpirationDate());
+        verifyNoInteractions(nrDocumentRepository);
+    }
+
+    @Test
+    void managerCompletionDoesNotPersistWhenMongoNrIsMissing() {
+        prepareManagerCompletion(10);
+        when(nrDocumentRepository.findById(10)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> service.markParticipantCompletionByManager(30L, 2L, "manager"));
+        verify(eventCompletionRepository, never()).save(any(EventCompletion.class));
+    }
+
+    @Test
+    void managerCompletionDoesNotPersistWhenRefresherPeriodIsInvalid() {
+        prepareManagerCompletion(10);
+        NrDocument nr = new NrDocument();
+        when(nrDocumentRepository.findById(10)).thenReturn(Optional.of(nr));
+
+        assertThrows(BusinessException.class,
+                () -> service.markParticipantCompletionByManager(30L, 2L, "manager"));
+        nr.setRefresherFrequencyMonths(0);
+        assertThrows(BusinessException.class,
+                () -> service.markParticipantCompletionByManager(30L, 2L, "manager"));
+        verify(eventCompletionRepository, never()).save(any(EventCompletion.class));
+    }
+
+    private void prepareManagerCompletion(Integer nrId) {
+        Event event = createEvent(EventStatus.ATIVO);
+        event.setNrId(nrId);
+        EventClass eventClass = createEventClass(event, LocalDateTime.of(2026, 1, 1, 0, 0),
+                LocalDateTime.of(2026, 1, 2, 0, 0));
+        EventClassParticipant participation = new EventClassParticipant();
+        participation.setId(90L);
+        participation.setEventClass(eventClass);
+        participation.setUser(createUser(2L, UserStatus.ATIVO, workspace));
+        when(eventRepository.findLockedInWorkspace(30L, workspace)).thenReturn(Optional.of(event));
+        when(eventClassParticipantRepository.findByEventClass_Event_IdAndUser_Id(30L, 2L))
+                .thenReturn(Optional.of(participation));
+        when(eventCompletionRepository.findByParticipation_Id(90L)).thenReturn(Optional.empty());
     }
 
     private CreateEventRequest createRequest(Integer nrId, List<Long> participantIds) {
