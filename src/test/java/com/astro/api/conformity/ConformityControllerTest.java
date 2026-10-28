@@ -1,7 +1,7 @@
 package com.astro.api.conformity;
 
 import com.astro.api.auth.security.*;
-import com.astro.api.conformity.controller.ConformityController;
+import com.astro.api.conformity.controller.CollaboratorConformityController;
 import com.astro.api.conformity.service.ConformityService;
 import com.astro.api.conformity.dto.response.ConformityResponse;
 import com.astro.api.common.handler.GlobalExceptionHandler;
@@ -22,7 +22,7 @@ class ConformityControllerTest {
     final AuthenticatedUser principal = new AuthenticatedUser("manager", "manager@example.com", Role.GESTOR);
     MockMvc mvc;
     @BeforeEach void setUp() {
-        mvc = MockMvcBuilders.standaloneSetup(new ConformityController(service, importer))
+        mvc = MockMvcBuilders.standaloneSetup(new CollaboratorConformityController(service, importer))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver()).build();
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal, null, List.of()));

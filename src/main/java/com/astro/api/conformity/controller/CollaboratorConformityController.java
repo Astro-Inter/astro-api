@@ -31,11 +31,11 @@ import com.astro.api.conformity.dto.request.ConformityApplicabilityRequest;
         @ApiResponse(responseCode = "401", description = "Autenticação ausente ou inválida"),
         @ApiResponse(responseCode = "403", description = "Gestor ativo necessário"),
         @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")})
-public class ConformityController {
+public class CollaboratorConformityController {
     private final ConformityService conformityService;
     private final ConformityImportService conformityImportService;
 
-    public ConformityController(ConformityService conformityService, ConformityImportService conformityImportService) {
+    public CollaboratorConformityController(ConformityService conformityService, ConformityImportService conformityImportService) {
         this.conformityService = conformityService;
         this.conformityImportService = conformityImportService;
     }

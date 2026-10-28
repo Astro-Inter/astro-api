@@ -102,7 +102,7 @@ class ConformitySecurityTest {
     @Configuration
     @EnableWebSecurity
     @org.springframework.web.servlet.config.annotation.EnableWebMvc
-    @Import({SecurityConfig.class, CorsConfig.class, com.astro.api.conformity.controller.ConformityController.class, com.astro.api.conformity.controller.UnitConformityController.class, GlobalExceptionHandler.class})
+    @Import({SecurityConfig.class, CorsConfig.class, com.astro.api.conformity.controller.CollaboratorConformityController.class, com.astro.api.conformity.controller.UnitConformityController.class, GlobalExceptionHandler.class})
     static class Config {
         @Bean com.astro.api.conformity.service.ConformityImportService conformityImportService() { return mock(com.astro.api.conformity.service.ConformityImportService.class); }
         @Bean FirebaseTokenService firebaseTokenService() { return mock(FirebaseTokenService.class); }
