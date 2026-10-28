@@ -47,7 +47,7 @@ class EventSecurityTest {
 
     @Test void requiresAuthenticationAndAdministrativeProfile() throws Exception {
         when(tokens.verify("invalid")).thenThrow(mock(FirebaseAuthException.class));
-        for (String path : List.of("/events/1", "/events/eligible-candidates", "/events/my-events", "/events?startDate=2026-10-01T00:00:00&endDate=2026-11-01T00:00:00")) {
+        for (String path : List.of("/events/1", "/events/eligible-candidates", "/events/my-events", "/events/details/1/manager-conclusion", "/events/details/1/collaborator-conclusion", "/events?startDate=2026-10-01T00:00:00&endDate=2026-11-01T00:00:00")) {
             mvc.perform(get(path)).andExpect(status().isUnauthorized());
             mvc.perform(get(path).header("Authorization", "Bearer invalid")).andExpect(status().isUnauthorized());
         }
@@ -57,6 +57,8 @@ class EventSecurityTest {
             when(authorization.getRole("uid")).thenReturn(Optional.of(role));
             mvc.perform(get("/events/1").header("Authorization", "Bearer valid")).andExpect(status().isForbidden());
             mvc.perform(get("/events/my-events").header("Authorization", "Bearer valid")).andExpect(status().isForbidden());
+            mvc.perform(get("/events/details/1/manager-conclusion").header("Authorization", "Bearer valid")).andExpect(status().isForbidden());
+            mvc.perform(get("/events/details/1/collaborator-conclusion").header("Authorization", "Bearer valid")).andExpect(status().isForbidden());
         }
         verifyNoInteractions(service);
     }
@@ -68,10 +70,14 @@ class EventSecurityTest {
             mvc.perform(get("/events/1").header("Authorization", "Bearer valid")).andExpect(status().isOk());
             mvc.perform(get("/events/eligible-candidates").header("Authorization", "Bearer valid")).andExpect(status().isOk());
             mvc.perform(get("/events/my-events").header("Authorization", "Bearer valid")).andExpect(status().isOk());
+            mvc.perform(get("/events/details/1/manager-conclusion").header("Authorization", "Bearer valid")).andExpect(status().isOk());
+            mvc.perform(get("/events/details/1/collaborator-conclusion").header("Authorization", "Bearer valid")).andExpect(status().isOk());
         }
         verify(service, times(2)).findById(1L, "uid");
         verify(service, times(2)).findEligibleCandidates(null, "uid");
         verify(service, times(2)).findMyEvents("uid");
+        verify(service, times(2)).findDetailsForManager(1L, "uid");
+        verify(service, times(2)).findDetailsForCollaboratorCompletion(1L, "uid");
     }
     @Test void permitsEmployeeProfilesToRequestTheirOwnCompletionAndRejectsAdmin() throws Exception {
         mvc.perform(multipart("/events/1/completion")).andExpect(status().isUnauthorized());
