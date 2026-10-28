@@ -284,6 +284,29 @@ public class EventService {
     }
 
     @Transactional
+    public EventCompletionResponse approveCollaboratorCompletionByManager(
+            Long eventId, Long participantId, String firebaseUid) {
+        User manager = findAuthenticatedManager(firebaseUid);
+        Event event = findEventInWorkspace(eventId, getWorkspace(manager));
+        ensureEventCreator(event, manager);
+        if (event.getCompletionMode() != CompletionMode.COLABORADOR) {
+            throw new BusinessException("Este evento não permite conclusão pelo colaborador");
+        }
+        EventClassParticipant participation = findEventParticipation(eventId, participantId);
+        EventCompletion completion = eventCompletionRepository.findLockedByParticipationId(participation.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Conclusão do participante não encontrada"));
+        ensureCompletionPending(completion);
+
+        LocalDateTime validationDate = LocalDateTime.now(clock);
+        completion.setStatus(EventCompletionStatus.CONCLUIDO);
+        completion.setValidationDate(validationDate);
+        completion.setExpirationDate(calculateCompletionExpiration(
+                event.getNrId(), completion.getCompletionDate().toLocalDate()));
+        completion.setRejectionReason(null);
+        return eventMapper.toCompletionResponse(eventCompletionRepository.save(completion));
+    }
+
+    @Transactional
     public EventCompletionResponse rejectCollaboratorCompletionByManager(
             Long eventId, Long participantId, String rejectionReason, String firebaseUid) {
         User manager = findAuthenticatedManager(firebaseUid);
