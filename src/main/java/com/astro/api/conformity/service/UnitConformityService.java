@@ -18,25 +18,25 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UnitConformityService {
-    private final ConformityRepository writes;
-    private final UnitConformityRepository repository;
-    private final UserRepository users;
-    private final NrCatalogRepository nrs;
-    private final UnitConformityMapper mapper;
+    private final ConformityRepository conformityRepository;
+    private final UnitConformityRepository unitConformityRepository;
+    private final UserRepository userRepository;
+    private final NrCatalogRepository nrCatalogRepository;
+    private final UnitConformityMapper unitConformityMapper;
 
-    public UnitConformityService(ConformityRepository writes, UnitConformityRepository repository,
-            UserRepository users, NrCatalogRepository nrs, UnitConformityMapper mapper) {
-        this.writes = writes;
-        this.repository = repository;
-        this.users = users;
-        this.nrs = nrs;
-        this.mapper = mapper;
+    public UnitConformityService(ConformityRepository conformityRepository, UnitConformityRepository unitConformityRepository,
+            UserRepository userRepository, NrCatalogRepository nrCatalogRepository, UnitConformityMapper unitConformityMapper) {
+        this.conformityRepository = conformityRepository;
+        this.unitConformityRepository = unitConformityRepository;
+        this.userRepository = userRepository;
+        this.nrCatalogRepository = nrCatalogRepository;
+        this.unitConformityMapper = unitConformityMapper;
     }
     @Transactional(readOnly = true)
     public List<UnitConformityResponse> findAll(AuthenticatedUser principal) {
         Long workspaceId = workspace(principal);
-        List<UnitConformityProjection> conformities = repository.findAllInScope(workspaceId, principal.firebaseUid());
-        List<UnitConformityResponse> response = conformities.stream().map(mapper::toResponse).toList();
+        List<UnitConformityProjection> conformities = unitConformityRepository.findAllInScope(workspaceId, principal.firebaseUid());
+        List<UnitConformityResponse> response = conformities.stream().map(unitConformityMapper::toResponse).toList();
         return response;
     }
     @Transactional(readOnly = true)
@@ -46,20 +46,20 @@ public class UnitConformityService {
     @Transactional
     public UnitConformityResponse create(CreateUnitConformityRequest request, AuthenticatedUser principal) {
         Long workspaceId = workspace(principal);
-        writes.lockWrites();
+        conformityRepository.lockWrites();
         Unit unit = unit(request.unitId(), workspaceId, principal);
         if (!unit.isActive) {
             throw new BusinessException("A unidade deve estar ativa");
         }
         requireNr(request.nrId(), true);
         conflict(request.unitId(), request.nrId(), null);
-        Conformity saved = repository.saveAndFlush(mapper.toManual(request));
+        Conformity saved = unitConformityRepository.saveAndFlush(unitConformityMapper.toManual(request));
         return details(saved.getId(), workspaceId, principal);
     }
     @Transactional
     public UnitConformityResponse update(Long id, UpdateConformityRequest request, AuthenticatedUser principal) {
         Long workspaceId = workspace(principal);
-        writes.lockWrites();
+        conformityRepository.lockWrites();
         Conformity record = record(id, workspaceId, principal);
         unit(record.getUnitId(), workspaceId, principal);
         boolean changed = !record.getNrId().equals(request.nrId());
@@ -70,14 +70,14 @@ public class UnitConformityService {
         if (changed && record.isApplicable()) {
             conflict(record.getUnitId(), request.nrId(), id);
         }
-        mapper.applyUpdate(record, request);
-        repository.saveAndFlush(record);
+        unitConformityMapper.applyUpdate(record, request);
+        unitConformityRepository.saveAndFlush(record);
         return details(id, workspaceId, principal);
     }
     @Transactional
     public UnitConformityResponse changeApplicability(Long id, ConformityApplicabilityRequest request, AuthenticatedUser principal) {
         Long workspaceId = workspace(principal);
-        writes.lockWrites();
+        conformityRepository.lockWrites();
         Conformity record = record(id, workspaceId, principal);
         Unit unit = unit(record.getUnitId(), workspaceId, principal);
         if (request.applicable() != record.isApplicable()) {
@@ -89,7 +89,7 @@ public class UnitConformityService {
                 conflict(record.getUnitId(), record.getNrId(), id);
             }
             record.setApplicable(request.applicable());
-            repository.saveAndFlush(record);
+            unitConformityRepository.saveAndFlush(record);
         }
         return details(id, workspaceId, principal);
     }
@@ -97,7 +97,7 @@ public class UnitConformityService {
         if (principal == null || principal.firebaseUid() == null) {
             throw new AccessDeniedException("Gestor autenticado necessário");
         }
-        User user = users.findByFirebaseUid(principal.firebaseUid()).orElseThrow(() -> new AccessDeniedException("Gestor ativo necessário"));
+        User user = userRepository.findByFirebaseUid(principal.firebaseUid()).orElseThrow(() -> new AccessDeniedException("Gestor ativo necessário"));
         if (user.getStatus() != UserStatus.ATIVO || (user.getType() != UserType.GESTOR && user.getType() != UserType.GESTOR_WORKSPACE)
                 || principal.role() == null || !user.getType().name().equals(principal.role().name())
                 || user.getUnit() == null || user.getUnit().workspace == null) {
@@ -106,17 +106,17 @@ public class UnitConformityService {
         return user.getUnit().workspace.id;
     }
     private Unit unit(Long id, Long workspaceId, AuthenticatedUser principal) {
-        return repository.findUnitInScope(id, workspaceId, principal.firebaseUid()).orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada"));
+        return unitConformityRepository.findUnitInScope(id, workspaceId, principal.firebaseUid()).orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada"));
     }
     private Conformity record(Long id, Long workspaceId, AuthenticatedUser principal) {
-        return repository.findRecordInScope(id, workspaceId, principal.firebaseUid()).orElseThrow(() -> new ResourceNotFoundException("Conformidade não encontrada"));
+        return unitConformityRepository.findRecordInScope(id, workspaceId, principal.firebaseUid()).orElseThrow(() -> new ResourceNotFoundException("Conformidade não encontrada"));
     }
     private UnitConformityResponse details(Long id, Long workspaceId, AuthenticatedUser principal) {
-        return repository.findDetailsInScope(id, workspaceId, principal.firebaseUid()).map(mapper::toResponse)
+        return unitConformityRepository.findDetailsInScope(id, workspaceId, principal.firebaseUid()).map(unitConformityMapper::toResponse)
                 .orElseThrow(() -> new ResourceNotFoundException("Conformidade não encontrada"));
     }
     private void requireNr(Integer id, boolean current) {
-        NrCatalog nr = nrs.findLockedByCodeNr(id).orElseThrow(() -> new ResourceNotFoundException("NR não encontrada"));
+        NrCatalog nr = nrCatalogRepository.findLockedByCodeNr(id).orElseThrow(() -> new ResourceNotFoundException("NR não encontrada"));
         if (current && nr.isRevoked()) {
             throw new BusinessException("A NR não pode estar revogada");
         }
@@ -124,9 +124,9 @@ public class UnitConformityService {
     private void conflict(Long unitId, Integer nrId, Long excludedId) {
         boolean hasConflict;
         if (excludedId == null) {
-            hasConflict = repository.existsByTypeAndUnitIdAndNrIdAndApplicableTrue("UNIDADE", unitId, nrId);
+            hasConflict = unitConformityRepository.existsByTypeAndUnitIdAndNrIdAndApplicableTrue("UNIDADE", unitId, nrId);
         } else {
-            hasConflict = repository.existsByTypeAndUnitIdAndNrIdAndApplicableTrueAndIdNot("UNIDADE", unitId, nrId, excludedId);
+            hasConflict = unitConformityRepository.existsByTypeAndUnitIdAndNrIdAndApplicableTrueAndIdNot("UNIDADE", unitId, nrId, excludedId);
         }
         if (hasConflict) {
             throw new ConflictException("Já existe uma conformidade aplicável para esta unidade e NR");
