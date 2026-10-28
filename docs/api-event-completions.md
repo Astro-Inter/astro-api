@@ -20,7 +20,7 @@ e a incluem nas pendentes. Consulte [o contrato completo](api-events.md).
 
 `GET /events/collaborator/{eventId}` retorna os detalhes apenas para um participante autorizado e não altera estado. Para registrar a visualização, o cliente chama `PATCH /events/collaborator/{eventId}/viewed`; assim, `viewed` na listagem passa a `true` e a Home deixa de exibir o evento como novo. Essa operação não cria nem envia uma conclusão: `participationStatus` permanece `PENDENTE` até o colaborador enviar a conclusão para validação.
 
-`PATCH /events/{eventId}/participants/{participantId}/completion/rejection`
+`PATCH /events/{eventId}/participants/{participantId}/rejection`
 permite que o gestor criador rejeite uma conclusão pendente de evento no modo
 `COLABORADOR`, inclusive depois do término da turma. O corpo JSON exige
 `rejectionReason` não vazio. A operação grava status `REJEITADO`, a data de

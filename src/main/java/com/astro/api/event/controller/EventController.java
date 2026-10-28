@@ -220,7 +220,7 @@ public class EventController {
                 "Conclusão do participante registrada", completion, request.getRequestURI()));
     }
 
-    @PatchMapping("/{eventId}/participants/{participantId}/completion/rejection")
+    @PatchMapping("/{eventId}/participants/{participantId}/rejection")
     @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
     @Operation(summary = "Rejeita a conclusão enviada por um colaborador",
             description = "Exige justificativa não vazia e gestor criador do evento. Disponível para conclusão pendente em evento no modo COLABORADOR, mesmo após o término da turma.")
