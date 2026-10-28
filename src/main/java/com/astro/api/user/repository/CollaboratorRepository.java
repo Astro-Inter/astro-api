@@ -66,6 +66,19 @@ public interface CollaboratorRepository extends JpaRepository<User, Long> {
             @Param("firebaseUid") String firebaseUid, @Param("workspaceId") Long workspaceId);
 
     @Query(value = """
+            SELECT collaborator_id AS "collaboratorId",
+                   collaborator_name AS "collaboratorName",
+                   event_id AS "eventId",
+                   event_title AS "eventTitle",
+                   class_limit_date AS "classLimitDate",
+                   completion_status AS "completionStatus",
+                   event_status AS "eventStatus"
+            FROM fn_carrega_eventos_colaborador(:firebaseUid, :collaboratorId)
+            """, nativeQuery = true)
+    List<CollaboratorEventProjection> findEventsInScope(@Param("collaboratorId") Long collaboratorId,
+            @Param("firebaseUid") String firebaseUid);
+
+    @Query(value = """
             SELECT v.id_usuario AS id, v.nome AS name, v.email,
                    v.cargo_id AS "roleId", v.cargo AS "roleName",
                    v.unidade_id AS "unitId", v.unidade AS "unitName", v.status, v.tipo AS "userType"

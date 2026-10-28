@@ -92,6 +92,24 @@ da conformidade mais recente do usuário para cada NR vinculada ao cargo. NRs
 revogadas não são retornadas. A foto usa o serviço de avatar já compartilhado
 pelos demais endpoints de colaboradores.
 
+## Eventos por colaborador
+
+`GET /collaborators/{collaboratorId}/events` retorna as participações do
+colaborador em turmas de eventos, ordenadas pelo prazo da turma mais recente
+primeiro. A consulta aplica o mesmo workspace e as unidades autorizadas dos
+outros endpoints administrativos. Colaborador inexistente ou fora do escopo
+retorna 404; ID não positivo retorna 400. A lista pode ser vazia.
+
+Cada item contém `collaboratorId`, `collaboratorName`, `eventId`, `eventTitle`,
+`classLimitDate`, `completionStatus` e `eventStatus`. Eventos cancelados e
+concluídos permanecem na resposta. `completionStatus` segue os valores de
+`ParticipationStatus`: `PENDENTE` quando não há conclusão registrada,
+`EM_ANALISE` quando existe uma conclusão `PENDENTE`, além de `CONCLUIDO` e
+`REJEITADO`. `eventStatus` segue `EventStatus`.
+Os dados são fornecidos por `fn_carrega_eventos_colaborador(TEXT, BIGINT)`,
+provisionada fora do repositório da API. A função deve estar instalada no banco
+antes de implantar esta versão.
+
 ## Cadastro — SCRUM-520
 
 `POST /collaborators` recebe todos os campos obrigatórios:

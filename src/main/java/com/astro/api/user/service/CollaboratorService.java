@@ -4,6 +4,7 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
 import com.astro.api.user.dto.response.CollaboratorPendingCountResponse;
 import com.astro.api.user.dto.response.CollaboratorProfileResponse;
+import com.astro.api.user.dto.response.CollaboratorEventResponse;
 import com.astro.api.user.dto.response.UserProfileResponse;
 import com.astro.api.user.mapper.CollaboratorMapper;
 import com.astro.api.user.repository.CollaboratorRepository;
@@ -138,6 +139,18 @@ public class CollaboratorService {
         Long pendingCount = collaboratorRepository.findPendingCountById(principal.firebaseUid(), collaboratorId);
         List<UserProfileResponse.NrProfileResponse> nrs = userService.findNrsByUserId(collaboratorId);
         return collaboratorMapper.toProfile(row, profilePhotoUrl, pendingCount, nrs);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CollaboratorEventResponse> findEventsById(Long collaboratorId, AuthenticatedUser principal) {
+        User manager = requireManager(principal);
+        checkId(collaboratorId);
+        collaboratorRepository.findDetailsInScope(collaboratorId, principal.firebaseUid(), manager.getUnit().workspace.id)
+                .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
+        return collaboratorRepository.findEventsInScope(collaboratorId, principal.firebaseUid())
+                .stream()
+                .map(collaboratorMapper::toEvent)
+                .toList();
     }
 
     private void checkId(Long collaboratorId) {
