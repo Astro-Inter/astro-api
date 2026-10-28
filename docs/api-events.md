@@ -10,7 +10,8 @@ Eventos inexistentes ou de outro workspace retornam 404; falta de autenticação
 | Método e rota | Contrato |
 | --- | --- |
 | `GET /events/{eventId}` | Detalhe completo, autoria, configurações, todas as turmas e participações |
-| `GET /events/manager/{eventId}` | Detalhes para evento com conclusão pelo gestor; inclui quantidade de participantes e prazo da última turma |
+| `GET /events/details/{eventId}/manager-conclusion/` | Detalhes para evento com conclusão pelo gestor; inclui quantidade de participantes e prazo da última turma |
+| `GET /events/details/{eventId}/collaborator-conclusion` | Detalhes para o gestor acompanhar conclusão pelo colaborador, com métricas de validação e envio |
 | `GET /events/{eventId}/participants` | Lista participantes do evento, título e status de conclusão individual |
 | `GET /events/{eventId}/participants/{participantId}` | Consulta os dados de um participante para conclusão pelo gestor |
 | `POST /events/{eventId}/participants/{participantId}/completion` | Registra a conclusão do participante pelo gestor |
@@ -40,13 +41,56 @@ participantes, por nome e ID do usuário. Listas vazias são `[]`.
 Cancelados e concluídos continuam consultáveis com todas essas permissões falsas.
 As flags orientam a interface; a autorização é reaplicada nas escritas.
 
-`GET /events/manager/{eventId}` é uma resposta própria para o fluxo de conclusão
+`GET /events/details/{eventId}/manager-conclusion/` é uma resposta própria para o fluxo de conclusão
 pelo gestor e não altera o contrato de `GET /events/{eventId}`. Retorna `eventId`,
 `eventTitle`, `eventDescription`, `externalLink`, `participantCount`,
 `lastClassLimitDate`, `completionMode`, `managerId` e `managerName`.
 `participantCount` é a quantidade de usuários distintos participantes;
 `lastClassLimitDate` é a maior data de término entre as turmas. Quando não houver
 turmas, o prazo é `null`. A validade não faz parte desta resposta.
+
+A rota anterior `GET /events/manager/{eventId}` foi substituída por
+`GET /events/details/{eventId}/manager-conclusion/`; clientes devem atualizar a URL.
+
+`GET /events/details/{eventId}/collaborator-conclusion` é a visão do gestor para
+eventos com `completionMode = COLABORADOR`. Exige gestor ativo (`GESTOR` ou
+`GESTOR_WORKSPACE`) e permite consultar eventos de qualquer gestor do mesmo
+workspace, inclusive cancelados ou concluídos. Evento fora do workspace ou
+inexistente retorna 404; modo de conclusão diferente de `COLABORADOR` ou
+identificador não positivo retorna 400.
+
+Retorna todos os campos de `ManagerCompletionModeEventDetailsResponse` e acrescenta:
+
+- `pendingValidationCount`: usuários com conclusão no estado atual `PENDENTE`.
+- `validatedCount`: usuários com conclusão `CONCLUIDO` ou `REJEITADO`.
+- `notSubmittedCount`: usuários participantes que não têm registro de conclusão.
+
+As métricas contam usuários distintos de todas as turmas do evento, sem filtro de
+prazo ou status do participante. Rejeitados permanecem em `validatedCount` até
+reenviar; o reenvio muda a conclusão para `PENDENTE`, retirando-a de
+`validatedCount` e incluindo-a em `pendingValidationCount`. Não é um histórico de
+ações de validação. O fluxo impede o mesmo usuário em turmas diferentes do mesmo
+evento. Sem participantes, as contagens são zero; sem turmas, `lastClassLimitDate`
+é `null`. A consulta não altera estado.
+
+Exemplo de `data`:
+
+```json
+{
+  "eventId": 42,
+  "eventTitle": "Treinamento",
+  "eventDescription": "Orientações de segurança",
+  "externalLink": null,
+  "participantCount": 10,
+  "lastClassLimitDate": "2026-11-05T12:00:00",
+  "completionMode": "COLABORADOR",
+  "managerId": 7,
+  "managerName": "Gestor",
+  "pendingValidationCount": 3,
+  "validatedCount": 5,
+  "notSubmittedCount": 2
+}
+```
 
 `GET /events/{eventId}/participants` exige perfil `GESTOR` ou `GESTOR_WORKSPACE`
 ativo e consulta o evento no workspace autenticado. Retorna uma lista no envelope

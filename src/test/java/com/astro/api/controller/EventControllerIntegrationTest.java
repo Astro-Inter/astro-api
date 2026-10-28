@@ -12,6 +12,8 @@ import com.astro.api.event.dto.request.CreateEventRequest;
 import com.astro.api.event.dto.request.UpdateEventClassRequest;
 import com.astro.api.event.dto.request.UpdateEventRequest;
 import com.astro.api.event.dto.response.CollaboratorEventResponse;
+import com.astro.api.event.dto.response.CollaboratorCompletionModeEventDetailsResponse;
+import com.astro.api.event.dto.response.ManagerCompletionModeEventDetailsResponse;
 import com.astro.api.event.dto.response.EventCalendarResponse;
 import com.astro.api.event.dto.response.EventCandidateResponse;
 import com.astro.api.event.dto.response.EventCompletionResponse;
@@ -76,6 +78,54 @@ class EventControllerIntegrationTest {
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new AuthenticatedUserArgumentResolver())
                 .build();
+    }
+
+    @Test
+    void returnsDetailsForBothCompletionModesUsingStandardEnvelope() throws Exception {
+        LocalDateTime deadline = LocalDateTime.of(2026, 11, 5, 12, 0);
+        when(eventService.findDetailsForManager(1L, "integration-manager"))
+                .thenReturn(new ManagerCompletionModeEventDetailsResponse(1L, "Event", "Description",
+                        "https://example.com", 4, deadline, CompletionMode.GESTOR, 9L, "Manager"));
+        when(eventService.findDetailsForCollaboratorCompletion(2L, "integration-manager"))
+                .thenReturn(new CollaboratorCompletionModeEventDetailsResponse(2L, "Event", "Description",
+                        "https://example.com", 4, deadline, CompletionMode.COLABORADOR, 9L, "Manager", 1, 2, 1));
+
+        mockMvc.perform(get("/events/details/1/manager-conclusion/"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.path").value("/events/details/1/manager-conclusion/"))
+                .andExpect(jsonPath("$.data.eventId").value(1))
+                .andExpect(jsonPath("$.data.participantCount").value(4))
+                .andExpect(jsonPath("$.data.completionMode").value("GESTOR"))
+                .andExpect(jsonPath("$.data.pendingValidationCount").doesNotExist());
+        mockMvc.perform(get("/events/details/2/collaborator-conclusion"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.path").value("/events/details/2/collaborator-conclusion"))
+                .andExpect(jsonPath("$.data.eventId").value(2))
+                .andExpect(jsonPath("$.data.participantCount").value(4))
+                .andExpect(jsonPath("$.data.completionMode").value("COLABORADOR"))
+                .andExpect(jsonPath("$.data.managerId").value(9))
+                .andExpect(jsonPath("$.data.pendingValidationCount").value(1))
+                .andExpect(jsonPath("$.data.validatedCount").value(2))
+                .andExpect(jsonPath("$.data.notSubmittedCount").value(1));
+    }
+
+    @Test
+    void collaboratorCompletionDetailsReturnStandardErrors() throws Exception {
+        when(eventService.findDetailsForCollaboratorCompletion(1L, "integration-manager"))
+                .thenThrow(new BusinessException("Este evento não permite conclusão pelo colaborador"));
+        when(eventService.findDetailsForCollaboratorCompletion(2L, "integration-manager"))
+                .thenThrow(new ResourceNotFoundException("Evento não encontrado"));
+
+        mockMvc.perform(get("/events/details/1/collaborator-conclusion"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+        mockMvc.perform(get("/events/details/2/collaborator-conclusion"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
+        mockMvc.perform(get("/events/details/invalid/collaborator-conclusion"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

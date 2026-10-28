@@ -23,6 +23,7 @@ import com.astro.api.event.dto.response.EventEvidenceResponse;
 import com.astro.api.event.dto.response.EventParticipantStatusResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.dto.response.ManagerCompletionModeEventDetailsResponse;
+import com.astro.api.event.dto.response.CollaboratorCompletionModeEventDetailsResponse;
 import com.astro.api.event.dto.response.MyEventResponse;
 import com.astro.api.event.dto.response.ManagerEventParticipantDetailsResponse;
 import com.astro.api.event.mapper.EventMapper;
@@ -39,6 +40,7 @@ import com.astro.api.event.repository.EventCandidateRepository;
 import com.astro.api.event.repository.EventClassParticipantRepository;
 import com.astro.api.event.repository.EventClassRepository;
 import com.astro.api.event.repository.EventCompletionRepository;
+import com.astro.api.event.repository.EventCompletionMetricsProjection;
 import com.astro.api.event.repository.EventEvidenceRepository;
 import com.astro.api.event.repository.EventRepository;
 import com.astro.api.role.repository.RoleRepository;
@@ -167,6 +169,18 @@ public class EventService {
 
         return eventMapper.toManagerCompletionModeEventDetailsResponse(
                 eventMapper.toCommonEventDetails(event), lastClassLimitDate, participantCount);
+    }
+
+    @Transactional(readOnly = true)
+    public CollaboratorCompletionModeEventDetailsResponse findDetailsForCollaboratorCompletion(
+            Long eventId, String firebaseUid) {
+        ManagerCompletionModeEventDetailsResponse details = findDetailsForManager(eventId, firebaseUid);
+        if (details.completionMode() != CompletionMode.COLABORADOR) {
+            throw new BusinessException("Este evento não permite conclusão pelo colaborador");
+        }
+        EventCompletionMetricsProjection metrics = eventClassParticipantRepository
+                .findCompletionMetricsByEventId(eventId);
+        return eventMapper.toCollaboratorCompletionModeEventDetailsResponse(details, metrics);
     }
 
     @Transactional(readOnly = true)
