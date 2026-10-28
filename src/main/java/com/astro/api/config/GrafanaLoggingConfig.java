@@ -2,6 +2,7 @@ package com.astro.api.config;
 
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.exporter.otlp.http.logs.OtlpHttpLogRecordExporter;
+import io.opentelemetry.exporter.otlp.http.logs.OtlpHttpLogRecordExporterBuilder;
 import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import io.opentelemetry.sdk.logs.SdkLoggerProvider;
 import io.opentelemetry.sdk.logs.export.BatchLogRecordProcessor;
@@ -28,7 +29,7 @@ public class GrafanaLoggingConfig {
         String endpoint = environment.getRequiredProperty("OTEL_EXPORTER_OTLP_ENDPOINT").trim();
         String headers = environment.getRequiredProperty("OTEL_EXPORTER_OTLP_HEADERS").trim();
 
-        var exporter = OtlpHttpLogRecordExporter.builder()
+        OtlpHttpLogRecordExporterBuilder exporter = OtlpHttpLogRecordExporter.builder()
                 .setEndpoint(logsEndpoint(endpoint));
         for (String entry : headers.split(",")) {
             int separator = entry.indexOf('=');
