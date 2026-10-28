@@ -16,6 +16,7 @@ import com.astro.api.event.dto.response.ManagerCompletionModeEventDetailsRespons
 import com.astro.api.event.dto.response.CollaboratorCompletionModeEventDetailsResponse;
 import com.astro.api.event.dto.response.MyEventResponse;
 import com.astro.api.event.dto.response.ManagerEventParticipantDetailsResponse;
+import com.astro.api.event.dto.response.ManagerCollaboratorCompletionDetailsResponse;
 import com.astro.api.event.service.EventService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -145,7 +146,7 @@ public class EventController {
                 "Participantes retornados com sucesso", participants, request.getRequestURI()));
     }
 
-    @GetMapping("/{eventId}/participants/{participantId}")
+    @GetMapping("/participant/{participantId}/manager-conclusion/{eventId}")
     @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
     @Operation(summary = "Consulta os dados de um participante para conclusão pelo gestor",
             description = "Exige gestor ativo e evento no workspace autenticado. participantId é o ID do usuário participante.")
@@ -157,16 +158,42 @@ public class EventController {
             @ApiResponse(responseCode = "404", description = "Evento fora do workspace ou participante não vinculado ao evento")
     })
     public ResponseEntity<ApiResult<ManagerEventParticipantDetailsResponse>> findParticipantDetailsForManager(
-            @Parameter(description = "ID persistido do evento no workspace autenticado", example = "1", schema = @Schema(minimum = "1"))
-            @PathVariable Long eventId,
             @Parameter(description = "ID do usuário participante", example = "25", schema = @Schema(minimum = "1"))
             @PathVariable Long participantId,
+            @Parameter(description = "ID persistido do evento no workspace autenticado", example = "1", schema = @Schema(minimum = "1"))
+            @PathVariable Long eventId,
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             HttpServletRequest request) {
         ManagerEventParticipantDetailsResponse participant = eventService.findParticipantDetailsForManager(
-                eventId, participantId, authenticatedUser.firebaseUid());
+                participantId, eventId, authenticatedUser.firebaseUid());
         return ResponseEntity.ok(ApiResult.success(
                 "Dados do participante retornados com sucesso", participant, request.getRequestURI()));
+    }
+
+    @GetMapping("/participant/{participantId}/collaborator-conclusion/{eventId}")
+    @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
+    @Operation(summary = "Consulta os detalhes da conclusão enviada pelo colaborador",
+            description = "Exige gestor ativo e evento no workspace autenticado, em modo COLABORADOR, com conclusão registrada. Retorna a foto do participante e URLs temporárias das evidências.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Detalhes da conclusão retornados no envelope ApiResult"),
+            @ApiResponse(responseCode = "400", description = "Evento não permite conclusão pelo colaborador"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado"),
+            @ApiResponse(responseCode = "403", description = "Gestor ativo necessário"),
+            @ApiResponse(responseCode = "404", description = "Evento, participação ou conclusão não encontrada"),
+            @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
+    })
+    public ResponseEntity<ApiResult<ManagerCollaboratorCompletionDetailsResponse>> findCollaboratorCompletionDetails(
+            @Parameter(description = "ID do usuário participante", example = "25", schema = @Schema(minimum = "1"))
+            @PathVariable Long participantId,
+            @Parameter(description = "ID persistido do evento no workspace autenticado", example = "1", schema = @Schema(minimum = "1"))
+            @PathVariable Long eventId,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            HttpServletRequest request) {
+        ManagerCollaboratorCompletionDetailsResponse completion =
+                eventService.findCollaboratorCompletionDetailsForManager(
+                        participantId, eventId, authenticatedUser.firebaseUid());
+        return ResponseEntity.ok(ApiResult.success(
+                "Detalhes da conclusão retornados com sucesso", completion, request.getRequestURI()));
     }
 
     @PostMapping("/{eventId}/participants/{participantId}/completion")

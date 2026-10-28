@@ -9,6 +9,7 @@ import com.astro.api.event.dto.response.EventEvidenceResponse;
 import com.astro.api.event.dto.response.EventParticipantResponse;
 import com.astro.api.event.dto.response.EventParticipantStatusResponse;
 import com.astro.api.event.dto.response.ManagerEventParticipantDetailsResponse;
+import com.astro.api.event.dto.response.ManagerCollaboratorCompletionDetailsResponse;
 import com.astro.api.event.dto.response.EventResponse;
 import com.astro.api.event.dto.response.ManagerCompletionModeEventDetailsResponse;
 import com.astro.api.event.dto.response.CollaboratorCompletionModeEventDetailsResponse;
@@ -147,6 +148,24 @@ public class EventMapper {
                 participation.getUser().getRole() == null ? null : participation.getUser().getRole().getName(),
                 participation.getUser().getUnit() == null ? null : participation.getUser().getUnit().name,
                 participation.getEventClass().getEndDate());
+    }
+
+    public ManagerCollaboratorCompletionDetailsResponse toManagerCollaboratorCompletionDetailsResponse(
+            EventClassParticipant participation,
+            String profilePhotoUrl,
+            EventCompletion completion,
+            List<EventEvidenceResponse> evidences) {
+        Event event = participation.getEventClass().getEvent();
+        return new ManagerCollaboratorCompletionDetailsResponse(
+                profilePhotoUrl,
+                participation.getUser().getName(),
+                participation.getUser().getRole() == null ? null : participation.getUser().getRole().getName(),
+                participation.getUser().getUnit() == null ? null : participation.getUser().getUnit().name,
+                completion.getCompletionDate(),
+                participation.getEventClass().getEndDate(),
+                event.isMandatoryEvidence(),
+                evidences,
+                event.getTitle());
     }
 
     public CommonEventDetails toCommonEventDetails(Event event) {
