@@ -4,5 +4,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.time.LocalDate;
 
-public record CreateUnitConformityRequest(@NotNull @Positive Long unitId,
-        @NotNull @Positive Integer nrId, LocalDate expiresAt) {}
+public record CreateUnitConformityRequest(
+        @NotNull(message = "{conformity.unitId.notNull}")
+        @Positive(message = "{conformity.unitId.positive}") Long unitId,
+        @NotNull(message = "{conformity.nrId.notNull}")
+        @Positive(message = "{conformity.nrId.positive}") Integer nrId,
+        LocalDate expiresAt) {}
