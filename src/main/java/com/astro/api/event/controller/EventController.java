@@ -192,7 +192,7 @@ public class EventController {
                 "Conclusão do participante registrada", completion, request.getRequestURI()));
     }
 
-    @GetMapping("/details/{eventId}/manager-conclusion/")
+    @GetMapping("/details/{eventId}/manager-conclusion")
     @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
     @Operation(summary = "Retorna os detalhes de um evento para conclusão pelo gestor",
             description = "Consulta no workspace autenticado. Retorna participantes, link externo, modo de conclusão e o prazo de término da última turma. A validade não é retornada neste fluxo.")
