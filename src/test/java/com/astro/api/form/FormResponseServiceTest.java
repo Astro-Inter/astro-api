@@ -55,7 +55,7 @@ class FormResponseServiceTest {
         service = new FormResponseService(repository, new FormAccessService(users),
                 new FormAnswerValidationService(List.of(new TextAnswerStrategy(), new DateAnswerStrategy(),
                         new OptionAnswerStrategy(), new PhotoAnswerStrategy()), factory.getValidator()),
-                new FormAnswerMapper(), new FormResponseMapper(new FormMapper()), storage, users, unitRepository, factory.getValidator(), new FormLocationService(unitRepository), viewedService);
+                new FormAnswerMapper(), new FormResponseMapper(new FormMapper()), storage, users, unitRepository, factory.getValidator(), new FormLocationService(unitRepository), viewedService, mock(com.astro.api.conformity.service.FormConformityService.class));
         form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.PENDING); form.setVersion(0L);
         form.getQuestions().getFirst().setType("texto"); form.getQuestions().getFirst().setRequired(true);
         when(repository.findById(eq(form.getId()), any(FormReadFilter.class))).thenReturn(Optional.of(form));
