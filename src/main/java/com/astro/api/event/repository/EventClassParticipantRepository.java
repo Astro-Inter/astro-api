@@ -25,9 +25,6 @@ public interface EventClassParticipantRepository extends JpaRepository<EventClas
     Optional<EventClassParticipant> findFirstByEventClass_Event_IdAndUser_Id(Long eventId, Long userId);
 
     @EntityGraph(attributePaths = {"user", "user.role", "user.unit", "eventClass", "eventClass.event"})
-    Optional<EventClassParticipant> findByIdAndEventClass_Event_Id(Long id, Long eventId);
-
-    @EntityGraph(attributePaths = {"user", "user.role", "user.unit", "eventClass", "eventClass.event"})
     Optional<EventClassParticipant> findFirstByEventClass_Event_IdAndUser_IdOrderByEventClass_EndDateDesc(
             Long eventId, Long userId);
 

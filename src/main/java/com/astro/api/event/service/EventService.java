@@ -204,23 +204,23 @@ public class EventService {
 
     @Transactional(readOnly = true)
     public ManagerEventParticipantDetailsResponse findParticipantDetailsForManager(
-            Long participationId, Long eventId, String firebaseUid) {
+            Long participantId, Long eventId, String firebaseUid) {
         User manager = findAuthenticatedManager(firebaseUid);
         findEventInWorkspace(eventId, getWorkspace(manager));
         EventClassParticipant participation = eventClassParticipantRepository
-                .findByIdAndEventClass_Event_Id(participationId, eventId)
+                .findFirstByEventClass_Event_IdAndUser_IdOrderByEventClass_EndDateDesc(eventId, participantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Participante não encontrado no evento"));
-        String profilePhotoUrl = userAvatarService.findUrl(participation.getUser().getId());
+        String profilePhotoUrl = userAvatarService.findUrl(participantId);
         return eventMapper.toManagerEventParticipantDetailsResponse(participation, profilePhotoUrl);
     }
 
     @Transactional(readOnly = true)
     public ManagerCollaboratorCompletionDetailsResponse findCollaboratorCompletionDetailsForManager(
-            Long participationId, Long eventId, String firebaseUid) {
+            Long participantId, Long eventId, String firebaseUid) {
         User manager = findAuthenticatedManager(firebaseUid);
         findEventInWorkspace(eventId, getWorkspace(manager));
         EventClassParticipant participation = eventClassParticipantRepository
-                .findByIdAndEventClass_Event_Id(participationId, eventId)
+                .findFirstByEventClass_Event_IdAndUser_IdOrderByEventClass_EndDateDesc(eventId, participantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Participante não encontrado no evento"));
         Event event = participation.getEventClass().getEvent();
         if (event.getCompletionMode() != CompletionMode.COLABORADOR) {
@@ -233,7 +233,7 @@ public class EventService {
                 .map(evidence -> eventMapper.toEvidenceResponse(
                         evidence, storageService.getEventEvidenceDownloadUrl(evidence.getObjectPath())))
                 .toList();
-        String profilePhotoUrl = userAvatarService.findUrl(participation.getUser().getId());
+        String profilePhotoUrl = userAvatarService.findUrl(participantId);
         return eventMapper.toManagerCollaboratorCompletionDetailsResponse(
                 participation, profilePhotoUrl, completion, evidences);
     }
