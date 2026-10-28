@@ -4,6 +4,7 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
 import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
 import com.astro.api.user.dto.response.CollaboratorPendingCountResponse;
+import com.astro.api.user.dto.response.CollaboratorProfileResponse;
 import com.astro.api.user.dto.request.CreateCollaboratorRequest;
 import com.astro.api.user.dto.request.UpdateCollaboratorRequest;
 import com.astro.api.user.dto.request.CollaboratorStatusRequest;
@@ -72,6 +73,18 @@ public class CollaboratorController {
             HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Colaborador retornado com sucesso",
                 service.findById(collaboratorId, user), request.getRequestURI()));
+    }
+
+    @GetMapping("/{collaboratorId}/profile")
+    @Operation(summary = "Consulta o perfil de um colaborador pelo ID",
+            description = "Retorna nome, cargo, foto, unidade, modalidade, e-mail, quantidade de eventos pendentes atribuídos e não respondidos e as NRs ativas vinculadas ao cargo com validade individual. Aceita COLABORADOR, GESTOR e GESTOR_WORKSPACE; restringe a consulta ao workspace e às unidades autorizadas do gestor autenticado.")
+    @ApiResponses({@ApiResponse(responseCode = "200", description = "Perfil retornado"),
+            @ApiResponse(responseCode = "404", description = "Colaborador inexistente ou fora do escopo")})
+    public ResponseEntity<ApiResult<CollaboratorProfileResponse>> findProfileById(
+            @PathVariable Long collaboratorId, @AuthenticationPrincipal AuthenticatedUser user,
+            HttpServletRequest request) {
+        return ResponseEntity.ok(ApiResult.success("Perfil do colaborador retornado com sucesso",
+                service.findProfileById(collaboratorId, user), request.getRequestURI()));
     }
 
     @PostMapping

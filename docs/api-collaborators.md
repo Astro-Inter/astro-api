@@ -74,6 +74,24 @@ ser consultados. Registros inexistentes e usuários fora do escopo retornam 404,
 existência. IDs não positivos retornam 400. A rota atende informações e edição,
 sem alterar o endpoint de perfil próprio `/user/me`.
 
+## Perfil por ID
+
+`GET /collaborators/{collaboratorId}/profile` retorna `id`, `name`, `roleName`,
+`profilePhotoUrl`, `unitName`, `workModel`, `email`, `pendingCount` e `nrs` para
+um usuário do tipo `COLABORADOR`, `GESTOR` ou `GESTOR_WORKSPACE`. Exige gestor
+ativo autenticado e aplica o mesmo workspace e as unidades autorizadas de
+`GET /collaborators/{collaboratorId}`. IDs não positivos retornam 400; usuário
+inexistente ou fora do escopo retorna 404.
+
+`pendingCount` segue a contagem da Home do gestor em
+`fn_carrega_colaboradores(TEXT)` e retorna a contagem do ID solicitado. A função
+existente já implementa a regra de eventos atribuídos ainda pendentes; não é
+necessário criar uma função SQL nova para este contrato. `nrs` usa o mesmo formato de `/user/me`:
+`code`, `validade`, `descricao`, `objetivo` e `aplicabilidade`. A validade vem
+da conformidade mais recente do usuário para cada NR vinculada ao cargo. NRs
+revogadas não são retornadas. A foto usa o serviço de avatar já compartilhado
+pelos demais endpoints de colaboradores.
+
 ## Cadastro — SCRUM-520
 
 `POST /collaborators` recebe todos os campos obrigatórios:

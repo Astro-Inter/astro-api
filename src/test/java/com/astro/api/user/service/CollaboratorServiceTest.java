@@ -48,8 +48,9 @@ class CollaboratorServiceTest {
     final FirebaseIdentityService identities = mock(FirebaseIdentityService.class);
     final PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
     final UserAvatarService avatars = mock(UserAvatarService.class);
+    final UserService userService = mock(UserService.class);
     final CollaboratorService service = new CollaboratorService(repository, users, new CollaboratorMapper(), roles, units,
-            events, identities, new CollaboratorStatusPolicy(), transactionManager, avatars);
+            events, identities, new CollaboratorStatusPolicy(), transactionManager, avatars, userService);
     final AuthenticatedUser principal = new AuthenticatedUser("manager", "manager@example.com", Role.GESTOR);
     User manager;
     Workspace workspace;

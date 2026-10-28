@@ -8,6 +8,7 @@ import com.astro.api.user.dto.request.CreateCollaboratorRequest;
 import com.astro.api.user.dto.request.UpdateCollaboratorRequest;
 import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
 import com.astro.api.user.dto.response.CollaboratorPendingCountResponse;
+import com.astro.api.user.dto.response.CollaboratorProfileResponse;
 import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
 import com.astro.api.user.model.CollaboratorImportData;
 import com.astro.api.user.model.CollaboratorImportRow;
@@ -18,6 +19,8 @@ import com.astro.api.user.model.WorkModel;
 import com.astro.api.user.repository.CollaboratorDetailsProjection;
 import com.astro.api.user.repository.CollaboratorPendingCountProjection;
 import com.astro.api.user.repository.CollaboratorSummaryProjection;
+import com.astro.api.user.dto.response.UserProfileResponse;
+import java.util.List;
 import java.time.Instant;
 import java.util.Locale;
 import org.springframework.stereotype.Component;
@@ -97,6 +100,14 @@ public class CollaboratorMapper {
     public CollaboratorPendingCountResponse toPendingCount(CollaboratorPendingCountProjection row, String profilePhotoUrl) {
         return new CollaboratorPendingCountResponse(row.getId(), row.getName(), profilePhotoUrl,
                 row.getRoleName(), row.getPendingCount());
+    }
+
+    public CollaboratorProfileResponse toProfile(CollaboratorDetailsProjection row, String profilePhotoUrl,
+                                                 Long pendingCount,
+                                                 List<UserProfileResponse.NrProfileResponse> nrs) {
+        WorkModel workModel = row.getWorkModel() == null ? null : WorkModel.valueOf(row.getWorkModel());
+        return new CollaboratorProfileResponse(row.getId(), row.getName(), row.getRoleName(), profilePhotoUrl,
+                row.getUnitName(), workModel, row.getEmail(), pendingCount, nrs);
     }
 
 }
