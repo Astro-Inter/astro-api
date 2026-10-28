@@ -76,4 +76,11 @@ public interface CollaboratorRepository extends JpaRepository<User, Long> {
             """, nativeQuery = true)
     List<CollaboratorSummaryProjection> findAllInScope(@Param("firebaseUid") String firebaseUid,
                                                      @Param("workspaceId") Long workspaceId);
+
+    @Query(value = """
+            SELECT id_usuario AS "id", nome AS "name", cargo AS "roleName",
+                   quantidade_pendencias AS "pendingCount"
+            FROM fn_carrega_colaboradores(:firebaseUid)
+            """, nativeQuery = true)
+    List<CollaboratorPendingCountProjection> findPendingCountInScope(@Param("firebaseUid") String firebaseUid);
 }

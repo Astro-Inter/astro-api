@@ -7,6 +7,7 @@ import com.astro.api.unit.model.Unit;
 import com.astro.api.user.dto.request.CreateCollaboratorRequest;
 import com.astro.api.user.dto.request.UpdateCollaboratorRequest;
 import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
+import com.astro.api.user.dto.response.CollaboratorPendingCountResponse;
 import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
 import com.astro.api.user.model.CollaboratorImportData;
 import com.astro.api.user.model.CollaboratorImportRow;
@@ -15,6 +16,7 @@ import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.model.WorkModel;
 import com.astro.api.user.repository.CollaboratorDetailsProjection;
+import com.astro.api.user.repository.CollaboratorPendingCountProjection;
 import com.astro.api.user.repository.CollaboratorSummaryProjection;
 import java.time.Instant;
 import java.util.Locale;
@@ -90,6 +92,11 @@ public class CollaboratorMapper {
         return new CollaboratorSummaryResponse(row.getId(), row.getName(), row.getEmail(),
                 row.getRoleId(), row.getRoleName(), row.getUnitId(), row.getUnitName(),
                 UserStatus.valueOf(row.getStatus()), profilePhotoUrl, initials(row.getName()), canManage);
+    }
+
+    public CollaboratorPendingCountResponse toPendingCount(CollaboratorPendingCountProjection row, String profilePhotoUrl) {
+        return new CollaboratorPendingCountResponse(row.getId(), row.getName(), profilePhotoUrl,
+                row.getRoleName(), row.getPendingCount());
     }
 
 }

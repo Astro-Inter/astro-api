@@ -2,8 +2,10 @@ package com.astro.api.user.service;
 
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
+import com.astro.api.user.dto.response.CollaboratorPendingCountResponse;
 import com.astro.api.user.mapper.CollaboratorMapper;
 import com.astro.api.user.repository.CollaboratorRepository;
+import com.astro.api.user.repository.CollaboratorPendingCountProjection;
 import com.astro.api.user.repository.CollaboratorSummaryProjection;
 import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
 import com.astro.api.common.exception.BusinessException;
@@ -82,6 +84,16 @@ public class CollaboratorService {
         Map<Long, String> urls = userAvatarService.findUrls(rows.stream().map(row -> row.getId()).toList());
         return rows.stream().map(row -> collaboratorMapper.toSummary(row, urls.get(row.getId()),
                 canManage(manager, row.getId(), row.getUserType()))).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CollaboratorPendingCountResponse> findPendingCount(AuthenticatedUser principal) {
+        requireManager(principal);
+        List<CollaboratorPendingCountProjection> rows = collaboratorRepository.findPendingCountInScope(
+                principal.firebaseUid());
+        Map<Long, String> urls = userAvatarService.findUrls(rows.stream()
+                .map(CollaboratorPendingCountProjection::getId).toList());
+        return rows.stream().map(row -> collaboratorMapper.toPendingCount(row, urls.get(row.getId()))).toList();
     }
 
     private User requireManager(AuthenticatedUser principal) {
