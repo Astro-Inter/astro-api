@@ -23,6 +23,7 @@ import com.astro.api.user.repository.UserProfilePhotoRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -169,6 +170,13 @@ public class UserService {
                 .map(nr -> toNrProfile(nr, documentsById.get(nr.getNrId())))
                 .filter(java.util.Objects::nonNull)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserProfileResponse.NrProfileResponse> findNrsByUserId(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+        return findNrs(user);
     }
 
     private UserProfileResponse.NrProfileResponse toNrProfile(

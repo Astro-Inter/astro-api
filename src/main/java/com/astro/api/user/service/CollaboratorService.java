@@ -3,10 +3,13 @@ package com.astro.api.user.service;
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
 import com.astro.api.user.dto.response.CollaboratorPendingCountResponse;
+import com.astro.api.user.dto.response.CollaboratorProfileResponse;
+import com.astro.api.user.dto.response.UserProfileResponse;
 import com.astro.api.user.mapper.CollaboratorMapper;
 import com.astro.api.user.repository.CollaboratorRepository;
 import com.astro.api.user.repository.CollaboratorPendingCountProjection;
 import com.astro.api.user.repository.CollaboratorSummaryProjection;
+import com.astro.api.user.repository.CollaboratorDetailsProjection;
 import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
 import com.astro.api.common.exception.BusinessException;
 import com.astro.api.common.exception.ResourceNotFoundException;
@@ -51,13 +54,15 @@ public class CollaboratorService {
     private final CollaboratorStatusPolicy collaboratorStatusPolicy;
     private final TransactionTemplate transactionTemplate;
     private final UserAvatarService userAvatarService;
+    private final UserService userService;
 
     public CollaboratorService(CollaboratorRepository collaboratorRepository, UserRepository userRepository,
                                CollaboratorMapper collaboratorMapper, RoleRepository roleRepository,
                                UnitRepository unitRepository, ApplicationEventPublisher eventPublisher,
                                FirebaseIdentityService firebaseIdentityService,
                                CollaboratorStatusPolicy collaboratorStatusPolicy,
-                               PlatformTransactionManager transactionManager, UserAvatarService userAvatarService) {
+                               PlatformTransactionManager transactionManager, UserAvatarService userAvatarService,
+                               UserService userService) {
         this.collaboratorRepository = collaboratorRepository;
         this.userRepository = userRepository;
         this.collaboratorMapper = collaboratorMapper;
@@ -69,6 +74,7 @@ public class CollaboratorService {
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.userAvatarService = userAvatarService;
+        this.userService = userService;
     }
 
     @Transactional(readOnly = true)
@@ -119,6 +125,19 @@ public class CollaboratorService {
                 .map(row -> collaboratorMapper.toDetails(row, userAvatarService.findUrl(row.getId()),
                         canManage(manager, row.getId(), row.getUserType())))
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
+    }
+
+    @Transactional(readOnly = true)
+    public CollaboratorProfileResponse findProfileById(Long collaboratorId, AuthenticatedUser principal) {
+        User manager = requireManager(principal);
+        checkId(collaboratorId);
+        CollaboratorDetailsProjection row = collaboratorRepository.findDetailsInScope(
+                        collaboratorId, principal.firebaseUid(), manager.getUnit().workspace.id)
+                .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
+        String profilePhotoUrl = userAvatarService.findUrl(collaboratorId);
+        Long pendingCount = collaboratorRepository.findPendingCountById(principal.firebaseUid(), collaboratorId);
+        List<UserProfileResponse.NrProfileResponse> nrs = userService.findNrsByUserId(collaboratorId);
+        return collaboratorMapper.toProfile(row, profilePhotoUrl, pendingCount, nrs);
     }
 
     private void checkId(Long collaboratorId) {

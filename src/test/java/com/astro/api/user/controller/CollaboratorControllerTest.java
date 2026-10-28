@@ -4,6 +4,8 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.security.Role;
 import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
 import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
+import com.astro.api.user.dto.response.CollaboratorProfileResponse;
+import com.astro.api.user.dto.response.UserProfileResponse;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.user.model.WorkModel;
 import com.astro.api.user.dto.request.CreateCollaboratorRequest;
@@ -23,6 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
+import java.time.LocalDate;
 
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -87,6 +90,42 @@ class CollaboratorControllerTest {
                 .andExpect(jsonPath("$.data.firebaseUid").doesNotExist())
                 .andExpect(jsonPath("$.data.senha").doesNotExist())
                 .andExpect(jsonPath("$.data.password").doesNotExist());
+    }
+
+    @Test
+    void returnsProfileByIdWithPendingCountAndNrValidityDetails() throws Exception {
+        UserProfileResponse.NrProfileResponse nr = new UserProfileResponse.NrProfileResponse(
+                10, LocalDate.of(2027, 4, 30), "Segurança", "Prevenir acidentes", "Trabalho industrial");
+        when(service.findProfileById(2L, principal)).thenReturn(new CollaboratorProfileResponse(2L,
+                "Ana Silva", "Operadora", "https://r2.example.com/ana.jpg", "Matriz", WorkModel.HIBRIDO,
+                "ana@example.com", 3L, List.of(nr)));
+
+        mvc.perform(get("/collaborators/2/profile"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(2))
+                .andExpect(jsonPath("$.data.name").value("Ana Silva"))
+                .andExpect(jsonPath("$.data.roleName").value("Operadora"))
+                .andExpect(jsonPath("$.data.profilePhotoUrl").value("https://r2.example.com/ana.jpg"))
+                .andExpect(jsonPath("$.data.unitName").value("Matriz"))
+                .andExpect(jsonPath("$.data.workModel").value("HIBRIDO"))
+                .andExpect(jsonPath("$.data.email").value("ana@example.com"))
+                .andExpect(jsonPath("$.data.pendingCount").value(3))
+                .andExpect(jsonPath("$.data.nrs[0].code").value(10))
+                .andExpect(jsonPath("$.data.nrs[0].validade").value("2027-04-30"))
+                .andExpect(jsonPath("$.data.nrs[0].descricao").value("Segurança"))
+                .andExpect(jsonPath("$.data.nrs[0].objetivo").value("Prevenir acidentes"))
+                .andExpect(jsonPath("$.data.nrs[0].aplicabilidade").value("Trabalho industrial"));
+        verify(service).findProfileById(2L, principal);
+    }
+
+    @Test
+    void mapsMissingAndInvalidProfileIdsToExistingHttpErrors() throws Exception {
+        when(service.findProfileById(999L, principal))
+                .thenThrow(new ResourceNotFoundException("Colaborador não encontrado"));
+        mvc.perform(get("/collaborators/999/profile"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Colaborador não encontrado"));
+        mvc.perform(get("/collaborators/invalid/profile")).andExpect(status().isBadRequest());
     }
 
     @Test
