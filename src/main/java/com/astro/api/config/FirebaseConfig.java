@@ -7,14 +7,12 @@ import com.google.firebase.auth.FirebaseAuth;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Base64;
 
 @Configuration
-@Profile("!conformity-local")
 public class FirebaseConfig {
 
     @Value("${FIREBASE_CREDENTIALS_BASE64}")
