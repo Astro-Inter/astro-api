@@ -7,6 +7,7 @@ import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.exception.SpreadsheetImportException;
 import com.astro.api.common.model.SpreadsheetImportMessage;
 import com.astro.api.common.response.ApiResult;
+import com.astro.api.common.logging.SafeExceptionLogging;
 import com.mongodb.MongoTimeoutException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -183,7 +184,7 @@ public class GlobalExceptionHandler {
             MongoTimeoutException.class
     })
     public ResponseEntity<ApiResult<Void>> handleDatabaseConnectionFailure(Exception ex, HttpServletRequest request) {
-        LOGGER.error("Falha de conexão com banco de dados ao processar {}", request.getRequestURI(), ex);
+        SafeExceptionLogging.log(LOGGER, "database_connection_failed", "database_access", ex, request, false);
 
         return ResponseEntity
                 .status(HttpStatus.SERVICE_UNAVAILABLE)
@@ -197,8 +198,7 @@ public class GlobalExceptionHandler {
     // Violação no banco. Ex: UNIQUE ou FK.
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResult<Void>> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest request) {
-        LOGGER.warn("Conflito de integridade ao processar {}: {}", request.getRequestURI(),
-                ex.getMostSpecificCause().getMessage());
+        SafeExceptionLogging.log(LOGGER, "data_integrity_violation", "database_write", ex, request, true);
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
                 .body(ApiResult.error(
@@ -222,7 +222,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResult<Void>> handleGeneric(Exception ex, HttpServletRequest request) {
-        LOGGER.error("Erro interno ao processar a requisição para {}", request.getRequestURI(), ex);
+        SafeExceptionLogging.log(LOGGER, "internal_error", "http_request", ex, request, false);
 
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)

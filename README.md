@@ -331,3 +331,7 @@ No web, a verificação do gestor deve chamar `/verify-key?tipoConta=GESTOR_WORK
 Ao comparar rotas para tratar erros, considere apenas `path.split('?')[0]`.
 Disponibilize a API antes de atualizar o web e valide com um código gerado pelo worker implantado.
 A configuração e o contrato da versão implantada precisam ser conferidos antes da publicação.
+
+## Diagnóstico operacional
+
+Consulte [os campos e limites dos novos diagnósticos](docs/observability-diagnostics.md) para investigar falhas por requisição ou execução no Grafana.

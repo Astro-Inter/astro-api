@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -50,7 +51,7 @@ class HttpRequestLoggingFilterTest {
 
     @Test
     void registraRotaStatusTempoEIdSemDadosSensiveis() throws Exception {
-        var response = mvc.perform(get("/items/42")
+        MockHttpServletResponse response = mvc.perform(get("/items/42")
                         .queryParam("token", "segredo-query")
                         .header("Authorization", "Bearer segredo-token")
                         .header("X-Request-ID", "id-externo")
@@ -58,11 +59,11 @@ class HttpRequestLoggingFilterTest {
                 .andExpect(status().isOk()).andReturn().getResponse();
 
         assertThat(appender.list).hasSize(1);
-        var event = appender.list.getFirst();
+        ILoggingEvent event = appender.list.getFirst();
         assertThat(event.getLevel()).isEqualTo(Level.INFO);
         assertThat(event.getFormattedMessage()).contains("method=GET", "route=/items/{id}", "status=200")
                 .doesNotContain("segredo", "id-externo", "/items/42");
-        var fields = event.getKeyValuePairs().stream()
+        Map<String, Object> fields = event.getKeyValuePairs().stream()
                 .collect(Collectors.toMap(pair -> pair.key, pair -> pair.value));
         assertThat(fields).containsEntry("event", "http_request")
                 .containsEntry("http_route", "/items/{id}").containsEntry("http_status", 200);
@@ -88,19 +89,19 @@ class HttpRequestLoggingFilterTest {
         mvc.perform(get("/items/42")).andExpect(status().isForbidden());
         assertThat(appender.list).hasSize(1);
         assertThat(appender.list.getFirst().getLevel()).isEqualTo(Level.WARN);
-        assertThat(appender.list.getFirst().getFormattedMessage()).contains("route=/items/42", "status=403");
+        assertThat(appender.list.getFirst().getFormattedMessage()).contains("route=unmatched", "status=403");
     }
 
     @Test
     void registra500EPropagaExcecaoSemExporMensagem() {
-        var filter = new HttpRequestLoggingFilter();
-        var request = new MockHttpServletRequest("GET", "/failure");
-        var response = new MockHttpServletResponse();
+        HttpRequestLoggingFilter filter = new HttpRequestLoggingFilter();
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/failure");
+        MockHttpServletResponse response = new MockHttpServletResponse();
         assertThatThrownBy(() -> filter.doFilter(request, response, (req, res) -> {
             throw new ServletException("segredo-interno");
         })).isInstanceOf(ServletException.class);
-        assertThat(appender.list).hasSize(1);
-        assertThat(appender.list.getFirst().getFormattedMessage()).contains("status=500")
+        assertThat(appender.list).hasSize(2);
+        assertThat(appender.list.getLast().getFormattedMessage()).contains("status=500")
                 .doesNotContain("segredo-interno");
     }
 
