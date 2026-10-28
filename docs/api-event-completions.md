@@ -12,6 +12,13 @@ Se uma conclusão tiver sido rejeitada, um novo POST substitui todas as evidênc
 
 `GET /events/collaborator/{eventId}` retorna os detalhes apenas para um participante autorizado e não altera estado. Para registrar a visualização, o cliente chama `PATCH /events/collaborator/{eventId}/viewed`; assim, `viewed` na listagem passa a `true` e a Home deixa de exibir o evento como novo. Essa operação não cria nem envia uma conclusão: `participationStatus` permanece `PENDENTE` até o colaborador enviar a conclusão para validação.
 
+`PATCH /events/{eventId}/participants/{participantId}/completion/rejection`
+permite que o gestor criador rejeite uma conclusão pendente de evento no modo
+`COLABORADOR`, inclusive depois do término da turma. O corpo JSON exige
+`rejectionReason` não vazio. A operação grava status `REJEITADO`, a data de
+validação e a justificativa, e retorna `200` com `EventCompletionResponse` no
+envelope `ApiResult`. Uma solicitação não pendente não pode ser rejeitada.
+
 Exemplo:
 
 

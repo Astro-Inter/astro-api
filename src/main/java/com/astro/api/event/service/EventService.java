@@ -244,6 +244,28 @@ public class EventService {
         return eventMapper.toCompletionResponse(savedCompletion);
     }
 
+    @Transactional
+    public EventCompletionResponse rejectCollaboratorCompletionByManager(
+            Long eventId, Long participantId, String rejectionReason, String firebaseUid) {
+        User manager = findAuthenticatedManager(firebaseUid);
+        Event event = findEventInWorkspace(eventId, getWorkspace(manager));
+        ensureEventCreator(event, manager);
+        if (event.getCompletionMode() != CompletionMode.COLABORADOR) {
+            throw new BusinessException("Este evento não permite conclusão pelo colaborador");
+        }
+        EventClassParticipant participation = findEventParticipation(eventId, participantId);
+        EventCompletion completion = eventCompletionRepository.findLockedByParticipationId(participation.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Conclusão do participante não encontrada"));
+        ensureCompletionPending(completion);
+
+        LocalDateTime validationDate = LocalDateTime.now(clock);
+        completion.setStatus(EventCompletionStatus.REJEITADO);
+        completion.setValidationDate(validationDate);
+        completion.setExpirationDate(null);
+        completion.setRejectionReason(rejectionReason.trim());
+        return eventMapper.toCompletionResponse(eventCompletionRepository.save(completion));
+    }
+
     private LocalDate calculateCompletionExpiration(Integer nrId, LocalDate completionDate) {
         if (nrId == null) {
             return null;
@@ -803,10 +825,28 @@ public class EventService {
     }
 
     private void ensureManagerAndEditable(Event event, User manager) {
+        ensureEventCreator(event, manager);
+        ensureEditable(event);
+    }
+
+    private void ensureEventCreator(Event event, User manager) {
         if (!event.getManager().getId().equals(manager.getId())) {
             throw new AccessDeniedException("Operação não autorizada para este evento");
         }
-        ensureEditable(event);
+    }
+
+    private EventClassParticipant findEventParticipation(Long eventId, Long participantId) {
+        if (participantId == null || participantId <= 0) {
+            throw new BusinessException("Identificador do participante deve ser positivo");
+        }
+        return eventClassParticipantRepository.findByEventClass_Event_IdAndUser_Id(eventId, participantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Participante não encontrado no evento"));
+    }
+
+    private void ensureCompletionPending(EventCompletion completion) {
+        if (completion.getStatus() != EventCompletionStatus.PENDENTE) {
+            throw new BusinessException("A conclusão não está pendente de validação");
+        }
     }
 
     private void ensureEditable(Event event) {
