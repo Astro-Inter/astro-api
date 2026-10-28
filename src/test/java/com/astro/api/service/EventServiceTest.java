@@ -16,6 +16,8 @@ import com.astro.api.event.dto.request.UpdateEventClassRequest;
 import com.astro.api.event.dto.request.UpdateEventRequest;
 import com.astro.api.event.dto.response.CollaboratorEventDetailsResponse;
 import com.astro.api.event.dto.response.CollaboratorEventResponse;
+import com.astro.api.event.dto.response.CollaboratorCompletionModeEventDetailsResponse;
+import com.astro.api.event.dto.response.ManagerCompletionModeEventDetailsResponse;
 import com.astro.api.event.dto.response.EventCompletionResponse;
 import com.astro.api.event.dto.response.EventCalendarResponse;
 import com.astro.api.event.dto.response.EventCandidateResponse;
@@ -40,6 +42,7 @@ import com.astro.api.event.repository.EventCandidateRepository;
 import com.astro.api.event.repository.EventClassParticipantRepository;
 import com.astro.api.event.repository.EventClassRepository;
 import com.astro.api.event.repository.EventCompletionRepository;
+import com.astro.api.event.repository.EventCompletionMetricsProjection;
 import com.astro.api.event.repository.EventEvidenceRepository;
 import com.astro.api.event.repository.EventRepository;
 import com.astro.api.event.service.EventService;
@@ -663,6 +666,84 @@ class EventServiceTest {
         when(eventClassParticipantRepository.findByEventClass_Event_IdAndUser_Id(30L, 2L))
                 .thenReturn(Optional.of(participation));
         when(eventCompletionRepository.findByParticipation_Id(90L)).thenReturn(Optional.empty());
+    }
+
+    @Test
+    void sharesEventDetailsAndLastClassDeadlineAcrossCompletionModes() {
+        Event event = createEvent(EventStatus.ATIVO);
+        event.setCompletionMode(CompletionMode.COLABORADOR);
+        event.setDescription("Description");
+        event.setExternalLink("https://example.com/training");
+        User creator = createUser(99L, UserStatus.ATIVO, workspace);
+        event.setManager(creator);
+        LocalDateTime lastEndDate = LocalDateTime.of(2027, 1, 2, 12, 0);
+        List<EventClass> classes = List.of(
+                createEventClass(event, lastEndDate.minusDays(1), lastEndDate),
+                createEventClass(event, lastEndDate.minusDays(3), lastEndDate.minusDays(2)));
+        when(eventRepository.findByIdAndManager_Unit_Workspace(30L, workspace)).thenReturn(Optional.of(event));
+        when(eventClassRepository.findByEventOrderByStartDate(event)).thenReturn(classes);
+        when(eventClassParticipantRepository.countDistinctParticipantsByEventId(30L)).thenReturn(5L);
+        EventCompletionMetricsProjection metrics = mock(EventCompletionMetricsProjection.class);
+        when(metrics.getParticipantCount()).thenReturn(5L);
+        when(metrics.getPendingValidationCount()).thenReturn(2L);
+        when(metrics.getValidatedCount()).thenReturn(2L);
+        when(metrics.getNotSubmittedCount()).thenReturn(1L);
+        when(eventClassParticipantRepository.findCompletionMetricsByEventId(30L)).thenReturn(metrics);
+
+        ManagerCompletionModeEventDetailsResponse managerDetails = service.findDetailsForManager(30L, "manager");
+        CollaboratorCompletionModeEventDetailsResponse response = service.findDetailsForCollaboratorCompletion(30L, "manager");
+
+        assertEquals(new CollaboratorCompletionModeEventDetailsResponse(30L, "Event", "Description",
+                "https://example.com/training", 5L, lastEndDate, CompletionMode.COLABORADOR,
+                99L, "User 99", 2L, 2L, 1L), response);
+        assertEquals(managerDetails.lastClassLimitDate(), response.lastClassLimitDate());
+        assertEquals(managerDetails.participantCount(), response.participantCount());
+        assertEquals(managerDetails.managerId(), response.managerId());
+    }
+
+    @Test
+    void collaboratorCompletionDetailsWithoutClassesHaveNoDeadlineAndZeroMetrics() {
+        Event event = createEvent(EventStatus.CANCELADO);
+        event.setCompletionMode(CompletionMode.COLABORADOR);
+        manager.setType(UserType.GESTOR_WORKSPACE);
+        when(eventRepository.findByIdAndManager_Unit_Workspace(30L, workspace)).thenReturn(Optional.of(event));
+        when(eventClassRepository.findByEventOrderByStartDate(event)).thenReturn(List.of());
+        when(eventClassParticipantRepository.findCompletionMetricsByEventId(30L))
+                .thenReturn(mock(EventCompletionMetricsProjection.class));
+
+        CollaboratorCompletionModeEventDetailsResponse response = service.findDetailsForCollaboratorCompletion(30L, "manager");
+
+        Assertions.assertNull(response.lastClassLimitDate());
+        assertEquals(0, response.participantCount());
+        assertEquals(0, response.pendingValidationCount());
+        assertEquals(0, response.validatedCount());
+        assertEquals(0, response.notSubmittedCount());
+    }
+
+    @Test
+    void collaboratorCompletionDetailsRejectWrongCompletionModeAndEventsOutsideWorkspace() {
+        assertThrows(ResourceNotFoundException.class,
+                () -> service.findDetailsForCollaboratorCompletion(30L, "manager"));
+        Event event = createEvent(EventStatus.ATIVO);
+        when(eventRepository.findByIdAndManager_Unit_Workspace(30L, workspace)).thenReturn(Optional.of(event));
+
+        assertThrows(BusinessException.class,
+                () -> service.findDetailsForCollaboratorCompletion(30L, "manager"));
+        assertThrows(BusinessException.class,
+                () -> service.findDetailsForCollaboratorCompletion(0L, "manager"));
+        verify(eventClassParticipantRepository, never()).findCompletionMetricsByEventId(any());
+    }
+
+    @Test
+    void collaboratorCompletionDetailsRequireAnActiveManager() {
+        manager.setStatus(UserStatus.DESATIVADO);
+        assertThrows(AccessDeniedException.class,
+                () -> service.findDetailsForCollaboratorCompletion(30L, "manager"));
+        manager.setStatus(UserStatus.ATIVO);
+        manager.setType(UserType.COLABORADOR);
+        assertThrows(AccessDeniedException.class,
+                () -> service.findDetailsForCollaboratorCompletion(30L, "manager"));
+        verifyNoInteractions(eventRepository, eventClassRepository, eventClassParticipantRepository);
     }
 
     private CreateEventRequest createRequest(Integer nrId, List<Long> participantIds) {
