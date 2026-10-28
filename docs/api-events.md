@@ -15,7 +15,8 @@ Eventos inexistentes ou de outro workspace retornam 404; falta de autenticação
 | `GET /events/{eventId}/participants` | Lista participantes do evento, título e status de conclusão individual |
 | `GET /events/participant/{participantId}/manager-conclusion/{eventId}` | Consulta os dados de um participante para conclusão pelo gestor |
 | `GET /events/participant/{participantId}/collaborator-conclusion/{eventId}` | Consulta os detalhes enviados pelo colaborador para validação do gestor |
-| `POST /events/{eventId}/participants/{participantId}/completion` | Registra a conclusão do participante pelo gestor |
+| `POST /events/{eventId}/participants/{participantId}/manager-conclusion` | Registra a conclusão do participante pelo gestor |
+| `PATCH /events/{eventId}/participants/{participantId}/collaborator-conclusion/approval` | Aprova a conclusão enviada pelo colaborador |
 | `PATCH /events/{eventId}/participants/{participantId}/rejection` | Rejeita a conclusão enviada pelo colaborador |
 | `GET /events/my-events` | Eventos criados pelo gestor autenticado, com pendências calculadas pela view `vw_eventos_gestor` |
 | `GET /events/collaborator/{eventId}` | Detalhes para o colaborador autenticado; consulta sem alterar estado |
@@ -124,7 +125,7 @@ persistido da conclusão: `PENDENTE`, `CONCLUIDO` ou `REJEITADO`), `completionDa
 de download) e `eventTitle`. Foto, cargo ou unidade podem ser nulos; evento,
 participante ou conclusão ausente retorna 404.
 
-`POST /events/{eventId}/participants/{participantId}/completion` é a operação
+`POST /events/{eventId}/participants/{participantId}/manager-conclusion` é a operação
 seguinte ao detalhe individual. Exige gestor ativo, criador do evento e evento
 ativo no workspace autenticado, configurado com `completionMode = GESTOR`. Pode
 ser executado em qualquer momento enquanto o evento estiver ativo. Registra a
@@ -140,6 +141,14 @@ Sem NR, a validade é `null`. Documento da NR ausente retorna 404; período ause
 ou não positivo retorna 400. Nessas situações a conclusão não é gravada. Uma
 falha de conexão ao banco retorna 503. A validade é persistida na conclusão e não
 integra a resposta `EventCompletionResponse`.
+
+`PATCH /events/{eventId}/participants/{participantId}/collaborator-conclusion/approval`
+aprova uma conclusão `PENDENTE` do modo `COLABORADOR`. Exige gestor ativo e
+criador do evento; pode ser executado após o término da turma. Atualiza o status
+para `CONCLUIDO`, registra `data_validacao` e calcula a validade da NR a partir
+da data de conclusão enviada pelo colaborador. Preserva as evidências já
+associadas e retorna `200` com `EventCompletionResponse`. Conclusão inexistente
+retorna 404; modo incompatível ou conclusão não pendente retorna 400.
 
 `PATCH /events/{eventId}/participants/{participantId}/rejection`
 rejeita uma conclusão pendente de evento no modo `COLABORADOR`. Recebe

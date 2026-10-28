@@ -197,7 +197,7 @@ public class EventController {
                 "Detalhes da conclusão retornados com sucesso", completion, request.getRequestURI()));
     }
 
-    @PostMapping("/{eventId}/participants/{participantId}/completion")
+    @PostMapping("/{eventId}/participants/{participantId}/manager-conclusion")
     @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
     @Operation(summary = "Marca a conclusão de um participante pelo gestor",
             description = "Disponível ao criador do evento ativo no modo GESTOR. A validade é a data de conclusão mais os meses de reciclagem da NR no MongoDB; sem NR, fica nula.")
@@ -242,6 +242,29 @@ public class EventController {
                 eventId, participantId, body.rejectionReason(), authenticatedUser.firebaseUid());
         return ResponseEntity.ok(ApiResult.success(
                 "Conclusão do colaborador rejeitada", completion, request.getRequestURI()));
+    }
+
+    @PatchMapping("/{eventId}/participants/{participantId}/collaborator-conclusion/approval")
+    @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
+    @Operation(summary = "Aprova a conclusão enviada pelo colaborador",
+            description = "Exige gestor criador do evento e uma conclusão PENDENTE no modo COLABORADOR. Preserva as evidências enviadas e registra a validação.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Conclusão aprovada no envelope ApiResult"),
+            @ApiResponse(responseCode = "400", description = "Modo incompatível ou conclusão não pendente"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado"),
+            @ApiResponse(responseCode = "403", description = "Gestor ativo e criador do evento necessários"),
+            @ApiResponse(responseCode = "404", description = "Evento, participante ou conclusão não encontrada"),
+            @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
+    })
+    public ResponseEntity<ApiResult<EventCompletionResponse>> approveCollaboratorCompletion(
+            @PathVariable Long eventId,
+            @PathVariable Long participantId,
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            HttpServletRequest request) {
+        EventCompletionResponse completion = eventService.approveCollaboratorCompletionByManager(
+                eventId, participantId, authenticatedUser.firebaseUid());
+        return ResponseEntity.ok(ApiResult.success(
+                "Conclusão do colaborador aprovada", completion, request.getRequestURI()));
     }
 
     @GetMapping("/details/{eventId}/manager-conclusion")
