@@ -119,7 +119,8 @@ consulta separada para o fluxo de validação da conclusão enviada pelo
 colaborador. Exige gestor ativo e evento no workspace autenticado, configurado
 no modo `COLABORADOR`, além de conclusão registrada para o participante.
 Retorna
-`profilePhotoUrl`, `participantName`, `roleName`, `unitName`, `completionDate`,
+`profilePhotoUrl`, `participantName`, `roleName`, `unitName`, `status` (status
+persistido da conclusão: `PENDENTE`, `CONCLUIDO` ou `REJEITADO`), `completionDate`,
 `endDate`, `evidenceMandatory`, `evidences` (zero a três itens com URL temporária
 de download) e `eventTitle`. Foto, cargo ou unidade podem ser nulos; evento,
 participante ou conclusão ausente retorna 404.
