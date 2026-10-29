@@ -102,7 +102,7 @@ retorna 404; ID não positivo retorna 400. A lista pode ser vazia.
 
 O objeto em `data` contém `collaboratorId`, `collaboratorName` e `events`. Cada
 item de `events` contém `eventId`, `eventTitle`, `classLimitDate`,
-`completionStatus` e `eventStatus`. Eventos cancelados e concluídos permanecem
+`completionStatus`, `eventStatus` e `completionMode` (`COLABORADOR` ou `GESTOR`). Eventos cancelados e concluídos permanecem
 na resposta. `completionStatus` segue os valores de
 `ParticipationStatus`: `PENDENTE` quando não há conclusão registrada,
 `EM_ANALISE` quando existe uma conclusão `PENDENTE`, além de `CONCLUIDO` e

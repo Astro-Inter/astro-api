@@ -11,6 +11,7 @@ import com.astro.api.user.dto.response.UserProfileResponse;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.user.model.WorkModel;
 import com.astro.api.event.model.EventStatus;
+import com.astro.api.event.model.CompletionMode;
 import com.astro.api.event.model.ParticipationStatus;
 import com.astro.api.user.dto.request.CreateCollaboratorRequest;
 import com.astro.api.user.dto.request.UpdateCollaboratorRequest;
@@ -128,7 +129,7 @@ class CollaboratorControllerTest {
         when(service.findEventsById(2L, principal)).thenReturn(new CollaboratorEventsResponse(
                 2L, "Ana Silva", List.of(new CollaboratorEventResponse(10L, "NR-10",
                         LocalDateTime.of(2026, 11, 12, 17, 30), ParticipationStatus.EM_ANALISE,
-                        EventStatus.CANCELADO))));
+                        EventStatus.CANCELADO, CompletionMode.COLABORADOR))));
 
         mvc.perform(get("/collaborators/2/events"))
                 .andExpect(status().isOk())
@@ -139,7 +140,8 @@ class CollaboratorControllerTest {
                 .andExpect(jsonPath("$.data.events[0].eventTitle").value("NR-10"))
                 .andExpect(jsonPath("$.data.events[0].classLimitDate").value("2026-11-12T17:30:00"))
                 .andExpect(jsonPath("$.data.events[0].completionStatus").value("EM_ANALISE"))
-                .andExpect(jsonPath("$.data.events[0].eventStatus").value("CANCELADO"));
+                .andExpect(jsonPath("$.data.events[0].eventStatus").value("CANCELADO"))
+                .andExpect(jsonPath("$.data.events[0].completionMode").value("COLABORADOR"));
         verify(service).findEventsById(2L, principal);
     }
 
