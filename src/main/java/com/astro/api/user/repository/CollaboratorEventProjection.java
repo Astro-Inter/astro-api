@@ -8,4 +8,5 @@ public interface CollaboratorEventProjection {
     LocalDateTime getClassLimitDate();
     String getCompletionStatus();
     String getEventStatus();
+    String getCompletionMode();
 }
