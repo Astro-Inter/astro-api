@@ -18,8 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "Conformidades de colaboradores", description = "Conformidades individuais, validade e evidências.")
 @ApiResponses({@ApiResponse(responseCode = "400", description = "Requisição inválida"),
-        @ApiResponse(responseCode = "401", description = "Autenticação ausente ou inválida"),
-        @ApiResponse(responseCode = "403", description = "Gestor ativo necessário"),
+        @ApiResponse(responseCode = "403", description = "Autenticação ausente ou inválida, ou gestor ativo necessário"),
         @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")})
 public interface CollaboratorConformitySwagger {
 

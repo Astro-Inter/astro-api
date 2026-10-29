@@ -55,6 +55,8 @@ class SwaggerDocumentationTest {
             byte[] document = mvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
                     .andReturn().getResponse().getContentAsByteArray();
             JsonNode api = new ObjectMapper().readTree(document);
+            Files.createDirectories(Path.of("target"));
+            Files.writeString(Path.of("target/astro-openapi.json"), api.toPrettyString());
             int operations = 0;
             for (JsonNode path : api.path("paths")) {
                 for (JsonNode operation : path) {
@@ -87,8 +89,59 @@ class SwaggerDocumentationTest {
                     .path("content").has("multipart/form-data"));
             assertEquals("2026-11-01T00:00:00", api.path("paths").path("/events").path("get")
                     .path("parameters").get(0).path("example").asText());
-            Files.createDirectories(Path.of("target"));
-            Files.writeString(Path.of("target/astro-openapi.json"), api.toPrettyString());
+            JsonNode schemas = api.path("components").path("schemas");
+            JsonNode managedEvent = schemas.path("ManagedCollaboratorEventResponse").path("properties");
+            assertTrue(managedEvent.has("eventId"));
+            assertTrue(managedEvent.has("completionStatus"));
+            assertTrue(managedEvent.has("completionMode"));
+            assertFalse(managedEvent.has("participationStatus"));
+            assertEquals("#/components/schemas/ManagedCollaboratorEventResponse", schemas
+                    .path("CollaboratorEventsResponse").path("properties").path("events").path("items")
+                    .path("$ref").asText());
+            JsonNode authenticatedEvent = schemas.path("AuthenticatedCollaboratorEventResponse").path("properties");
+            assertTrue(authenticatedEvent.has("id"));
+            assertTrue(authenticatedEvent.has("participationStatus"));
+            assertFalse(authenticatedEvent.has("completionMode"));
+            JsonNode managedResponse = api.path("paths").path("/collaborators/{collaboratorId}/events")
+                    .path("get").path("responses").path("200").path("content")
+                    .path("*/*").path("schema");
+            assertEquals("#/components/schemas/ApiResultCollaboratorEventsResponse", managedResponse.path("$ref").asText());
+            assertEquals("#/components/schemas/CollaboratorEventsResponse", schemas
+                    .path("ApiResultCollaboratorEventsResponse").path("properties").path("data").path("$ref").asText());
+            JsonNode authenticatedResponse = api.path("paths").path("/events/collaborator").path("get")
+                    .path("responses").path("200").path("content").path("*/*").path("schema");
+            String authenticatedEnvelope = authenticatedResponse.path("$ref").asText()
+                    .replace("#/components/schemas/", "");
+            assertEquals("#/components/schemas/AuthenticatedCollaboratorEventResponse", schemas
+                    .path(authenticatedEnvelope).path("properties").path("data").path("items").path("$ref").asText());
+            for (String path : new String[]{"/nrs", "/home/collaborator", "/home/manager", "/user/me",
+                    "/collaborators", "/notifications"}) {
+                JsonNode responses = api.path("paths").path(path).path("get").path("responses");
+                assertTrue(responses.has("403"), path);
+                assertFalse(responses.has("401"), path);
+            }
+            assertEquals("#/components/schemas/ApiErrorResponse", api.path("paths")
+                    .path("/collaborators/{collaboratorId}/events").path("get").path("responses")
+                    .path("404").path("content").path("*/*").path("schema").path("$ref").asText());
+            assertEquals("#/components/schemas/SpreadsheetImportErrorResponse", api.path("paths")
+                    .path("/register-workspace").path("post").path("responses").path("422")
+                    .path("content").path("*/*").path("schema").path("$ref").asText());
+            assertTrue(schemas.path("SpreadsheetImportErrorResponse").path("properties").path("data")
+                    .path("items").path("properties").has("row"));
+            assertLocalReferencesResolve(api, schemas);
+        }
+    }
+
+    private static void assertLocalReferencesResolve(JsonNode node, JsonNode schemas) {
+        if (node.isObject()) {
+            JsonNode reference = node.get("$ref");
+            if (reference != null && reference.asText().startsWith("#/components/schemas/")) {
+                String name = reference.asText().substring("#/components/schemas/".length());
+                assertTrue(schemas.has(name), "Schema ausente: " + name);
+            }
+            node.elements().forEachRemaining(child -> assertLocalReferencesResolve(child, schemas));
+        } else if (node.isArray()) {
+            node.elements().forEachRemaining(child -> assertLocalReferencesResolve(child, schemas));
         }
     }
 

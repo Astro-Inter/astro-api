@@ -16,8 +16,7 @@ public interface NrSwagger {
     @Operation(summary = "Lista os códigos de NR disponíveis para seleção")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "NRs retornadas com sucesso"),
-            @ApiResponse(responseCode = "401", description = "Não autenticado"),
-            @ApiResponse(responseCode = "403", description = "Não autorizado")
+            @ApiResponse(responseCode = "403", description = "Não autenticado ou sem permissão")
     })
     ResponseEntity<ApiResult<List<NrResponse>>> findAll(HttpServletRequest request);
 }

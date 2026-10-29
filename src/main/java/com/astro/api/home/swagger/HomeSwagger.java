@@ -18,8 +18,7 @@ public interface HomeSwagger {
     @Operation(summary = "Retorna a Home do colaborador", description = "Requer autenticação. status_message pode ser URGENT, PENDENT, ANALYSIS ou OK.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Home retornada com sucesso"),
-            @ApiResponse(responseCode = "401", description = "Não autenticado"),
-            @ApiResponse(responseCode = "403", description = "Não autorizado"),
+            @ApiResponse(responseCode = "403", description = "Não autenticado ou sem permissão"),
             @ApiResponse(responseCode = "404", description = "Colaborador inexistente ou inelegível"),
             @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
     })
@@ -29,6 +28,7 @@ public interface HomeSwagger {
     @Operation(summary = "Consulta nome, foto e indicadores da Home do seu workspace",
             description = "profilePhotoUrl contém a URL temporária da foto da própria conta. Ausência ou falha da foto retorna null sem impedir os indicadores.")
     @ApiResponse(responseCode = "200", description = "Operação concluída com sucesso")
+    @ApiResponse(responseCode = "403", description = "Não autenticado ou sem permissão")
     ResponseEntity<ApiResult<WorkspaceHomeResponse>> loadHome(
              AuthenticatedUser user, HttpServletRequest request);
 
@@ -37,8 +37,7 @@ public interface HomeSwagger {
                     + "viewed informa se o item já foi visualizado e days_left informa dias de calendário até o prazo.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Home retornada com sucesso"),
-            @ApiResponse(responseCode = "401", description = "Não autenticado"),
-            @ApiResponse(responseCode = "403", description = "Não autorizado"),
+            @ApiResponse(responseCode = "403", description = "Não autenticado ou sem permissão"),
             @ApiResponse(responseCode = "404", description = "Gestor inexistente, inativo ou inelegível"),
             @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
     })

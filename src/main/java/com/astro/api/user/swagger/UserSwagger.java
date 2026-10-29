@@ -17,7 +17,7 @@ public interface UserSwagger {
     @Operation(summary = "Retorna o perfil do usuário autenticado", description = "Retorna os dados do próprio usuário, a URL temporária da foto de perfil no R2 e as NRs ativas vinculadas ao seu cargo.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Perfil retornado com sucesso"),
-            @ApiResponse(responseCode = "401", description = "Token ausente ou inválido"),
+            @ApiResponse(responseCode = "403", description = "Token ausente ou inválido"),
             @ApiResponse(responseCode = "404", description = "Usuário não encontrado")
     })
     ResponseEntity<ApiResult<UserProfileResponse>> me(
@@ -29,7 +29,7 @@ public interface UserSwagger {
             @ApiResponse(responseCode = "204", description = "Foto de perfil atualizada com sucesso"),
             @ApiResponse(responseCode = "400", description = "Arquivo ausente, inválido ou acima do limite de 5 MB"),
             @ApiResponse(responseCode = "413", description = "Upload excede o limite da requisição"),
-            @ApiResponse(responseCode = "401", description = "Token ausente ou inválido"),
+            @ApiResponse(responseCode = "403", description = "Token ausente ou inválido"),
             @ApiResponse(responseCode = "404", description = "Usuário não encontrado")
     })
     ResponseEntity<Void> updateProfilePhoto(
