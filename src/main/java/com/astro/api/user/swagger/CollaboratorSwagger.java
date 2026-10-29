@@ -21,8 +21,7 @@ import org.springframework.http.ResponseEntity;
 @Tag(name = "Colaboradores", description = "Cadastro e gestão de colaboradores no escopo do gestor.")
 @ApiResponses({
         @ApiResponse(responseCode = "400", description = "Parâmetro ou corpo inválido"),
-        @ApiResponse(responseCode = "401", description = "Autenticação ausente ou inválida"),
-        @ApiResponse(responseCode = "403", description = "Sem permissão de gestor ativo"),
+        @ApiResponse(responseCode = "403", description = "Autenticação ausente ou inválida, ou sem permissão de gestor ativo"),
         @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
 })
 public interface CollaboratorSwagger {
@@ -38,7 +37,7 @@ public interface CollaboratorSwagger {
             description = "Inclui COLABORADOR, GESTOR e GESTOR_WORKSPACE das unidades autorizadas no workspace do gestor autenticado; exclui o próprio gestor. Retorna id, name, profilePhotoUrl, roleName e pendingCount. A contagem considera cada evento uma vez, eventos cancelados e prazos expirados são ignorados, e eventos em análise não contam como pendentes. Usuários inativos ou pré-cadastrados retornam contagem zero.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Resumo dos colaboradores, possivelmente vazio"),
-            @ApiResponse(responseCode = "403", description = "Solicitante não é gestor ativo")
+            @ApiResponse(responseCode = "403", description = "Autenticação ausente ou inválida, ou solicitante não é gestor ativo")
     })
     ResponseEntity<ApiResult<List<CollaboratorPendingCountResponse>>> pendingCount(
              AuthenticatedUser user, HttpServletRequest request);

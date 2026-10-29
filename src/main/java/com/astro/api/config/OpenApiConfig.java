@@ -6,6 +6,11 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.media.ArraySchema;
+import io.swagger.v3.oas.models.media.ObjectSchema;
+import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.media.StringSchema;
+import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springdoc.core.utils.SpringDocUtils;
@@ -55,6 +60,47 @@ public class OpenApiConfig {
                         new SecurityRequirement()
                                 .addList("bearerAuth")
                 );
+    }
+
+    @Bean
+    public OpenApiCustomizer errorResponseSchemas() {
+        return openApi -> {
+            ObjectSchema error = errorSchema();
+            ObjectSchema spreadsheetError = errorSchema();
+            ObjectSchema spreadsheetMessage = new ObjectSchema();
+            spreadsheetMessage.addProperty("row", new Schema<>().type("integer").format("int32"));
+            spreadsheetMessage.addProperty("field", new StringSchema());
+            spreadsheetMessage.addProperty("message", new StringSchema());
+            spreadsheetError.addProperty("data", new ArraySchema().items(spreadsheetMessage));
+            openApi.getComponents().addSchemas("ApiErrorResponse", error);
+            openApi.getComponents().addSchemas("SpreadsheetImportErrorResponse", spreadsheetError);
+            if (openApi.getPaths() == null) {
+                return;
+            }
+            openApi.getPaths().values().forEach(path -> path.readOperations().forEach(operation -> {
+                if (operation.getResponses() == null) {
+                    return;
+                }
+                operation.getResponses().forEach((code, response) -> {
+                    if (!code.matches("[45][0-9][0-9]") || response.getContent() == null) {
+                        return;
+                    }
+                    String schemaName = code.equals("422") ? "SpreadsheetImportErrorResponse" : "ApiErrorResponse";
+                    response.getContent().values().forEach(media ->
+                            media.setSchema(new Schema<>().$ref("#/components/schemas/" + schemaName)));
+                });
+            }));
+        };
+    }
+
+    private static ObjectSchema errorSchema() {
+        ObjectSchema error = new ObjectSchema();
+        error.addProperty("success", new Schema<>().type("boolean"));
+        error.addProperty("message", new StringSchema());
+        error.addProperty("data", new Schema<>().nullable(true));
+        error.addProperty("errors", new ArraySchema().items(new StringSchema()));
+        error.addProperty("path", new StringSchema());
+        return error;
     }
 }
 

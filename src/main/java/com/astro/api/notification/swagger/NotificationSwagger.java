@@ -19,8 +19,7 @@ public interface NotificationSwagger {
             description = "Requer autenticação. A consulta não altera o estado de visualização das notificações.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Notificações retornadas com sucesso"),
-            @ApiResponse(responseCode = "401", description = "Não autenticado"),
-            @ApiResponse(responseCode = "403", description = "Não autorizado"),
+            @ApiResponse(responseCode = "403", description = "Não autenticado ou sem permissão"),
             @ApiResponse(responseCode = "404", description = "Usuário autenticado não encontrado")
     })
     ResponseEntity<ApiResult<List<NotificationResponse>>> findAll(
@@ -30,8 +29,7 @@ public interface NotificationSwagger {
             description = "Retorna a mensagem, o título e o ID do evento associado, quando houver. A consulta não altera o estado de visualização.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Notificação retornada com sucesso"),
-            @ApiResponse(responseCode = "401", description = "Não autenticado"),
-            @ApiResponse(responseCode = "403", description = "Não autorizado"),
+            @ApiResponse(responseCode = "403", description = "Não autenticado ou sem permissão"),
             @ApiResponse(responseCode = "404", description = "Notificação inexistente ou não pertencente ao usuário"),
             @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
     })
@@ -44,8 +42,7 @@ public interface NotificationSwagger {
             description = "A notificação é identificada pelo ID e a operação é idempotente.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Notificação marcada como visualizada"),
-            @ApiResponse(responseCode = "401", description = "Não autenticado"),
-            @ApiResponse(responseCode = "403", description = "Não autorizado"),
+            @ApiResponse(responseCode = "403", description = "Não autenticado ou sem permissão"),
             @ApiResponse(responseCode = "404", description = "Notificação inexistente ou não pertencente ao usuário"),
             @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
     })
