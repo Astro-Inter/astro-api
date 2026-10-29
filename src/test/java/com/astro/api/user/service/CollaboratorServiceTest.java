@@ -3,6 +3,7 @@ package com.astro.api.user.service;
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.security.Role;
 import com.astro.api.event.model.EventStatus;
+import com.astro.api.event.model.CompletionMode;
 import com.astro.api.event.model.ParticipationStatus;
 import com.astro.api.user.mapper.CollaboratorMapper;
 import com.astro.api.user.repository.CollaboratorRepository;
@@ -292,6 +293,9 @@ class CollaboratorServiceTest {
                 result.events().stream().map(CollaboratorEventResponse::completionStatus).toList());
         assertEquals(List.of(EventStatus.ATIVO, EventStatus.CANCELADO, EventStatus.CONCLUIDO, EventStatus.ATIVO),
                 result.events().stream().map(CollaboratorEventResponse::eventStatus).toList());
+        assertEquals(List.of(CompletionMode.GESTOR, CompletionMode.COLABORADOR,
+                        CompletionMode.GESTOR, CompletionMode.COLABORADOR),
+                result.events().stream().map(CollaboratorEventResponse::completionMode).toList());
         assertEquals(classLimitDate, result.events().getFirst().classLimitDate());
         verify(repository).findDetailsInScope(2L, "manager", 3L);
         verify(repository).findEventsInScope(2L, "manager");
@@ -328,6 +332,7 @@ class CollaboratorServiceTest {
         when(row.getClassLimitDate()).thenReturn(classLimitDate);
         when(row.getCompletionStatus()).thenReturn(completionStatus);
         when(row.getEventStatus()).thenReturn(eventStatus);
+        when(row.getCompletionMode()).thenReturn(eventId % 2 == 0 ? "GESTOR" : "COLABORADOR");
         return row;
     }
 

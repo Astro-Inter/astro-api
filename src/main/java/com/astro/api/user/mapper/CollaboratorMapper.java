@@ -3,6 +3,7 @@ package com.astro.api.user.mapper;
 import com.astro.api.role.model.Role;
 import com.astro.api.event.model.EventStatus;
 import com.astro.api.event.model.EventCompletionStatus;
+import com.astro.api.event.model.CompletionMode;
 import com.astro.api.event.model.ParticipationStatus;
 import com.astro.api.common.text.NormalizedText;
 import com.astro.api.common.text.PersonalDataNormalizer;
@@ -41,7 +42,8 @@ public class CollaboratorMapper {
                 row.getEventTitle(),
                 row.getClassLimitDate(),
                 toParticipationStatus(row.getCompletionStatus()),
-                EventStatus.valueOf(row.getEventStatus()));
+                EventStatus.valueOf(row.getEventStatus()),
+                CompletionMode.valueOf(row.getCompletionMode()));
     }
 
     public CollaboratorEventsResponse toEvents(CollaboratorDetailsProjection collaborator,

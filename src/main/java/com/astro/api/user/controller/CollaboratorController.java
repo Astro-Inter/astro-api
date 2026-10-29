@@ -78,7 +78,7 @@ public class CollaboratorController {
 
     @GetMapping("/{collaboratorId}/events")
     @Operation(summary = "Lista os eventos atribuídos a um colaborador",
-            description = "Retorna todas as participações do colaborador, incluindo eventos cancelados e concluídos. O status da conclusão usa PENDENTE quando ainda não há conclusão e EM_ANALISE quando foi enviada para validação. Restringe a consulta ao workspace e às unidades autorizadas do gestor autenticado.")
+            description = "Retorna todas as participações do colaborador, incluindo eventos cancelados e concluídos, o status da conclusão e o modo de conclusão do evento (COLABORADOR ou GESTOR). O status da conclusão usa PENDENTE quando ainda não há conclusão e EM_ANALISE quando foi enviada para validação. Restringe a consulta ao workspace e às unidades autorizadas do gestor autenticado.")
     @ApiResponses({@ApiResponse(responseCode = "200", description = "Eventos retornados, possivelmente vazio"),
             @ApiResponse(responseCode = "404", description = "Colaborador inexistente ou fora do escopo")})
     public ResponseEntity<ApiResult<CollaboratorEventsResponse>> findEventsById(
