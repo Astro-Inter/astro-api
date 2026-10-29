@@ -4,6 +4,7 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.security.Role;
 import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
 import com.astro.api.user.dto.response.CollaboratorEventResponse;
+import com.astro.api.user.dto.response.CollaboratorEventsResponse;
 import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
 import com.astro.api.user.dto.response.CollaboratorProfileResponse;
 import com.astro.api.user.dto.response.UserProfileResponse;
@@ -124,20 +125,21 @@ class CollaboratorControllerTest {
 
     @Test
     void returnsCollaboratorEventsWithBothStatusesAndClassDeadline() throws Exception {
-        when(service.findEventsById(2L, principal)).thenReturn(List.of(new CollaboratorEventResponse(
-                2L, "Ana Silva", 10L, "NR-10", LocalDateTime.of(2026, 11, 12, 17, 30),
-                ParticipationStatus.EM_ANALISE, EventStatus.CANCELADO)));
+        when(service.findEventsById(2L, principal)).thenReturn(new CollaboratorEventsResponse(
+                2L, "Ana Silva", List.of(new CollaboratorEventResponse(10L, "NR-10",
+                        LocalDateTime.of(2026, 11, 12, 17, 30), ParticipationStatus.EM_ANALISE,
+                        EventStatus.CANCELADO))));
 
         mvc.perform(get("/collaborators/2/events"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data[0].collaboratorId").value(2))
-                .andExpect(jsonPath("$.data[0].collaboratorName").value("Ana Silva"))
-                .andExpect(jsonPath("$.data[0].eventId").value(10))
-                .andExpect(jsonPath("$.data[0].eventTitle").value("NR-10"))
-                .andExpect(jsonPath("$.data[0].classLimitDate").value("2026-11-12T17:30:00"))
-                .andExpect(jsonPath("$.data[0].completionStatus").value("EM_ANALISE"))
-                .andExpect(jsonPath("$.data[0].eventStatus").value("CANCELADO"));
+                .andExpect(jsonPath("$.data.collaboratorId").value(2))
+                .andExpect(jsonPath("$.data.collaboratorName").value("Ana Silva"))
+                .andExpect(jsonPath("$.data.events[0].eventId").value(10))
+                .andExpect(jsonPath("$.data.events[0].eventTitle").value("NR-10"))
+                .andExpect(jsonPath("$.data.events[0].classLimitDate").value("2026-11-12T17:30:00"))
+                .andExpect(jsonPath("$.data.events[0].completionStatus").value("EM_ANALISE"))
+                .andExpect(jsonPath("$.data.events[0].eventStatus").value("CANCELADO"));
         verify(service).findEventsById(2L, principal);
     }
 

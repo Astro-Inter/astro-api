@@ -3,7 +3,7 @@ package com.astro.api.user.controller;
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
 import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
-import com.astro.api.user.dto.response.CollaboratorEventResponse;
+import com.astro.api.user.dto.response.CollaboratorEventsResponse;
 import com.astro.api.user.dto.response.CollaboratorPendingCountResponse;
 import com.astro.api.user.dto.response.CollaboratorProfileResponse;
 import com.astro.api.user.dto.request.CreateCollaboratorRequest;
@@ -81,7 +81,7 @@ public class CollaboratorController {
             description = "Retorna todas as participações do colaborador, incluindo eventos cancelados e concluídos. O status da conclusão usa PENDENTE quando ainda não há conclusão e EM_ANALISE quando foi enviada para validação. Restringe a consulta ao workspace e às unidades autorizadas do gestor autenticado.")
     @ApiResponses({@ApiResponse(responseCode = "200", description = "Eventos retornados, possivelmente vazio"),
             @ApiResponse(responseCode = "404", description = "Colaborador inexistente ou fora do escopo")})
-    public ResponseEntity<ApiResult<List<CollaboratorEventResponse>>> findEventsById(
+    public ResponseEntity<ApiResult<CollaboratorEventsResponse>> findEventsById(
             @PathVariable Long collaboratorId, @AuthenticationPrincipal AuthenticatedUser user,
             HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Eventos do colaborador retornados com sucesso",

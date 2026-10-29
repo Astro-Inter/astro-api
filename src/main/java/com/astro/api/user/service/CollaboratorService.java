@@ -4,10 +4,11 @@ import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
 import com.astro.api.user.dto.response.CollaboratorPendingCountResponse;
 import com.astro.api.user.dto.response.CollaboratorProfileResponse;
-import com.astro.api.user.dto.response.CollaboratorEventResponse;
+import com.astro.api.user.dto.response.CollaboratorEventsResponse;
 import com.astro.api.user.dto.response.UserProfileResponse;
 import com.astro.api.user.mapper.CollaboratorMapper;
 import com.astro.api.user.repository.CollaboratorRepository;
+import com.astro.api.user.repository.CollaboratorEventProjection;
 import com.astro.api.user.repository.CollaboratorPendingCountProjection;
 import com.astro.api.user.repository.CollaboratorSummaryProjection;
 import com.astro.api.user.repository.CollaboratorDetailsProjection;
@@ -142,15 +143,15 @@ public class CollaboratorService {
     }
 
     @Transactional(readOnly = true)
-    public List<CollaboratorEventResponse> findEventsById(Long collaboratorId, AuthenticatedUser principal) {
+    public CollaboratorEventsResponse findEventsById(Long collaboratorId, AuthenticatedUser principal) {
         User manager = requireManager(principal);
         checkId(collaboratorId);
-        collaboratorRepository.findDetailsInScope(collaboratorId, principal.firebaseUid(), manager.getUnit().workspace.id)
+        CollaboratorDetailsProjection collaborator = collaboratorRepository.findDetailsInScope(
+                        collaboratorId, principal.firebaseUid(), manager.getUnit().workspace.id)
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
-        return collaboratorRepository.findEventsInScope(collaboratorId, principal.firebaseUid())
-                .stream()
-                .map(collaboratorMapper::toEvent)
-                .toList();
+        List<CollaboratorEventProjection> events = collaboratorRepository.findEventsInScope(
+                collaboratorId, principal.firebaseUid());
+        return collaboratorMapper.toEvents(collaborator, events);
     }
 
     private void checkId(Long collaboratorId) {

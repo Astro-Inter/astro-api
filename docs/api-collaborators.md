@@ -100,9 +100,10 @@ primeiro. A consulta aplica o mesmo workspace e as unidades autorizadas dos
 outros endpoints administrativos. Colaborador inexistente ou fora do escopo
 retorna 404; ID não positivo retorna 400. A lista pode ser vazia.
 
-Cada item contém `collaboratorId`, `collaboratorName`, `eventId`, `eventTitle`,
-`classLimitDate`, `completionStatus` e `eventStatus`. Eventos cancelados e
-concluídos permanecem na resposta. `completionStatus` segue os valores de
+O objeto em `data` contém `collaboratorId`, `collaboratorName` e `events`. Cada
+item de `events` contém `eventId`, `eventTitle`, `classLimitDate`,
+`completionStatus` e `eventStatus`. Eventos cancelados e concluídos permanecem
+na resposta. `completionStatus` segue os valores de
 `ParticipationStatus`: `PENDENTE` quando não há conclusão registrada,
 `EM_ANALISE` quando existe uma conclusão `PENDENTE`, além de `CONCLUIDO` e
 `REJEITADO`. `eventStatus` segue `EventStatus`.

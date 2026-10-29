@@ -11,6 +11,7 @@ import com.astro.api.user.dto.request.CreateCollaboratorRequest;
 import com.astro.api.user.dto.request.UpdateCollaboratorRequest;
 import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
 import com.astro.api.user.dto.response.CollaboratorEventResponse;
+import com.astro.api.user.dto.response.CollaboratorEventsResponse;
 import com.astro.api.user.dto.response.CollaboratorPendingCountResponse;
 import com.astro.api.user.dto.response.CollaboratorProfileResponse;
 import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
@@ -36,13 +37,17 @@ import static com.astro.api.user.mapper.UserAvatarMapper.initials;
 public class CollaboratorMapper {
     public CollaboratorEventResponse toEvent(CollaboratorEventProjection row) {
         return new CollaboratorEventResponse(
-                row.getCollaboratorId(),
-                row.getCollaboratorName(),
                 row.getEventId(),
                 row.getEventTitle(),
                 row.getClassLimitDate(),
                 toParticipationStatus(row.getCompletionStatus()),
                 EventStatus.valueOf(row.getEventStatus()));
+    }
+
+    public CollaboratorEventsResponse toEvents(CollaboratorDetailsProjection collaborator,
+                                                List<CollaboratorEventProjection> rows) {
+        List<CollaboratorEventResponse> events = rows.stream().map(this::toEvent).toList();
+        return new CollaboratorEventsResponse(collaborator.getId(), collaborator.getName(), events);
     }
 
     private ParticipationStatus toParticipationStatus(String completionStatus) {
