@@ -2,8 +2,11 @@ package com.astro.api.user.service;
 
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.security.Role;
+import com.astro.api.event.model.EventStatus;
+import com.astro.api.event.model.ParticipationStatus;
 import com.astro.api.user.mapper.CollaboratorMapper;
 import com.astro.api.user.repository.CollaboratorRepository;
+import com.astro.api.user.repository.CollaboratorEventProjection;
 import com.astro.api.user.repository.CollaboratorSummaryProjection;
 import com.astro.api.user.repository.CollaboratorDetailsProjection;
 import com.astro.api.common.exception.BusinessException;
@@ -21,6 +24,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.user.model.*;
 import com.astro.api.user.repository.UserRepository;
@@ -32,6 +36,8 @@ import org.springframework.security.access.AccessDeniedException;
 import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
 import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
 import com.astro.api.user.dto.response.CollaboratorProfileResponse;
+import com.astro.api.user.dto.response.CollaboratorEventResponse;
+import com.astro.api.user.dto.response.CollaboratorEventsResponse;
 import com.astro.api.user.dto.response.UserProfileResponse;
 import org.mockito.InOrder;
 import org.hibernate.exception.ConstraintViolationException;
@@ -260,6 +266,69 @@ class CollaboratorServiceTest {
         verify(repository).findDetailsInScope(2L, "manager", 3L);
         verify(repository).findPendingCountById("manager", 2L);
         verify(userService).findNrsByUserId(2L);
+    }
+
+    @Test
+    void returnsAllScopedEventsAndMapsCompletionAndEventStatuses() {
+        CollaboratorDetailsProjection collaborator = mock(CollaboratorDetailsProjection.class);
+        when(collaborator.getId()).thenReturn(2L);
+        when(collaborator.getName()).thenReturn("Ana Silva");
+        when(repository.findDetailsInScope(2L, "manager", 3L)).thenReturn(Optional.of(collaborator));
+        LocalDateTime classLimitDate = LocalDateTime.of(2026, 11, 12, 17, 30);
+        List<CollaboratorEventProjection> rows = List.of(
+                eventRow(10L, "Integração", classLimitDate, null, "ATIVO"),
+                eventRow(11L, "NR-10", classLimitDate, "PENDENTE", "CANCELADO"),
+                eventRow(12L, "NR-12", classLimitDate, "CONCLUIDO", "CONCLUIDO"),
+                eventRow(13L, "NR-35", classLimitDate, "REJEITADO", "ATIVO"));
+        when(repository.findEventsInScope(2L, "manager")).thenReturn(rows);
+
+        CollaboratorEventsResponse result = service.findEventsById(2L, principal);
+
+        assertEquals(2L, result.collaboratorId());
+        assertEquals("Ana Silva", result.collaboratorName());
+        assertEquals(List.of(10L, 11L, 12L, 13L), result.events().stream().map(CollaboratorEventResponse::eventId).toList());
+        assertEquals(List.of(ParticipationStatus.PENDENTE, ParticipationStatus.EM_ANALISE,
+                        ParticipationStatus.CONCLUIDO, ParticipationStatus.REJEITADO),
+                result.events().stream().map(CollaboratorEventResponse::completionStatus).toList());
+        assertEquals(List.of(EventStatus.ATIVO, EventStatus.CANCELADO, EventStatus.CONCLUIDO, EventStatus.ATIVO),
+                result.events().stream().map(CollaboratorEventResponse::eventStatus).toList());
+        assertEquals(classLimitDate, result.events().getFirst().classLimitDate());
+        verify(repository).findDetailsInScope(2L, "manager", 3L);
+        verify(repository).findEventsInScope(2L, "manager");
+    }
+
+    @Test
+    void returnsEmptyEventListForAnAuthorizedCollaboratorWithoutParticipations() {
+        CollaboratorDetailsProjection collaborator = mock(CollaboratorDetailsProjection.class);
+        when(collaborator.getId()).thenReturn(2L);
+        when(collaborator.getName()).thenReturn("Ana Silva");
+        when(repository.findDetailsInScope(2L, "manager", 3L)).thenReturn(Optional.of(collaborator));
+        when(repository.findEventsInScope(2L, "manager")).thenReturn(List.of());
+
+        CollaboratorEventsResponse result = service.findEventsById(2L, principal);
+        assertEquals(2L, result.collaboratorId());
+        assertEquals("Ana Silva", result.collaboratorName());
+        assertTrue(result.events().isEmpty());
+    }
+
+    @Test
+    void rejectsInvalidOrOutOfScopeCollaboratorIdsBeforeLoadingEvents() {
+        assertThrows(BusinessException.class, () -> service.findEventsById(0L, principal));
+        when(repository.findDetailsInScope(999L, "manager", 3L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.findEventsById(999L, principal));
+        verify(repository, never()).findEventsInScope(anyLong(), anyString());
+    }
+
+    private CollaboratorEventProjection eventRow(Long eventId, String eventTitle, LocalDateTime classLimitDate,
+                                                  String completionStatus, String eventStatus) {
+        CollaboratorEventProjection row = mock(CollaboratorEventProjection.class);
+        when(row.getEventId()).thenReturn(eventId);
+        when(row.getEventTitle()).thenReturn(eventTitle);
+        when(row.getClassLimitDate()).thenReturn(classLimitDate);
+        when(row.getCompletionStatus()).thenReturn(completionStatus);
+        when(row.getEventStatus()).thenReturn(eventStatus);
+        return row;
     }
 
     @Test

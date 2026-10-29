@@ -3,11 +3,15 @@ package com.astro.api.user.controller;
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.auth.security.Role;
 import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
+import com.astro.api.user.dto.response.CollaboratorEventResponse;
+import com.astro.api.user.dto.response.CollaboratorEventsResponse;
 import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
 import com.astro.api.user.dto.response.CollaboratorProfileResponse;
 import com.astro.api.user.dto.response.UserProfileResponse;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.user.model.WorkModel;
+import com.astro.api.event.model.EventStatus;
+import com.astro.api.event.model.ParticipationStatus;
 import com.astro.api.user.dto.request.CreateCollaboratorRequest;
 import com.astro.api.user.dto.request.UpdateCollaboratorRequest;
 import com.astro.api.user.dto.request.CollaboratorStatusRequest;
@@ -26,6 +30,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -116,6 +121,38 @@ class CollaboratorControllerTest {
                 .andExpect(jsonPath("$.data.nrs[0].objetivo").value("Prevenir acidentes"))
                 .andExpect(jsonPath("$.data.nrs[0].aplicabilidade").value("Trabalho industrial"));
         verify(service).findProfileById(2L, principal);
+    }
+
+    @Test
+    void returnsCollaboratorEventsWithBothStatusesAndClassDeadline() throws Exception {
+        when(service.findEventsById(2L, principal)).thenReturn(new CollaboratorEventsResponse(
+                2L, "Ana Silva", List.of(new CollaboratorEventResponse(10L, "NR-10",
+                        LocalDateTime.of(2026, 11, 12, 17, 30), ParticipationStatus.EM_ANALISE,
+                        EventStatus.CANCELADO))));
+
+        mvc.perform(get("/collaborators/2/events"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.collaboratorId").value(2))
+                .andExpect(jsonPath("$.data.collaboratorName").value("Ana Silva"))
+                .andExpect(jsonPath("$.data.events[0].eventId").value(10))
+                .andExpect(jsonPath("$.data.events[0].eventTitle").value("NR-10"))
+                .andExpect(jsonPath("$.data.events[0].classLimitDate").value("2026-11-12T17:30:00"))
+                .andExpect(jsonPath("$.data.events[0].completionStatus").value("EM_ANALISE"))
+                .andExpect(jsonPath("$.data.events[0].eventStatus").value("CANCELADO"));
+        verify(service).findEventsById(2L, principal);
+    }
+
+    @Test
+    void mapsMissingAndMalformedCollaboratorEventIdsToExistingHttpErrors() throws Exception {
+        when(service.findEventsById(999L, principal))
+                .thenThrow(new ResourceNotFoundException("Colaborador não encontrado"));
+
+        mvc.perform(get("/collaborators/999/events"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Colaborador não encontrado"));
+        mvc.perform(get("/collaborators/invalid/events"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

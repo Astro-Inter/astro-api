@@ -1,12 +1,17 @@
 package com.astro.api.user.mapper;
 
 import com.astro.api.role.model.Role;
+import com.astro.api.event.model.EventStatus;
+import com.astro.api.event.model.EventCompletionStatus;
+import com.astro.api.event.model.ParticipationStatus;
 import com.astro.api.common.text.NormalizedText;
 import com.astro.api.common.text.PersonalDataNormalizer;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.user.dto.request.CreateCollaboratorRequest;
 import com.astro.api.user.dto.request.UpdateCollaboratorRequest;
 import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
+import com.astro.api.user.dto.response.CollaboratorEventResponse;
+import com.astro.api.user.dto.response.CollaboratorEventsResponse;
 import com.astro.api.user.dto.response.CollaboratorPendingCountResponse;
 import com.astro.api.user.dto.response.CollaboratorProfileResponse;
 import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
@@ -17,6 +22,7 @@ import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.model.WorkModel;
 import com.astro.api.user.repository.CollaboratorDetailsProjection;
+import com.astro.api.user.repository.CollaboratorEventProjection;
 import com.astro.api.user.repository.CollaboratorPendingCountProjection;
 import com.astro.api.user.repository.CollaboratorSummaryProjection;
 import com.astro.api.user.dto.response.UserProfileResponse;
@@ -29,6 +35,32 @@ import static com.astro.api.user.mapper.UserAvatarMapper.initials;
 
 @Component
 public class CollaboratorMapper {
+    public CollaboratorEventResponse toEvent(CollaboratorEventProjection row) {
+        return new CollaboratorEventResponse(
+                row.getEventId(),
+                row.getEventTitle(),
+                row.getClassLimitDate(),
+                toParticipationStatus(row.getCompletionStatus()),
+                EventStatus.valueOf(row.getEventStatus()));
+    }
+
+    public CollaboratorEventsResponse toEvents(CollaboratorDetailsProjection collaborator,
+                                                List<CollaboratorEventProjection> rows) {
+        List<CollaboratorEventResponse> events = rows.stream().map(this::toEvent).toList();
+        return new CollaboratorEventsResponse(collaborator.getId(), collaborator.getName(), events);
+    }
+
+    private ParticipationStatus toParticipationStatus(String completionStatus) {
+        if (completionStatus == null) {
+            return ParticipationStatus.PENDENTE;
+        }
+        return switch (EventCompletionStatus.valueOf(completionStatus)) {
+            case PENDENTE -> ParticipationStatus.EM_ANALISE;
+            case CONCLUIDO -> ParticipationStatus.CONCLUIDO;
+            case REJEITADO -> ParticipationStatus.REJEITADO;
+        };
+    }
+
     public CollaboratorImportData toImportData(CollaboratorImportRow row) {
         return new CollaboratorImportData(row.name(), row.cpf(), row.email(), workModel(row.workModel()));
     }
