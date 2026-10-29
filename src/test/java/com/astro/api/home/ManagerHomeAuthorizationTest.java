@@ -48,7 +48,7 @@ class ManagerHomeAuthorizationTest {
     }
 
     @Configuration
-    @EnableMethodSecurity
+    @EnableMethodSecurity(proxyTargetClass = true)
     static class Config {
         @Bean
         HomeService homeService() {

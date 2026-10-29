@@ -1,5 +1,8 @@
 # ASTRO API
 
+Consulte o [guia do Swagger e OpenAPI](docs/swagger.md) para autenticação,
+organização da documentação e verificação do contrato.
+
 API REST responsável pelo backend do **ASTRO**, centralizando as regras de negócio e o acesso aos dados relacionados à gestão de conformidade com Normas Regulamentadoras (NRs).
 
 ## Sobre o ASTRO

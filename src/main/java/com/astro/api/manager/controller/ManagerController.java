@@ -1,5 +1,7 @@
 package com.astro.api.manager.controller;
 
+import com.astro.api.manager.swagger.ManagerSwagger;
+
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.response.ApiResult;
 import com.astro.api.manager.dto.response.ManagerSummaryResponse;
@@ -10,7 +12,6 @@ import com.astro.api.manager.dto.request.ManagerStatusRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
 import com.astro.api.manager.service.ManagerService;
-import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,13 +22,12 @@ import java.util.List;
 @RestController
 @RequestMapping("/managers")
 @PreAuthorize("hasRole('GESTOR_WORKSPACE')")
-public class ManagerController {
+public class ManagerController implements ManagerSwagger {
     private final ManagerService service;
 
     public ManagerController(ManagerService service) { this.service = service; }
 
     @GetMapping
-    @Operation(summary = "Lista gestores de todas as unidades do próprio workspace")
     public ResponseEntity<ApiResult<List<ManagerSummaryResponse>>> findAll(
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Gestores retornados com sucesso",
@@ -35,7 +35,6 @@ public class ManagerController {
     }
 
     @GetMapping("/{managerId}")
-    @Operation(summary = "Consulta os detalhes de um gestor do próprio workspace")
     public ResponseEntity<ApiResult<ManagerDetailsResponse>> findById(@PathVariable("managerId") Long managerId,
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Gestor retornado com sucesso",
@@ -43,7 +42,6 @@ public class ManagerController {
     }
 
     @PostMapping
-    @Operation(summary = "Promove um colaborador ativo a gestor, preservando a conta existente")
     public ResponseEntity<ApiResult<ManagerDetailsResponse>> promote(@Valid @RequestBody PromoteManagerRequest body,
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         ManagerDetailsResponse manager = service.promote(body, principal);
@@ -52,7 +50,6 @@ public class ManagerController {
     }
 
     @PutMapping("/{managerId}")
-    @Operation(summary = "Substitui todos os campos editáveis de um gestor do próprio workspace")
     public ResponseEntity<ApiResult<ManagerDetailsResponse>> update(@PathVariable("managerId") Long managerId,
             @Valid @RequestBody UpdateManagerRequest body, @AuthenticationPrincipal AuthenticatedUser principal,
             HttpServletRequest request) {
@@ -61,7 +58,6 @@ public class ManagerController {
     }
 
     @PatchMapping("/{managerId}/status")
-    @Operation(summary = "Ativa ou desativa explicitamente toda a conta de um gestor")
     public ResponseEntity<ApiResult<ManagerDetailsResponse>> changeStatus(@PathVariable("managerId") Long managerId,
             @Valid @RequestBody ManagerStatusRequest body, @AuthenticationPrincipal AuthenticatedUser principal,
             HttpServletRequest request) {

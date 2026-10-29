@@ -50,7 +50,7 @@ class ChatControllerAuthorizationTest {
     }
 
     @Configuration
-    @EnableMethodSecurity
+    @EnableMethodSecurity(proxyTargetClass = true)
     static class Config {
         @Bean ChatContactService chatContactService() {
             UserRepository unusedRepository = (UserRepository) Proxy.newProxyInstance(

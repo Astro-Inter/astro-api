@@ -1,14 +1,13 @@
 package com.astro.api.home.controller;
 
+import com.astro.api.home.swagger.HomeSwagger;
+
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.response.ApiResult;
 import com.astro.api.home.dto.response.ManagerHomeResponse;
 import com.astro.api.home.dto.response.WorkspaceHomeResponse;
 import com.astro.api.home.dto.response.CollaboratorHomeResponse;
 import com.astro.api.home.service.HomeService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/home")
-public class HomeController {
+public class HomeController implements HomeSwagger {
     private final HomeService homeService;
 
     public HomeController(HomeService homeService) {
@@ -28,14 +27,6 @@ public class HomeController {
 
     @GetMapping("/collaborator")
     @PreAuthorize("hasAnyRole('COLABORADOR', 'GESTOR', 'GESTOR_WORKSPACE')")
-    @Operation(summary = "Retorna a Home do colaborador", description = "Requer autenticação. status_message pode ser URGENT, PENDENT, ANALYSIS ou OK.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Home retornada com sucesso"),
-            @ApiResponse(responseCode = "401", description = "Não autenticado"),
-            @ApiResponse(responseCode = "403", description = "Não autorizado"),
-            @ApiResponse(responseCode = "404", description = "Colaborador inexistente ou inelegível"),
-            @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
-    })
     public ResponseEntity<ApiResult<CollaboratorHomeResponse>> collaboratorHome(
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser, HttpServletRequest request) {
         CollaboratorHomeResponse response = homeService.getCollaboratorHome(authenticatedUser.firebaseUid());
@@ -45,8 +36,6 @@ public class HomeController {
 
     @GetMapping("/workspace")
     @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
-    @Operation(summary = "Consulta nome, foto e indicadores da Home do seu workspace",
-            description = "profilePhotoUrl contém a URL temporária da foto da própria conta. Ausência ou falha da foto retorna null sem impedir os indicadores.")
     public ResponseEntity<ApiResult<WorkspaceHomeResponse>> loadHome(
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Dados da Home retornados com sucesso",
@@ -55,16 +44,6 @@ public class HomeController {
 
     @GetMapping("/manager")
     @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
-    @Operation(summary = "Retorna a Home do gestor",
-            description = "Requer autenticação de gestor. Os indicadores resumem os eventos atuais e as pendências; "
-                    + "viewed informa se o item já foi visualizado e days_left informa dias de calendário até o prazo.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Home retornada com sucesso"),
-            @ApiResponse(responseCode = "401", description = "Não autenticado"),
-            @ApiResponse(responseCode = "403", description = "Não autorizado"),
-            @ApiResponse(responseCode = "404", description = "Gestor inexistente, inativo ou inelegível"),
-            @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
-    })
     public ResponseEntity<ApiResult<ManagerHomeResponse>> loadManagerHome(
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         ManagerHomeResponse response = homeService.loadManagerHome(user);

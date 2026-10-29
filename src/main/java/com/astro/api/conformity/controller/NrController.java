@@ -1,11 +1,10 @@
 package com.astro.api.conformity.controller;
 
+import com.astro.api.conformity.swagger.NrSwagger;
+
 import com.astro.api.common.response.ApiResult;
 import com.astro.api.conformity.dto.response.NrResponse;
 import com.astro.api.conformity.repository.NrCatalogRepository;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,7 +17,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/nrs")
 @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
-public class NrController {
+public class NrController implements NrSwagger {
     private final NrCatalogRepository nrCatalogRepository;
 
     public NrController(NrCatalogRepository nrCatalogRepository) {
@@ -26,12 +25,6 @@ public class NrController {
     }
 
     @GetMapping
-    @Operation(summary = "Lista os códigos de NR disponíveis para seleção")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "NRs retornadas com sucesso"),
-            @ApiResponse(responseCode = "401", description = "Não autenticado"),
-            @ApiResponse(responseCode = "403", description = "Não autorizado")
-    })
     public ResponseEntity<ApiResult<List<NrResponse>>> findAll(HttpServletRequest request) {
         List<NrResponse> nrs = nrCatalogRepository.findAllByOrderByCodeNrAsc().stream()
                 .map(nrCatalog -> new NrResponse(nrCatalog.getCodeNr(), nrCatalog.getTitle()))
