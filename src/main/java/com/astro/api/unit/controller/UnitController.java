@@ -1,5 +1,7 @@
 package com.astro.api.unit.controller;
 
+import com.astro.api.unit.swagger.UnitSwagger;
+
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.response.ApiResult;
 import com.astro.api.unit.dto.request.UpdateUnitNrsRequest;
@@ -7,7 +9,6 @@ import com.astro.api.unit.dto.response.UnitResponse;
 import com.astro.api.unit.dto.response.UnitNrResponse;
 import com.astro.api.unit.dto.response.UnitNrOptionResponse;
 import com.astro.api.unit.service.UnitService;
-import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +21,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/units")
 @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
-public class UnitController {
+public class UnitController implements UnitSwagger {
     private final UnitService service;
 
     public UnitController(UnitService service) {
@@ -28,7 +29,6 @@ public class UnitController {
     }
 
     @GetMapping
-    @Operation(summary = "Lista unidades do workspace do gestor")
     public ResponseEntity<ApiResult<List<UnitResponse>>> findAll(
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Unidades retornadas com sucesso",
@@ -36,7 +36,6 @@ public class UnitController {
     }
 
     @PatchMapping("/{unitId}/status")
-    @Operation(summary = "Alterna o status da unidade entre ativo e inativo")
     public ResponseEntity<ApiResult<Boolean>> toggleStatus(@PathVariable("unitId") Long unitId,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Status da unidade alterado com sucesso",
@@ -44,7 +43,6 @@ public class UnitController {
     }
 
     @GetMapping("/{unitId}/nrs/associated")
-    @Operation(summary = "Consulta NRs associadas à unidade")
     public ResponseEntity<ApiResult<List<UnitNrResponse>>> findNrs(@PathVariable("unitId") Long unitId,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("NRs da unidade retornadas com sucesso",
@@ -52,7 +50,6 @@ public class UnitController {
     }
 
     @GetMapping("/{unitId}/nrs")
-    @Operation(summary = "Lista NRs disponíveis e indica as associações da unidade")
     public ResponseEntity<ApiResult<List<UnitNrOptionResponse>>> findNrOptions(@PathVariable("unitId") Long unitId,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Opções de NRs retornadas com sucesso",
@@ -60,7 +57,6 @@ public class UnitController {
     }
 
     @PostMapping("/{unitId}/nrs")
-    @Operation(summary = "Associa ou remove as NRs informadas da unidade")
     public ResponseEntity<ApiResult<Void>> updateNrs(@PathVariable("unitId") Long unitId,
             @Valid @RequestBody UpdateUnitNrsRequest body,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {

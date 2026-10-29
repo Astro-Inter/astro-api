@@ -73,7 +73,7 @@ class HomeAuthorizationTest {
     }
 
     @Configuration
-    @EnableMethodSecurity
+    @EnableMethodSecurity(proxyTargetClass = true)
     static class Config {
         @Bean HomeService homeService() { return mock(HomeService.class); }
         @Bean HomeController homeController(HomeService service) {

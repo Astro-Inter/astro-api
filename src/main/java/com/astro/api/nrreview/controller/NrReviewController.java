@@ -1,5 +1,7 @@
 package com.astro.api.nrreview.controller;
 
+import com.astro.api.nrreview.swagger.NrReviewSwagger;
+
 import com.astro.api.common.response.ApiResult;
 import com.astro.api.nrreview.dto.NrApprovalRequest;
 import com.astro.api.nrreview.dto.NrApprovalResult;
@@ -21,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/admin/nrs")
 @PreAuthorize("hasRole('ADMIN')")
-public class NrReviewController {
+public class NrReviewController implements NrReviewSwagger {
     private final NrReviewService nrReviewService;
 
     public NrReviewController(NrReviewService nrReviewService) {

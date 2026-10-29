@@ -1,5 +1,7 @@
 package com.astro.api.user.controller;
 
+import com.astro.api.user.swagger.CollaboratorSwagger;
+
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.user.dto.response.CollaboratorSummaryResponse;
 import com.astro.api.user.dto.response.CollaboratorDetailsResponse;
@@ -13,9 +15,6 @@ import jakarta.validation.Valid;
 import java.net.URI;
 import com.astro.api.user.service.CollaboratorService;
 import com.astro.api.common.response.ApiResult;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,13 +26,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/collaborators")
 @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
-@ApiResponses({
-        @ApiResponse(responseCode = "400", description = "Parâmetro ou corpo inválido"),
-        @ApiResponse(responseCode = "401", description = "Autenticação ausente ou inválida"),
-        @ApiResponse(responseCode = "403", description = "Sem permissão de gestor ativo"),
-        @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
-})
-public class CollaboratorController {
+public class CollaboratorController implements CollaboratorSwagger {
     private final CollaboratorService service;
 
     public CollaboratorController(CollaboratorService service) {
@@ -41,9 +34,6 @@ public class CollaboratorController {
     }
 
     @GetMapping
-    @Operation(summary = "Lista colaboradores do escopo do gestor",
-            description = "Inclui COLABORADOR, GESTOR e GESTOR_WORKSPACE no workspace e unidades autorizadas, ordenados por nome e ID, com os três status, URL de foto e iniciais. canManage informa permissão para edição e status. excludeSelf=true oculta somente o usuário autenticado desta listagem; o padrão false mantém todos para seleções de participantes e conformidades. Não expõe CPF nem dados de autenticação.")
-    @ApiResponse(responseCode = "200", description = "Lista de colaboradores, possivelmente vazia")
     public ResponseEntity<ApiResult<List<CollaboratorSummaryResponse>>> findAll(
             @AuthenticationPrincipal AuthenticatedUser user,
             @RequestParam(defaultValue = "false") boolean excludeSelf, HttpServletRequest request) {
@@ -52,12 +42,6 @@ public class CollaboratorController {
     }
 
     @GetMapping("/pending-count")
-    @Operation(summary = "Lista colaboradores do workspace com a contagem de eventos pendentes",
-            description = "Inclui COLABORADOR, GESTOR e GESTOR_WORKSPACE das unidades autorizadas no workspace do gestor autenticado; exclui o próprio gestor. Retorna id, name, profilePhotoUrl, roleName e pendingCount. A contagem considera cada evento uma vez, eventos cancelados e prazos expirados são ignorados, e eventos em análise não contam como pendentes. Usuários inativos ou pré-cadastrados retornam contagem zero.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Resumo dos colaboradores, possivelmente vazio"),
-            @ApiResponse(responseCode = "403", description = "Solicitante não é gestor ativo")
-    })
     public ResponseEntity<ApiResult<List<CollaboratorPendingCountResponse>>> pendingCount(
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Resumo dos colaboradores retornado com sucesso",
@@ -65,10 +49,6 @@ public class CollaboratorController {
     }
 
     @GetMapping("/{collaboratorId}")
-    @Operation(summary = "Consulta detalhes do colaborador para informações e edição",
-            description = "Inclui COLABORADOR, GESTOR e GESTOR_WORKSPACE, com CPF, modalidade, URL de foto, iniciais e canManage; restringe a consulta ao workspace e às unidades autorizadas. Ambos os gestores podem consultar os três perfis. Não expõe dados de autenticação.")
-    @ApiResponses({@ApiResponse(responseCode = "200", description = "Detalhes do colaborador"),
-            @ApiResponse(responseCode = "404", description = "Colaborador inexistente ou fora do escopo")})
     public ResponseEntity<ApiResult<CollaboratorDetailsResponse>> findById(
             @PathVariable Long collaboratorId, @AuthenticationPrincipal AuthenticatedUser user,
             HttpServletRequest request) {
@@ -77,10 +57,6 @@ public class CollaboratorController {
     }
 
     @GetMapping("/{collaboratorId}/events")
-    @Operation(summary = "Lista os eventos atribuídos a um colaborador",
-            description = "Retorna todas as participações do colaborador, incluindo eventos cancelados e concluídos, o status da conclusão e o modo de conclusão do evento (COLABORADOR ou GESTOR). O status da conclusão usa PENDENTE quando ainda não há conclusão e EM_ANALISE quando foi enviada para validação. Restringe a consulta ao workspace e às unidades autorizadas do gestor autenticado.")
-    @ApiResponses({@ApiResponse(responseCode = "200", description = "Eventos retornados, possivelmente vazio"),
-            @ApiResponse(responseCode = "404", description = "Colaborador inexistente ou fora do escopo")})
     public ResponseEntity<ApiResult<CollaboratorEventsResponse>> findEventsById(
             @PathVariable Long collaboratorId, @AuthenticationPrincipal AuthenticatedUser user,
             HttpServletRequest request) {
@@ -89,10 +65,6 @@ public class CollaboratorController {
     }
 
     @GetMapping("/{collaboratorId}/profile")
-    @Operation(summary = "Consulta o perfil de um colaborador pelo ID",
-            description = "Retorna nome, cargo, foto, unidade, modalidade, e-mail, quantidade de eventos pendentes atribuídos e não respondidos e as NRs ativas vinculadas ao cargo com validade individual. Aceita COLABORADOR, GESTOR e GESTOR_WORKSPACE; restringe a consulta ao workspace e às unidades autorizadas do gestor autenticado.")
-    @ApiResponses({@ApiResponse(responseCode = "200", description = "Perfil retornado"),
-            @ApiResponse(responseCode = "404", description = "Colaborador inexistente ou fora do escopo")})
     public ResponseEntity<ApiResult<CollaboratorProfileResponse>> findProfileById(
             @PathVariable Long collaboratorId, @AuthenticationPrincipal AuthenticatedUser user,
             HttpServletRequest request) {
@@ -101,11 +73,6 @@ public class CollaboratorController {
     }
 
     @PostMapping
-    @Operation(summary = "Pré-cadastra um colaborador",
-            description = "Exige nome, CPF válido, e-mail, roleId, unitId e modalidade. Normaliza CPF e e-mail, valida vínculos ativos e cria COLABORADOR/PRE_CADASTRADO sem senha. Reutiliza a fila de conclusão do cadastro.")
-    @ApiResponses({@ApiResponse(responseCode = "201", description = "Colaborador pré-cadastrado"),
-            @ApiResponse(responseCode = "404", description = "Cargo ou unidade inexistente no workspace"),
-            @ApiResponse(responseCode = "409", description = "CPF ou e-mail já cadastrado")})
     public ResponseEntity<ApiResult<CollaboratorDetailsResponse>> create(
             @Valid @RequestBody CreateCollaboratorRequest body, @AuthenticationPrincipal AuthenticatedUser user,
             HttpServletRequest request) {
@@ -115,12 +82,6 @@ public class CollaboratorController {
     }
 
     @PutMapping("/{collaboratorId}")
-    @Operation(summary = "Edita todos os campos administrativos do colaborador",
-            description = "Gestor do workspace pode editar os três perfis no escopo; gestor comum pode editar colaboradores e sua própria conta, mas recebe 403 para outros gestores e gestor do workspace. Exige todos os campos editáveis não nulos, incluindo status. Mantém vínculos inativos quando não alterados. Preserva ID, tipo, criado_em e Firebase UID. Mudanças de e-mail vinculadas ao Firebase usam compensação em caso de falha.")
-    @ApiResponses({@ApiResponse(responseCode = "200", description = "Colaborador atualizado"),
-            @ApiResponse(responseCode = "404", description = "Colaborador, cargo ou unidade inexistente no escopo"),
-            @ApiResponse(responseCode = "409", description = "CPF ou e-mail em conflito"),
-            @ApiResponse(responseCode = "500", description = "Falha de sincronização com a autenticação")})
     public ResponseEntity<ApiResult<CollaboratorDetailsResponse>> update(@PathVariable Long collaboratorId,
             @Valid @RequestBody UpdateCollaboratorRequest body, @AuthenticationPrincipal AuthenticatedUser user,
             HttpServletRequest request) {
@@ -129,10 +90,6 @@ public class CollaboratorController {
     }
 
     @PatchMapping("/{collaboratorId}/status")
-    @Operation(summary = "Altera explicitamente o status do colaborador",
-            description = "Gestor do workspace pode administrar os três perfis no escopo; gestor comum não pode alterar o status de outros gestores ou do gestor do workspace (403). Aceita ATIVO ou DESATIVADO. Repetir o status atual é idempotente. Ativação exige cadastro concluído e cargo/unidade ativos; não conclui pré-cadastro. A desativação impede operações protegidas na próxima requisição.")
-    @ApiResponses({@ApiResponse(responseCode = "200", description = "Status aplicado, com detalhes do colaborador"),
-            @ApiResponse(responseCode = "404", description = "Colaborador inexistente ou fora do escopo")})
     public ResponseEntity<ApiResult<CollaboratorDetailsResponse>> changeStatus(@PathVariable Long collaboratorId,
             @Valid @RequestBody CollaboratorStatusRequest body, @AuthenticationPrincipal AuthenticatedUser user,
             HttpServletRequest request) {

@@ -65,7 +65,7 @@ class WorkspaceSettingsAuthorizationTest {
     }
 
     @Configuration
-    @EnableMethodSecurity
+    @EnableMethodSecurity(proxyTargetClass = true)
     static class Config {
         @Bean WorkspaceSettingsService settings() { return mock(WorkspaceSettingsService.class); }
         @Bean WorkspaceImportService imports() { return mock(WorkspaceImportService.class); }

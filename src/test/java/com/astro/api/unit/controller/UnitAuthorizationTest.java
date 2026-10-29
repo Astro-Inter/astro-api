@@ -58,7 +58,7 @@ class UnitAuthorizationTest {
     }
 
     @Configuration
-    @EnableMethodSecurity
+    @EnableMethodSecurity(proxyTargetClass = true)
     static class Config {
         @Bean UnitService unitService() { return mock(UnitService.class); }
         @Bean UnitController unitController(UnitService service) { return new UnitController(service); }

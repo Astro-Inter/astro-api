@@ -1,5 +1,7 @@
 package com.astro.api.notification.controller;
 
+import com.astro.api.notification.swagger.NotificationSwagger;
+
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.response.ApiResult;
 import com.astro.api.common.service.ViewedService;
@@ -8,9 +10,6 @@ import com.astro.api.notification.dto.response.NotificationResponse;
 import com.astro.api.notification.model.Notification;
 import com.astro.api.notification.service.AuthenticatedNotifications;
 import com.astro.api.notification.service.NotificationService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -26,7 +25,7 @@ import java.util.Set;
 
 @RestController
 @RequestMapping("/notifications")
-public class NotificationController {
+public class NotificationController implements NotificationSwagger {
     private static final String NOTIFICATIONS_RESOURCE = "notifications";
 
     private final NotificationService notificationService;
@@ -39,14 +38,6 @@ public class NotificationController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('COLABORADOR', 'GESTOR', 'GESTOR_WORKSPACE')")
-    @Operation(summary = "Lista todas as notificações do usuário autenticado",
-            description = "Requer autenticação. A consulta não altera o estado de visualização das notificações.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Notificações retornadas com sucesso"),
-            @ApiResponse(responseCode = "401", description = "Não autenticado"),
-            @ApiResponse(responseCode = "403", description = "Não autorizado"),
-            @ApiResponse(responseCode = "404", description = "Usuário autenticado não encontrado")
-    })
     public ResponseEntity<ApiResult<List<NotificationResponse>>> findAll(
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser, HttpServletRequest request) {
         AuthenticatedNotifications result =
@@ -66,15 +57,6 @@ public class NotificationController {
 
     @GetMapping("/{notificationId}")
     @PreAuthorize("hasAnyRole('COLABORADOR', 'GESTOR', 'GESTOR_WORKSPACE')")
-    @Operation(summary = "Consulta uma notificação do usuário autenticado pelo ID",
-            description = "Retorna a mensagem, o título e o ID do evento associado, quando houver. A consulta não altera o estado de visualização.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Notificação retornada com sucesso"),
-            @ApiResponse(responseCode = "401", description = "Não autenticado"),
-            @ApiResponse(responseCode = "403", description = "Não autorizado"),
-            @ApiResponse(responseCode = "404", description = "Notificação inexistente ou não pertencente ao usuário"),
-            @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
-    })
     public ResponseEntity<ApiResult<NotificationDetailsResponse>> findById(
             @PathVariable String notificationId,
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
@@ -89,15 +71,6 @@ public class NotificationController {
 
     @PatchMapping("/{notificationId}/viewed")
     @PreAuthorize("hasAnyRole('COLABORADOR', 'GESTOR', 'GESTOR_WORKSPACE')")
-    @Operation(summary = "Marca uma notificação do usuário autenticado como visualizada",
-            description = "A notificação é identificada pelo ID e a operação é idempotente.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Notificação marcada como visualizada"),
-            @ApiResponse(responseCode = "401", description = "Não autenticado"),
-            @ApiResponse(responseCode = "403", description = "Não autorizado"),
-            @ApiResponse(responseCode = "404", description = "Notificação inexistente ou não pertencente ao usuário"),
-            @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
-    })
     public ResponseEntity<ApiResult<Void>> markAsViewed(
             @PathVariable String notificationId,
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,

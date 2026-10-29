@@ -1,5 +1,7 @@
 package com.astro.api.role.controller;
 
+import com.astro.api.role.swagger.RoleSwagger;
+
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.role.dto.request.RoleRequest;
 import com.astro.api.role.dto.request.RoleStatusRequest;
@@ -9,7 +11,6 @@ import com.astro.api.role.dto.response.RoleNrResponse;
 import com.astro.api.role.dto.response.RoleResponse;
 import com.astro.api.role.service.RoleService;
 import com.astro.api.common.response.ApiResult;
-import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -31,7 +32,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/roles")
 @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
-public class RoleController {
+public class RoleController implements RoleSwagger {
     private final RoleService service;
 
     public RoleController(RoleService service) {
@@ -39,7 +40,6 @@ public class RoleController {
     }
 
     @PostMapping
-    @Operation(summary = "Cria cargo no workspace do gestor")
     public ResponseEntity<ApiResult<Void>> create(@Valid @RequestBody RoleRequest body,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
         service.create(body, user);
@@ -48,7 +48,6 @@ public class RoleController {
     }
 
     @PatchMapping("/{roleId}/status")
-    @Operation(summary = "Alterna o status do cargo entre ativo e inativo")
     public ResponseEntity<ApiResult<Boolean>> toggleStatus(@PathVariable("roleId") Long roleId,
             @Valid @RequestBody RoleStatusRequest body,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
@@ -57,7 +56,6 @@ public class RoleController {
     }
 
     @PutMapping("/{roleId}")
-    @Operation(summary = "Atualiza nome e status do cargo")
     public ResponseEntity<ApiResult<RoleResponse>> update(@PathVariable("roleId") Long roleId,
             @Valid @RequestBody RoleRequest body,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
@@ -66,8 +64,6 @@ public class RoleController {
     }
 
     @PostMapping("/{roleId}/nrs")
-    @Operation(summary = "Vincula ou desvincula as NRs informadas do cargo",
-            description = "Rejeita NRs marcadas ausentes do catálogo relacional e ignora itens desmarcados ausentes. NRs omitidas mantêm seus vínculos.")
     public ResponseEntity<ApiResult<Void>> updateNrs(@PathVariable("roleId") Long roleId,
             @Valid @RequestBody UpdateRoleNrsRequest body,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
@@ -77,7 +73,6 @@ public class RoleController {
     }
 
     @GetMapping
-    @Operation(summary = "Lista cargos do workspace do gestor")
     public ResponseEntity<ApiResult<List<RoleResponse>>> findAll(
             @RequestParam("firebase_uid") String uid,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
@@ -86,7 +81,6 @@ public class RoleController {
     }
 
     @GetMapping("/{roleId}/nrs")
-    @Operation(summary = "Consulta NRs vinculadas ao cargo")
     public ResponseEntity<ApiResult<List<RoleNrResponse>>> findNrs(
             @PathVariable("roleId") Long roleId, @RequestParam("firebase_uid") String uid,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
@@ -95,8 +89,6 @@ public class RoleController {
     }
 
     @GetMapping("/{roleId}/nrs/options")
-    @Operation(summary = "Lista opções de NRs e indica os vínculos do cargo",
-            description = "Oferece NRs de colaboradores presentes no catálogo relacional e preserva as NRs já vinculadas para permitir sua remoção.")
     public ResponseEntity<ApiResult<List<RoleNrOptionResponse>>> findNrOptions(
             @PathVariable("roleId") Long roleId, @RequestParam("firebase_uid") String uid,
             @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {

@@ -1,5 +1,7 @@
 package com.astro.api.chat.controller;
 
+import com.astro.api.chat.swagger.ChatSwagger;
+
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.chat.dto.response.ChatContactResponse;
 import com.astro.api.chat.dto.response.ChatMessagePageResponse;
@@ -8,9 +10,6 @@ import com.astro.api.chat.service.ChatContactService;
 import com.astro.api.chat.service.ChatService;
 import com.astro.api.common.response.ApiResult;
 import jakarta.servlet.http.HttpServletRequest;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,7 +24,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/chats")
-public class ChatController {
+public class ChatController implements ChatSwagger {
     private final ChatService chatService;
     private final ChatContactService chatContactService;
 
@@ -50,15 +49,6 @@ public class ChatController {
 
     @GetMapping("/{conversationId}/messages")
     @PreAuthorize("hasAnyRole('COLABORADOR', 'GESTOR', 'GESTOR_WORKSPACE')")
-    @Operation(summary = "Consulta o histórico paginado de uma conversa")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Mensagens retornadas em ordem cronológica"),
-            @ApiResponse(responseCode = "400", description = "Identificador, limite ou cursor inválido"),
-            @ApiResponse(responseCode = "401", description = "Token Firebase ausente ou inválido"),
-            @ApiResponse(responseCode = "403", description = "Usuário não participante ou conversa fora do Workspace"),
-            @ApiResponse(responseCode = "404", description = "Conversa ou colaborador não encontrado"),
-            @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
-    })
     public ResponseEntity<ApiResult<ChatMessagePageResponse>> findMessages(
             @PathVariable UUID conversationId,
             @RequestParam(defaultValue = "30") int limit,
@@ -72,15 +62,6 @@ public class ChatController {
 
     @PatchMapping("/{conversationId}/read")
     @PreAuthorize("hasAnyRole('COLABORADOR', 'GESTOR', 'GESTOR_WORKSPACE')")
-    @Operation(summary = "Marca a conversa como lida para o usuário autenticado")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Contador de mensagens não lidas removido"),
-            @ApiResponse(responseCode = "400", description = "Identificador da conversa inválido"),
-            @ApiResponse(responseCode = "401", description = "Token Firebase ausente ou inválido"),
-            @ApiResponse(responseCode = "403", description = "Usuário não participante ou conversa fora do Workspace"),
-            @ApiResponse(responseCode = "404", description = "Conversa ou colaborador não encontrado"),
-            @ApiResponse(responseCode = "503", description = "Serviço de dados indisponível")
-    })
     public ResponseEntity<Void> markAsRead(@PathVariable String conversationId,
                                            @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
         chatService.markAsRead(authenticatedUser, conversationId);

@@ -1,5 +1,7 @@
 package com.astro.api.form.controller;
 
+import com.astro.api.form.swagger.FormSwagger;
+
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.response.ApiResult;
 import com.astro.api.form.dto.request.FormRequest;
@@ -8,7 +10,6 @@ import com.astro.api.form.dto.response.FormPageResponse;
 import com.astro.api.form.dto.response.FormRecipientsResponse;
 import com.astro.api.form.model.FormStatus;
 import com.astro.api.form.service.FormService;
-import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.beans.PropertyEditorSupport;
@@ -22,7 +23,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/forms")
 @PreAuthorize("hasAnyRole('GESTOR', 'GESTOR_WORKSPACE')")
-public class FormController {
+public class FormController implements FormSwagger {
     private final FormService formService;
 
     public FormController(FormService formService) {
@@ -40,7 +41,6 @@ public class FormController {
     }
 
     @PostMapping("/{id}/publish")
-    @Operation(summary = "Publica um rascunho válido, tornando-o pendente para o gestor destinatário")
     public ResponseEntity<ApiResult<FormDetailsResponse>> publish(@PathVariable("id") String id,
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Formulário publicado com sucesso",
@@ -48,7 +48,6 @@ public class FormController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Exclui um formulário sem respostas, respeitando remetente e workspace")
     public ResponseEntity<Void> delete(@PathVariable("id") String id,
             @AuthenticationPrincipal AuthenticatedUser principal) {
         formService.delete(id, principal);
@@ -56,7 +55,6 @@ public class FormController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Substitui dados e perguntas de um formulário próprio ou gerenciado pelo workspace")
     public ResponseEntity<ApiResult<FormDetailsResponse>> update(@PathVariable("id") String id,
             @Valid @RequestBody FormRequest body, @AuthenticationPrincipal AuthenticatedUser principal,
             HttpServletRequest request) {
@@ -65,7 +63,6 @@ public class FormController {
     }
 
     @PostMapping
-    @Operation(summary = "Cria um formulário pendente ou um rascunho com respostas vazias")
     public ResponseEntity<ApiResult<FormDetailsResponse>> create(@Valid @RequestBody FormRequest body,
             @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
         FormDetailsResponse form = formService.create(body, principal);
@@ -74,7 +71,6 @@ public class FormController {
     }
 
     @GetMapping("/recipients")
-    @Operation(summary = "Lista gestores ativos do workspace para selecionar o destinatário do formulário")
     public ResponseEntity<ApiResult<FormRecipientsResponse>> findRecipients(
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser, HttpServletRequest request) {
         return ResponseEntity.ok(ApiResult.success("Destinatários retornados com sucesso",
@@ -82,7 +78,6 @@ public class FormController {
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Consulta informações e perguntas de um formulário acessível")
     public ResponseEntity<ApiResult<FormDetailsResponse>> findById(
             @PathVariable("id") String id, @AuthenticationPrincipal AuthenticatedUser principal,
             HttpServletRequest request) {
@@ -91,7 +86,6 @@ public class FormController {
     }
 
     @GetMapping
-    @Operation(summary = "Lista formulários acessíveis com busca, status e paginação")
     public ResponseEntity<ApiResult<FormPageResponse>> findAll(
             @AuthenticationPrincipal AuthenticatedUser principal,
             @RequestParam(name = "search", required = false) String search,

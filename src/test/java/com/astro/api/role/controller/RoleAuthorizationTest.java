@@ -45,7 +45,7 @@ class RoleAuthorizationTest {
     }
 
     @Configuration
-    @EnableMethodSecurity
+    @EnableMethodSecurity(proxyTargetClass = true)
     static class Config {
         @Bean RoleService roleService() { return mock(RoleService.class); }
         @Bean RoleController roleController(RoleService service) { return new RoleController(service); }
