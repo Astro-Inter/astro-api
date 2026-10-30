@@ -1,5 +1,6 @@
 package com.astro.api.home.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
@@ -12,6 +13,8 @@ public record ManagerHomeDatabaseResponse(
 ) {
     public record ManagerPendingValidationDatabaseResponse(
             Long id,
+            @JsonAlias("user_id") Long participantId,
+            @JsonAlias("event_id") Long eventId,
             @JsonProperty("collaborator_name") String collaboratorName,
             @JsonProperty("event_title") String eventTitle
     ) {

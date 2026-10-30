@@ -1,6 +1,7 @@
 package com.astro.api.home;
 
 import com.astro.api.home.mapper.WorkspaceHomeMapper;
+import com.astro.api.home.mapper.ManagerHomeMapper;
 import com.astro.api.home.service.WorkspaceHomeProfileService;
 
 import com.astro.api.auth.security.AuthenticatedUser;
@@ -38,7 +39,8 @@ class HomeControllerTest {
     @BeforeEach
     void setUp() {
         var service = new HomeService(repository, JsonMapper.builder().build(),
-                mock(NotificationService.class), mock(ViewedService.class), mock(FormService.class), mock(UserAvatarService.class), new WorkspaceHomeMapper(JsonMapper.builder().build()), profiles);
+                mock(NotificationService.class), mock(ViewedService.class), mock(FormService.class), mock(UserAvatarService.class),
+                new ManagerHomeMapper(), new WorkspaceHomeMapper(JsonMapper.builder().build()), profiles);
         mvc = MockMvcBuilders.standaloneSetup(new HomeController(service))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {

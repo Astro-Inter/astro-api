@@ -37,7 +37,9 @@ da função instalada no ambiente.
 contém `username`, `profilePhotoUrl`, `workspace_name`, `pending_validations`,
 `pending_forms` e `indicators`.
 
-Cada validação contém `id`, `collaborator_name`, `event_title` e `viewed`.
+Cada validação contém `id`, `participantId`, `eventId`, `collaborator_name`,
+`event_title` e `viewed`. `participantId` identifica o usuário participante e
+`eventId` identifica o evento associado à conclusão pendente.
 Cada formulário contém `id`, `title`, `days_left` e `viewed`; são consultados
 até três formulários pendentes. `days_left` é a diferença em dias de calendário
 até o prazo, no fuso `America/Sao_Paulo`; pode ser negativo ou nulo. Os
