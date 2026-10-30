@@ -270,6 +270,12 @@ class CollaboratorPostgresTest {
             "com.astro.api.unit.repository", "com.astro.api.role.repository"})
     @Import({CollaboratorService.class, CollaboratorMapper.class, CollaboratorStatusPolicy.class, UserAvatarService.class})
     static class Config {
+        @Bean com.astro.api.workspace.service.PreRegistrationQueueService preRegistrationQueueService() {
+            return org.mockito.Mockito.mock(com.astro.api.workspace.service.PreRegistrationQueueService.class);
+        }
+        @Bean com.astro.api.user.service.UserService userService() {
+            return org.mockito.Mockito.mock(com.astro.api.user.service.UserService.class);
+        }
         @Bean com.astro.api.common.storage.R2StorageService storage() {
             return org.mockito.Mockito.mock(com.astro.api.common.storage.R2StorageService.class);
         }

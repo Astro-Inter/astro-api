@@ -281,3 +281,11 @@ no projeto. A verificação somente de leitura no banco configurado confirmou a
 existência da view e da função; não executou alterações nem validou os endpoints
 novos nesse ambiente. Os endpoints precisam ser implantados antes de testes HTTP
 no ambiente publicado. Os dropdowns continuam usando `/roles` e `/units`.
+
+## Reenvio da chave de acesso — SCRUM-672
+
+`POST /collaborators/{collaboratorId}/access-key/resend`, sem corpo, exige Bearer Firebase de GESTOR ou GESTOR_WORKSPACE ativo. O destinatário vem do registro consultado dentro do workspace e das unidades autorizadas, sob bloqueio da linha. Não aceita e-mail ou identidade enviados pelo cliente. Exige tipo COLABORADOR, status PRE_CADASTRADO e Firebase UID ausente; não altera status, vínculos ou identidade.
+
+Inclui o e-mail na lista Redis `processamento:email:colaborador`, reutilizando o processamento do cadastro. A API não gera ou expõe tokens, não altera TTL e não confirma entrega do e-mail. A geração/envio e o prazo informado de sete dias permanecem no consumidor existente, externo a este repositório.
+
+Retorna 202 com `ApiResult<Void>` (data null) apenas após confirmação do Redis. Retorna 400 para ID ou estado inválido, 401/403 sem autenticação válida ou sem perfil/permissão, 404 para registro inexistente ou fora do escopo, 503 para falha de conexão com Redis. Outras falhas seguem o handler global. Redis e PostgreSQL não compartilham transação; erro de rede após a gravação pode deixar o resultado do enfileiramento indeterminado. Repetir a solicitação pode reenfileirar o mesmo e-mail.
