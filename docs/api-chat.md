@@ -272,3 +272,46 @@ O histórico e a busca de conversas por participantes não dependem de índices
 personalizados criados pela API. Sem índices apropriados já existentes no
 MongoDB, essas consultas podem ficar mais lentas conforme as collections
 crescem.
+
+
+## Indicador temporário de digitação (SCRUM-261)
+
+A conexão STOMP autenticada existente anuncia `astro-typing:1` no frame
+`CONNECTED`, preservando versão, identidade e heartbeats. Clientes novos só
+ativam o recurso quando recebem esse cabeçalho; clientes antigos continuam
+usando mensagens normalmente. Não foi adicionado endpoint HTTP.
+
+- Publicar em `/app/chat.typing`.
+- Inscrever em `/user/queue/typing` após conectar e novamente após reconectar.
+- Entrada `ChatTypingRequest`: `typing` obrigatório (boolean) e exatamente um
+  seletor: `recipientId` (Long) ou `conversationId` (UUID). Campos desconhecidos,
+  inclusive identidade do remetente e texto digitado, são rejeitados.
+- Saída `ChatTypingResponse`: `conversationId`, `senderId`, `typing`, `expiresAt`.
+  A identidade vem do principal autenticado e o prazo é calculado no servidor:
+  cinco segundos para início/renovação, instante atual para encerramento.
+- A autorização revalida participantes, identidade Firebase, perfil, status e
+  unidade ativos, workspace e política de comunicação do envio de mensagens.
+  Uma conversa informada precisa existir e incluir o remetente. Para um contato
+  autorizado, consulta a conversa existente pelo par antes de calcular um ID
+  pela regra determinística. Nenhum documento é criado.
+- O canal Redis `astro:chat:typing:v1` distribui os eventos entre instâncias,
+  entregando somente na fila privada do destinatário. Eventos de início vencidos
+  são descartados. Não há replay offline, outbox, contador de não lidas ou push.
+- Redis limita renovações de início a uma por par em 1,5 segundo; parar remove
+  essa chave temporária e publica o encerramento. O cliente limita a dois segundos.
+- Erros usam `/user/queue/errors`, com `clientMessageId:null` e códigos
+  `TYPING_FORBIDDEN`, `TYPING_INVALID_REQUEST` ou `TYPING_UNAVAILABLE`.
+  São independentes da confirmação de envio de mensagens.
+
+O mobile exibe somente três pontinhos animados no final da conversa, em um
+item temporário separado do histórico. Apagar o texto, enviar, sair da conversa,
+ficar em segundo plano ou desconectar limpa o sinal. Um destinatário limpa o
+indicador ao receber a mensagem ou expirar o prazo, mesmo sem evento de parada.
+A animação respeita a configuração de animações do Android.
+
+Para validar: publicar esta API; conectar dois usuários autorizados do mesmo
+workspace, abrir a conversa nos dois clientes e digitar em um deles. Conferir
+os pontinhos no outro, renovação durante a digitação e desaparecimento ao parar,
+enviar, sair da tela ou desligar a rede. Usuários sem permissão e outros
+workspaces não devem receber eventos. API antiga deve manter o chat normal,
+com o indicador desativado por ausência do cabeçalho de capacidade.

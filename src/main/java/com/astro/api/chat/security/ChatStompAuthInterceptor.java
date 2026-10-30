@@ -61,7 +61,8 @@ public class ChatStompAuthInterceptor implements ChannelInterceptor {
 
         ChatPrincipal principal = authenticatedPrincipal(accessor);
         if (command == StompCommand.SUBSCRIBE) {
-            if (PRIVATE_MESSAGES_DESTINATION.equals(accessor.getDestination())
+            if ("/user/queue/typing".equals(accessor.getDestination())
+                    || PRIVATE_MESSAGES_DESTINATION.equals(accessor.getDestination())
                     || PRIVATE_ERRORS_DESTINATION.equals(accessor.getDestination())) {
                 return message;
             }
@@ -74,7 +75,7 @@ public class ChatStompAuthInterceptor implements ChannelInterceptor {
         }
 
         if (command == StompCommand.SEND) {
-            if ("/app/chat.send".equals(accessor.getDestination())) return message;
+            if ("/app/chat.send".equals(accessor.getDestination()) || "/app/chat.typing".equals(accessor.getDestination())) return message;
             throw denied("Destino de envio não autorizado");
         }
 

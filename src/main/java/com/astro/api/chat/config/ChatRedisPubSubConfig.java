@@ -1,6 +1,8 @@
 package com.astro.api.chat.config;
 
 import com.astro.api.chat.messaging.ChatRedisMessageListener;
+import com.astro.api.chat.messaging.ChatRedisTypingListener;
+import com.astro.api.chat.messaging.RedisChatTypingPublisher;
 import com.astro.api.chat.messaging.RedisChatMessagePublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,10 +14,13 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 public class ChatRedisPubSubConfig {
     @Bean
     public RedisMessageListenerContainer chatRedisMessageListenerContainer(
-            RedisConnectionFactory connectionFactory, ChatRedisMessageListener listener) {
+            RedisConnectionFactory connectionFactory, ChatRedisMessageListener listener,
+            ChatRedisTypingListener typingListener) {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
         container.addMessageListener(listener, new ChannelTopic(RedisChatMessagePublisher.DELIVERY_CHANNEL));
+        container.addMessageListener(typingListener, new ChannelTopic(
+                RedisChatTypingPublisher.TYPING_CHANNEL));
         return container;
     }
 }
