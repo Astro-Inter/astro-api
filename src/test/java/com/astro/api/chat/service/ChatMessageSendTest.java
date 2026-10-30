@@ -127,6 +127,47 @@ class ChatMessageSendTest {
         verify(mongo, never()).inTransaction(any());
     }
 
+    @Test
+    void typingUsesCurrentParticipantAuthorizationWithoutPersistingOrSendingPush() {
+        com.astro.api.chat.model.ChatTypingTarget target = service.authorizeTyping(sender, 2L, null);
+        assertEquals(2L, target.recipientId());
+        assertEquals(ChatMessageIds.forConversation(1L, 2L), target.conversationId());
+        verify(mongo).findConversationByPair(1L, 2L);
+        verify(mongo, never()).inTransaction(any());
+        org.mockito.Mockito.verifyNoInteractions(redis, pushOutbox, messagePublisher);
+    }
+
+    @Test
+    void typingUsesExistingConversationIdWhenSelectedByRecipient() {
+        String id = "11111111-2222-4333-8444-555555555555";
+        when(mongo.findConversationByPair(1L, 2L)).thenReturn(new ConversationDocument(id, List.of(1L, 2L)));
+        assertEquals(id, service.authorizeTyping(sender, 2L, null).conversationId());
+        verify(mongo, never()).inTransaction(any());
+    }
+
+    @Test
+    void typingRejectsAnotherWorkspaceAndInactiveParticipant() {
+        ChatSendUserProjection peer = participant(2L, UserType.GESTOR, 20L);
+        ChatSendUserProjection senderUser = participant(1L, UserType.COLABORADOR, 10L);
+        when(users.findChatSendUsers(eq("uid-1"), anyList())).thenReturn(List.of(senderUser, peer));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.authorizeTyping(sender, 2L, null));
+        when(peer.getWorkspaceId()).thenReturn(10L);
+        when(peer.getStatus()).thenReturn(UserStatus.DESATIVADO);
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.authorizeTyping(sender, 2L, null));
+        org.mockito.Mockito.verifyNoInteractions(mongo, redis, pushOutbox, messagePublisher);
+    }
+
+    @Test
+    void typingRejectsConversationOfAnotherUser() {
+        String id = "11111111-2222-4333-8444-555555555555";
+        when(mongo.findConversation(id)).thenReturn(new ConversationDocument(id, List.of(2L, 3L)));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.authorizeTyping(sender, null, id));
+        verify(users, never()).findChatSendUsers(any(), anyList());
+    }
+
     private static ChatSendRequest request(Long recipientId, String content, String clientMessageId) {
         ChatSendRequest request = new ChatSendRequest();
         request.setRecipientId(recipientId);

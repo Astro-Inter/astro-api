@@ -10,6 +10,7 @@ import com.astro.api.chat.dto.response.ChatSendResponse;
 import com.astro.api.chat.dto.request.ChatSendRequest;
 import com.astro.api.chat.model.ChatMessageDocument;
 import com.astro.api.chat.model.ChatMessageIds;
+import com.astro.api.chat.model.ChatTypingTarget;
 import com.astro.api.chat.model.ConversationDocument;
 import com.astro.api.chat.mapper.ChatMessageMapper;
 import com.astro.api.chat.mapper.ChatPushEventMapper;
@@ -280,17 +281,7 @@ public class ChatService {
         String conversationId = normalizeOptionalUuid(request.getConversationId(), "conversationId");
         String replyId = normalizeOptionalUuid(request.getReplyToMessageId(), "replyToMessageId");
         String clientMessageId = normalizeOptionalUuid(request.getClientMessageId(), "clientMessageId");
-        Long recipientId = request.getRecipientId();
-        if (conversationId != null) {
-            ConversationDocument conversation = chatMongoRepository.findConversation(conversationId);
-            if (conversation == null) throw new ResourceNotFoundException("Conversa não encontrada");
-            if (conversation.participants() == null || conversation.participants().size() != 2
-                    || !conversation.participants().contains(senderId)) {
-                throw new AccessDeniedException("Usuário não participa desta conversa");
-            }
-            recipientId = conversation.participants().stream().filter(id -> !senderId.equals(id)).findFirst()
-                    .orElseThrow(() -> new AccessDeniedException("Conversa inválida"));
-        }
+        Long recipientId = resolveRecipient(principal, request.getRecipientId(), conversationId);
         ChatPushParticipants pushParticipants = validateParticipants(principal, recipientId);
         String selectedConversationId = conversationId;
         ChatMessageDocument message;
@@ -316,6 +307,36 @@ public class ChatService {
                 message.senderId(), message.content(), message.replyToMessageId(), message.createdAt());
         messagePublisher.publish(recipientId, response);
         return response;
+    }
+
+    @Transactional(readOnly = true)
+    public ChatTypingTarget authorizeTyping(ChatPrincipal principal, Long recipientId, String conversationId) {
+        String normalizedId = normalizeOptionalUuid(conversationId, "conversationId");
+        Long recipient = resolveRecipient(principal, recipientId, normalizedId);
+        validateParticipants(principal, recipient);
+        if (normalizedId == null) {
+            ConversationDocument existing = chatMongoRepository.findConversationByPair(principal.collaboratorId(), recipient);
+            if (existing != null) normalizedId = existing.id();
+            else normalizedId = ChatMessageIds.forConversation(principal.collaboratorId(), recipient);
+        }
+        return new ChatTypingTarget(normalizedId, recipient);
+    }
+
+    private Long resolveRecipient(ChatPrincipal principal, Long recipientId, String conversationId) {
+        Long senderId = principal.collaboratorId();
+        if (conversationId != null) {
+            ConversationDocument conversation = chatMongoRepository.findConversation(conversationId);
+            if (conversation == null) throw new ResourceNotFoundException("Conversa não encontrada");
+            if (conversation.participants() == null || conversation.participants().size() != 2
+                    || conversation.participants().stream().anyMatch(Objects::isNull)
+                    || conversation.participants().getFirst().equals(conversation.participants().getLast())
+                    || !conversation.participants().contains(senderId)) {
+                throw new AccessDeniedException("Usuário não participa desta conversa");
+            }
+            recipientId = conversation.participants().stream().filter(id -> !senderId.equals(id)).findFirst()
+                    .orElseThrow(() -> new AccessDeniedException("Conversa inválida"));
+        }
+        return recipientId;
     }
 
     private UserChatProjection authorizeCurrentUser(AuthenticatedUser authenticatedUser) {
