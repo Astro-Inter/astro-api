@@ -5,6 +5,8 @@ import com.astro.api.user.model.UserType;
 
 public interface ChatSendUserProjection {
     Long getId();
+    String getName();
+    String getFirebaseUid();
     UserType getType();
     UserStatus getStatus();
     Boolean getUnitActive();

@@ -52,7 +52,8 @@ class ChatServiceTest {
         current = user(1L, "João", UserType.COLABORADOR, 10L);
         when(users.findChatUserByFirebaseUid("uid")).thenReturn(Optional.of(current));
         service = new ChatService(users, mongo, redis, avatars, new ChatMessageMapper(),
-                mock(ChatMessagePublisher.class));
+                mock(ChatMessagePublisher.class), mock(com.astro.api.chat.push.ChatPushSettings.class),
+                mock(com.astro.api.chat.push.ChatPushOutbox.class));
     }
 
     @Test
