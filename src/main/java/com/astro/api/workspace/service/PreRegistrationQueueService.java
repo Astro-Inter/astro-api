@@ -29,6 +29,13 @@ public class PreRegistrationQueueService {
         }
     }
 
+    public void enqueueCollaboratorEmail(String email) {
+        Long queueSize = redisTemplate.opsForList().rightPush(COLLABORATOR_EMAIL_QUEUE, email);
+        if (queueSize == null || queueSize <= 0) {
+            throw new org.springframework.dao.DataAccessResourceFailureException("Não foi possível solicitar o reenvio da chave de acesso");
+        }
+    }
+
     public void enqueueManagerEmail(String email) {
         redisTemplate.opsForList().rightPush(WORKSPACE_EMAIL_QUEUE, email);
     }

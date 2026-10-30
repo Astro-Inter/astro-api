@@ -38,6 +38,7 @@ class CollaboratorSecurityTest {
             FirebaseTokenService tokens = context.getBean(FirebaseTokenService.class);
             AuthorizationService authorization = context.getBean(AuthorizationService.class);
             CollaboratorService service = context.getBean(CollaboratorService.class);
+            mvc.perform(post("/collaborators/2/access-key/resend")).andExpect(result -> assertTrue(result.getResponse().getStatus() == 401 || result.getResponse().getStatus() == 403));
             mvc.perform(get("/collaborators")).andExpect(result -> assertTrue(result.getResponse().getStatus() >= 400));
             mvc.perform(patch("/collaborators/2/status").contentType("application/json").content("{\"status\":\"DESATIVADO\"}"))
                     .andExpect(result -> assertTrue(result.getResponse().getStatus() == 401 || result.getResponse().getStatus() == 403));
@@ -51,6 +52,8 @@ class CollaboratorSecurityTest {
             when(tokens.verify("valid")).thenReturn(token);
             for (Role role : List.of(Role.COLABORADOR, Role.ADMIN)) {
                 when(authorization.getRole("manager")).thenReturn(Optional.of(role));
+                mvc.perform(post("/collaborators/2/access-key/resend").header("Authorization", "Bearer valid"))
+                        .andExpect(status().isForbidden());
                 mvc.perform(get("/collaborators").header("Authorization", "Bearer valid"))
                         .andExpect(status().isForbidden());
                 mvc.perform(get("/collaborators/2").header("Authorization", "Bearer valid"))
@@ -71,6 +74,8 @@ class CollaboratorSecurityTest {
                 when(authorization.getRole("manager")).thenReturn(Optional.of(role));
                 mvc.perform(get("/collaborators").header("Authorization", "Bearer valid"))
                         .andExpect(status().isOk());
+                mvc.perform(post("/collaborators/2/access-key/resend").header("Authorization", "Bearer valid"))
+                        .andExpect(status().isAccepted());
             }
         }
     }

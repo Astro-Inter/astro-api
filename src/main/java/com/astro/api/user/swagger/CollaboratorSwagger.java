@@ -75,6 +75,14 @@ public interface CollaboratorSwagger {
               CreateCollaboratorRequest body,  AuthenticatedUser user,
             HttpServletRequest request);
 
+    @Operation(summary = "Solicita o reenvio da chave de acesso do colaborador",
+            description = "Exige gestor ativo e acesso ao workspace e à unidade. Aceita apenas COLABORADOR/PRE_CADASTRADO sem Firebase UID. Inclui o e-mail armazenado na mesma fila Redis do cadastro; não gera a chave nem confirma a entrega. Falhas do Redis são propagadas.")
+    @ApiResponses({@ApiResponse(responseCode = "202", description = "E-mail incluído na fila de pré-cadastro"),
+            @ApiResponse(responseCode = "400", description = "Usuário não elegível para reenvio"),
+            @ApiResponse(responseCode = "404", description = "Colaborador inexistente ou fora do escopo")})
+    ResponseEntity<ApiResult<Void>> resendAccessKey(Long collaboratorId, AuthenticatedUser user,
+            HttpServletRequest request);
+
     @Operation(summary = "Edita todos os campos administrativos do colaborador",
             description = "Gestor do workspace pode editar os três perfis no escopo; gestor comum pode editar colaboradores e sua própria conta, mas recebe 403 para outros gestores e gestor do workspace. Exige todos os campos editáveis não nulos, incluindo status. Mantém vínculos inativos quando não alterados. Preserva ID, tipo, criado_em e Firebase UID. Mudanças de e-mail vinculadas ao Firebase usam compensação em caso de falha.")
     @ApiResponses({@ApiResponse(responseCode = "200", description = "Colaborador atualizado"),
