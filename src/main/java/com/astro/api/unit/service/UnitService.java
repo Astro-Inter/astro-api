@@ -99,7 +99,12 @@ public class UnitService {
         }
         try {
             String nrsJson = objectMapper.writeValueAsString(body.nrs().stream()
-                    .map(nr -> Map.of("nr", nr.nr(), "ativo", nr.active())).toList());
+                    .map(nr -> {
+                        Map<String, Object> serializedNr = new LinkedHashMap<>();
+                        serializedNr.put("nr", nr.nr());
+                        serializedNr.put("ativo", nr.active());
+                        return serializedNr;
+                    }).toList());
             executeDatabaseOperation(() -> {
                 unitRepository.updateNrs(firebaseUid, unitId, nrsJson);
                 return null;

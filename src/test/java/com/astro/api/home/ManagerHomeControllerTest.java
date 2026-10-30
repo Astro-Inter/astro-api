@@ -46,8 +46,8 @@ class ManagerHomeControllerTest {
                 .andExpect(jsonPath("$.path").value("/home/manager"))
                 .andExpect(jsonPath("$.data.username").value("Ana"))
                 .andExpect(jsonPath("$.data.profilePhotoUrl").value("https://example.com/manager.jpg"))
-                .andExpect(jsonPath("$.data.pending_validations").isArray())
-                .andExpect(jsonPath("$.data.pending_forms").isArray());
+                .andExpect(jsonPath("$.data.pendingValidations").isArray())
+                .andExpect(jsonPath("$.data.pendingForms").isArray());
         verify(service).loadManagerHome(user);
     }
 }

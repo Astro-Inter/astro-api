@@ -89,7 +89,7 @@ class CollaboratorControllerTest {
         mvc.perform(get("/collaborators/2"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.cpf").value("52998224725"))
                 .andExpect(jsonPath("$.data.workModel").value("HIBRIDO"))
-                .andExpect(jsonPath("$.data.workspace_id").value(3))
+                .andExpect(jsonPath("$.data.workspaceId").value(3))
                 .andExpect(jsonPath("$.data.profilePhotoUrl").value("https://r2.example.com/foto.jpg"))
                 .andExpect(jsonPath("$.data.avatarInitials").value("C"))
                 .andExpect(jsonPath("$.data.firebase_uid").doesNotExist())
@@ -110,17 +110,17 @@ class CollaboratorControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(2))
                 .andExpect(jsonPath("$.data.name").value("Ana Silva"))
-                .andExpect(jsonPath("$.data.roleName").value("Operadora"))
+                .andExpect(jsonPath("$.data.role").value("Operadora"))
                 .andExpect(jsonPath("$.data.profilePhotoUrl").value("https://r2.example.com/ana.jpg"))
                 .andExpect(jsonPath("$.data.unitName").value("Matriz"))
                 .andExpect(jsonPath("$.data.workModel").value("HIBRIDO"))
                 .andExpect(jsonPath("$.data.email").value("ana@example.com"))
                 .andExpect(jsonPath("$.data.pendingCount").value(3))
                 .andExpect(jsonPath("$.data.nrs[0].code").value(10))
-                .andExpect(jsonPath("$.data.nrs[0].validade").value("2027-04-30"))
-                .andExpect(jsonPath("$.data.nrs[0].descricao").value("Segurança"))
-                .andExpect(jsonPath("$.data.nrs[0].objetivo").value("Prevenir acidentes"))
-                .andExpect(jsonPath("$.data.nrs[0].aplicabilidade").value("Trabalho industrial"));
+                .andExpect(jsonPath("$.data.nrs[0].expiresAt").value("2027-04-30"))
+                .andExpect(jsonPath("$.data.nrs[0].description").value("Segurança"))
+                .andExpect(jsonPath("$.data.nrs[0].objective").value("Prevenir acidentes"))
+                .andExpect(jsonPath("$.data.nrs[0].applicable").value("Trabalho industrial"));
         verify(service).findProfileById(2L, principal);
     }
 

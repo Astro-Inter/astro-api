@@ -69,7 +69,7 @@ class UnitControllerTest {
                 .andExpect(jsonPath("$.data[0].number").value("10A"))
                 .andExpect(jsonPath("$.data[0].id_unidade").value(12))
                 .andExpect(jsonPath("$.data[0].id_workspace").value(3))
-                .andExpect(jsonPath("$.data[0].nome").value("Matriz"))
+                .andExpect(jsonPath("$.data[0].name").value("Matriz"))
                 .andExpect(jsonPath("$.data[0].quantidade_colaboradores").value(25));
         verify(service).findAll(user);
     }
@@ -86,7 +86,7 @@ class UnitControllerTest {
                 .andExpect(jsonPath("$.data[0].workspaceId").value(3))
                 .andExpect(jsonPath("$.data[0].id_workspace").value(3))
                 .andExpect(jsonPath("$.data[0].name").value("Filial"))
-                .andExpect(jsonPath("$.data[0].nome").value("Filial"))
+                .andExpect(jsonPath("$.data[0].name").value("Filial"))
                 .andExpect(jsonPath("$.data[0].status").value("Inativo"))
                 .andExpect(jsonPath("$.data[0].collaboratorCount").value(0))
                 .andExpect(jsonPath("$.data[0].quantidade_colaboradores").value(0));

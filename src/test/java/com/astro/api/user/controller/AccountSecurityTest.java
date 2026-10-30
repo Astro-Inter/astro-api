@@ -101,13 +101,13 @@ class AccountSecurityTest {
             mvc.perform(get("/user/me/account-details?userId=999&workspaceId=2")
                             .header("Authorization", "Bearer valid"))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.data", aMapWithSize(9)))
-                    .andExpect(jsonPath("$.data.nome").value("Maria Rosa"))
+                    .andExpect(jsonPath("$.data.name").value("Maria Rosa"))
                     .andExpect(jsonPath("$.data.email").value("stored@example.com"))
                     .andExpect(jsonPath("$.data.roleId").value(20))
-                    .andExpect(jsonPath("$.data.cargo").value("Engenheira"))
+                    .andExpect(jsonPath("$.data.roleName").value("Engenheira"))
                     .andExpect(jsonPath("$.data.unitId").value(10))
-                    .andExpect(jsonPath("$.data.unidade").value("Osasco"))
-                    .andExpect(jsonPath("$.data.modalidade").value("REMOTO"))
+                    .andExpect(jsonPath("$.data.unitName").value("Osasco"))
+                    .andExpect(jsonPath("$.data.workModel").value("REMOTO"))
                     .andExpect(content().string(org.hamcrest.Matchers.containsString("\"cpf\":null")))
                     .andExpect(content().string(org.hamcrest.Matchers.containsString("\"profilePhotoUrl\":null")));
             verify(accountService).findDetails(principal);
@@ -129,8 +129,8 @@ class AccountSecurityTest {
                 "Maria Rosa", "Engenheira", "Osasco", "REMOTO", "stored@example.com", null, java.util.List.of()));
         mvc.perform(get("/user/me").header("Authorization", "Bearer valid"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data", aMapWithSize(7)))
-                .andExpect(jsonPath("$.data.nrs").isArray()).andExpect(jsonPath("$.data.nome").value("Maria Rosa"))
-                .andExpect(jsonPath("$.data.cargo").value("Engenheira"));
+                .andExpect(jsonPath("$.data.nrs").isArray()).andExpect(jsonPath("$.data.name").value("Maria Rosa"))
+                .andExpect(jsonPath("$.data.role").value("Engenheira"));
         verifyNoInteractions(accountService);
     }
 
@@ -222,7 +222,7 @@ class AccountSecurityTest {
                             .header("Authorization", "Bearer valid"))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.success").value(true))
                     .andExpect(jsonPath("$.data", aMapWithSize(3)))
-                    .andExpect(jsonPath("$.data.nome").value("Maria Rosa"))
+                    .andExpect(jsonPath("$.data.name").value("Maria Rosa"))
                     .andExpect(jsonPath("$.data.email").value("stored@example.com"))
                     .andExpect(content().string(org.hamcrest.Matchers.containsString("\"profilePhotoUrl\":null")))
                     .andExpect(jsonPath("$.path").value("/user/me/account-summary"));

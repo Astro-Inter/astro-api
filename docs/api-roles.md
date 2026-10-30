@@ -8,7 +8,8 @@ O `RoleManagementRepository` converte as projections em DTOs e traduz SQLSTATEs.
 O repositório JPA também mantém as importações e consultas já existentes.
 
 As rotas usam nomes em inglês, como os demais módulos da API: `/roles` para
-cargos e `/nrs/options` para as opções. Os campos JSON usam os nomes dos atributos dos DTOs. As mensagens das constraints das requests ficam em
+cargos e `/nrs/options` para as opções. Os campos JSON usam os nomes dos atributos
+dos DTOs. As mensagens das constraints das requests ficam em
 `src/main/resources/ValidationMessages.properties`.
 
 Todas as chamadas exigem `Authorization: Bearer <token Firebase>` e perfil `GESTOR`

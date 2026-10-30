@@ -4,20 +4,20 @@ import java.time.LocalDate;
 import java.util.List;
 
 public record UserProfileResponse(
-        String nome,
-        String cargo,
-        String unidade,
-        String modalidade,
+        String name,
+        String role,
+        String unit,
+        String workModel,
         String email,
         String profilePhotoUrl,
         List<NrProfileResponse> nrs
 ) {
     public record NrProfileResponse(
             int code,
-            LocalDate validade,
-            String descricao,
-            String objetivo,
-            String aplicabilidade
+            LocalDate expiresAt,
+            String description,
+            String objective,
+            String applicable
     ) {
     }
 }
