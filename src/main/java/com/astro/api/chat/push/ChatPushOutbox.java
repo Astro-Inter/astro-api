@@ -1,5 +1,8 @@
 package com.astro.api.chat.push;
 
+import com.astro.api.chat.model.ChatPushEvent;
+import com.astro.api.chat.model.ChatPushOutboxEntry;
+import com.astro.api.chat.mapper.ChatPushEventMapper;
 import com.mongodb.client.ClientSession;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
@@ -20,27 +23,24 @@ public class ChatPushOutbox {
     }
 
     public void insert(ClientSession session, ChatPushEvent event) {
-        Document payload = new Document("version", event.version()).append("messageId", event.messageId())
-                .append("conversationId", event.conversationId()).append("senderId", event.senderId())
-                .append("recipientId", event.recipientId()).append("workspaceId", event.workspaceId())
-                .append("recipientUid", event.recipientUid()).append("senderName", event.senderName())
-                .append("preview", event.preview()).append("createdAt", event.createdAt().toString());
+        Document payload = ChatPushEventMapper.toDocument(event);
         events.insertOne(session, new Document("_id", event.messageId()).append("payload", payload)
                 .append("nextAttempt", Date.from(event.createdAt())).append("expiresAt", Date.from(event.createdAt().plusSeconds(86400)))
                 .append("attempts", 0).append("done", false));
     }
 
-    public Document claim(Instant now, String lease) {
+    public ChatPushOutboxEntry claim(Instant now, String lease) {
         initialize();
-        return events.findOneAndUpdate(new Document("done", false)
+        Document document = events.findOneAndUpdate(new Document("done", false)
                         .append("nextAttempt", new Document("$lte", Date.from(now)))
                         .append("expiresAt", new Document("$gt", Date.from(now))),
                 new Document("$set", new Document("lease", lease).append("nextAttempt", Date.from(now.plusSeconds(120))))
                         .append("$inc", new Document("attempts", 1)),
                 new FindOneAndUpdateOptions().sort(new Document("nextAttempt", 1)).returnDocument(ReturnDocument.AFTER));
+        return ChatPushEventMapper.fromOutboxDocument(document);
     }
 
-    private synchronized void initialize() {
+    private void initialize() {
         if (initialized) return;
         events.createIndex(new Document("done", 1).append("nextAttempt", 1));
         events.createIndex(new Document("expiresAt", 1),

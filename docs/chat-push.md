@@ -28,6 +28,12 @@ idempotentemente. Uma rodada reivindica até 10 eventos; lease atômico de 120s
 impede disputa normal entre réplicas. Falhas/HTTP diferente de 200/202 usam espera
 progressiva de 1s a 300s, até o evento expirar em 24h. Timeout HTTP de 10s,
 conexão de 5s. Nenhum token Firebase é enviado por essa integração.
+O cliente HTTP é um bean próprio injetado pelo único construtor público do
+dispatcher, sem @Autowired. A inicialização tardia dos índices não precisa de
+synchronized no fluxo atual: claim é chamado somente pelo dispatcher executado
+no chatPushScheduler de uma thread por instância. A exclusão entre réplicas
+permanece no findOneAndUpdate atômico e no lease Mongo. Falhas na criação dos
+índices deixam a inicialização pendente para a rodada seguinte.
 
 ## Contrato interno versão 1
 
@@ -37,6 +43,10 @@ version (número 1); messageId e conversationId (UUID); senderId, recipientId e
 workspaceId (strings decimais para preservar precisão); recipientUid (Firebase);
 senderName (até 80 pontos Unicode); preview (até 160); createdAt (ISO-8601).
 O mapper normaliza espaços e limita a prévia preservando Unicode.
+Internamente, ChatPushEvent usa IDs Long e ChatPushOutboxEntry representa o
+evento reivindicado com sua contagem de tentativas. Somente o mapper/repository
+conhecem BSON; elegibilidade e dispatcher recebem modelos tipados. O mapper
+mantém IDs como strings e a data ISO-8601 na persistência e no JSON do Worker.
 
 202 significa persistência durável no Worker, não entrega no dispositivo.
 Após aceite, a outbox remove payload e lease. O TTL elimina o recibo em até 24h

@@ -1,5 +1,6 @@
 package com.astro.api.chat.push;
 
+import com.astro.api.chat.model.ChatPushEvent;
 import com.mongodb.client.ClientSession;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
@@ -27,7 +28,7 @@ class ChatPushOutboxTest {
         ChatPushOutbox outbox = outbox();
         ClientSession session = mock(ClientSession.class);
         Instant now = Instant.parse("2026-10-30T10:00:00Z");
-        outbox.insert(session, new ChatPushEvent(1, "message", "conversation", "1", "2", "10",
+        outbox.insert(session, new ChatPushEvent(1, "message", "conversation", 1L, 2L, 10L,
                 "uid-2", "Gestor", "Olá", now));
         ArgumentCaptor<Document> document = ArgumentCaptor.forClass(Document.class);
         verify(events).insertOne(eq(session), document.capture());
@@ -58,5 +59,24 @@ class ChatPushOutboxTest {
         assertEquals(java.util.Date.from(now), filter.getValue().get("expiresAt", Document.class).get("$gt"));
         assertEquals("lease", update.getValue().get("$set", Document.class).getString("lease"));
         assertEquals(now.plusSeconds(120), update.getValue().get("$set", Document.class).getDate("nextAttempt").toInstant());
+    }
+
+    @Test void repeatedClaimsInitializeIndexesOnlyOnce() {
+        ChatPushOutbox outbox = outbox();
+        outbox.claim(Instant.now(), "first");
+        outbox.claim(Instant.now(), "second");
+        verify(events, times(1)).createIndex(new Document("done", 1).append("nextAttempt", 1));
+        verify(events, times(1)).createIndex(eq(new Document("expiresAt", 1)),
+                any(com.mongodb.client.model.IndexOptions.class));
+    }
+
+    @Test void failedIndexInitializationIsRetriedOnNextClaim() {
+        ChatPushOutbox outbox = outbox();
+        when(events.createIndex(any(Document.class))).thenThrow(new IllegalStateException("unavailable")).thenReturn("index");
+        assertThrows(IllegalStateException.class, () -> outbox.claim(Instant.now(), "first"));
+        outbox.claim(Instant.now(), "second");
+        verify(events, times(2)).createIndex(new Document("done", 1).append("nextAttempt", 1));
+        verify(events).findOneAndUpdate(any(Document.class), any(Document.class),
+                any(com.mongodb.client.model.FindOneAndUpdateOptions.class));
     }
 }
