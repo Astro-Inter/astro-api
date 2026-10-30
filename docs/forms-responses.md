@@ -87,7 +87,8 @@ e segue a visibilidade dos participantes. Ambos retornam o mesmo formato em `dat
   "locationPolicy": {"captureRequired": false, "enforceUnitRadius": false, "radiusMeters": 100, "maxReadingAgeSeconds": null},
   "locations": [],
   "review": {"status": "awaiting_review"},
-  "canReview": true
+  "canReview": true,
+  "locationCheck": null
 }
 ```
 

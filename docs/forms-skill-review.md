@@ -1,5 +1,8 @@
 # Revisão da PR #63 com astro-api-development
 
+Este arquivo registra uma revisão e seus resultados no momento da PR. Para o
+contrato atual, consulte [formulários](forms.md) e [respostas](forms-responses.md).
+
 Escopo: endpoints de formulários do astro-api e suas integrações. Skill instalada em
 `<CODEX_HOME>/skills/astro-api-development` a partir do ZIP fornecido.
 Foram lidos o SKILL.md e `references/requisitos-trabalho.md`.

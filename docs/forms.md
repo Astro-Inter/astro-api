@@ -117,7 +117,13 @@ Cada alternativa aceita 2 a 100 opções, com no máximo uma marcada `other`.
 O texto de `other` é normalizado para `Outros`; seu campo de resposta pertence ao mobile.
 Fotos aceitam 1 a 10 arquivos e limites de 5, 10, 20, 50 ou 100 MB por arquivo.
 O padrão de foto é 1 arquivo de até 10 MB. Não há upload de fotos nessas rotas.
-Esses limites também se aplicam a rascunhos, que podem ter opções e enunciados vazios.
+Esses valores configuram a pergunta; no envio das respostas o limite efetivo é
+o menor entre o valor configurado e 50 MiB por imagem. O limite global da
+requisição multipart também se aplica. Consulte [respostas](forms-responses.md).
+Em rascunhos, os limites máximos e a regra de no máximo uma opção `other`
+continuam valendo, mas a pergunta de alternativa pode ter menos de duas opções;
+opções e enunciados podem estar vazios. Na publicação, opções comuns precisam
+ter texto não vazio.
 
 O `_id` dos formulários é um UUID versão 4 gerado por `UUID.randomUUID()` no Java,
 salvo como string no MongoDB e exposto como `id` na API, inclusive na Home mobile.

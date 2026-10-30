@@ -1,11 +1,14 @@
 # Administração web de eventos — SCRUM-422
 
-Os endpoints usam Firebase e `ApiResult<T>`. Exigem usuário ativo com perfil
+As rotas administrativas usam Firebase e `ApiResult<T>`. Exigem usuário ativo com perfil
 `GESTOR` ou `GESTOR_WORKSPACE`. O servidor determina usuário e workspace.
 As leituras permitem consultar eventos de outros gestores do mesmo workspace;
 escritas exigem o criador, inclusive quando o solicitante é `GESTOR_WORKSPACE`.
 Eventos inexistentes ou de outro workspace retornam 404; falta de autenticação,
 401; falta de permissão, 403; validação, 400; conflito de integridade, 409.
+As rotas de participação `/events/collaborator` e de solicitação de conclusão
+também aceitam `COLABORADOR`, além dos dois perfis de gestor, com as regras de
+participação descritas em [solicitação de conclusão](api-event-completions.md).
 
 | Método e rota | Contrato |
 | --- | --- |
@@ -141,6 +144,12 @@ Sem NR, a validade é `null`. Documento da NR ausente retorna 404; período ause
 ou não positivo retorna 400. Nessas situações a conclusão não é gravada. Uma
 falha de conexão ao banco retorna 503. A validade é persistida na conclusão e não
 integra a resposta `EventCompletionResponse`.
+
+A gravação da conclusão pode também acionar a trigger PostgreSQL de conformidade,
+quando instalada. A API calcula a validade da conclusão a partir do catálogo
+MongoDB; a função SQL da trigger no repositório do banco usa os meses do catálogo
+PostgreSQL para a conformidade. A consistência entre os catálogos depende da
+sincronização e dos objetos instalados; consulte [conformidades](conformities.md).
 
 `PATCH /events/{eventId}/participants/{participantId}/collaborator-conclusion/approval`
 aprova uma conclusão `PENDENTE` do modo `COLABORADOR`. Exige gestor ativo e
@@ -294,5 +303,6 @@ local descartável e fixtures com constraints consultadas no catálogo publicado
 em modo somente leitura em 14/10/2026. Esses testes e suas fixtures foram removidos.
 Nenhum DDL, índice, trigger ou automatização de negócio foi aplicado no ambiente
 publicado por essa validação.
-Fluxos mobile de conclusão/evidências, aprovação, notificações, conformidade e
-encerramento automático permanecem fora desta entrega.
+Os fluxos de participação e conclusão foram ampliados posteriormente; consulte
+[solicitação de conclusão](api-event-completions.md) e
+[notificações](api-notifications.md) para os contratos atuais.

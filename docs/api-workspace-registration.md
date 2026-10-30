@@ -10,6 +10,12 @@ aba usa as colunas `nome`, `cpf`, `email`, `unidade`, `cargo` e `modalidade`.
 Deve haver exatamente uma linha com o e-mail do gestor informado no cadastro.
 Nome, cargo e unidade do gestor continuam obrigatórios.
 
+A parte `data` tem `password`, `email`, `workspace` e `units`. `password` e
+`email` devem ser preenchidos, com e-mail válido; `workspace` contém `name` e
+`cnpj` de 14 dígitos. `units` é uma lista não vazia de endereços no formato
+`UnitRequest` documentado em [configurações de workspace](api-workspace-settings.md#unidades).
+No cadastro inicial, o CNPJ deve chegar já com 14 dígitos, sem pontuação.
+
 CPF e modalidade do gestor continuam opcionais. Quando preenchidos:
 
 - O CPF segue a normalização do cadastro inicial (somente dígitos), deve ter

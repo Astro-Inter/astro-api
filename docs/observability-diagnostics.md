@@ -1,5 +1,8 @@
 # Diagnóstico operacional dos logs
 
+Este documento registra a alteração e a validação da PR indicada abaixo. O estado
+de coleta e implantação deve ser confirmado no ambiente em uso.
+
 Vínculo: [SCRUM-401](https://luizacursino.atlassian.net/browse/SCRUM-401). Continuação da [PR #13](https://github.com/Astro-Inter/astro-api/pull/13) na branch `feat/SCRUM-401-conexao-com-grafana-api`, atualizada com a main.
 
 ## Alteração

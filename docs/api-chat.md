@@ -1,5 +1,27 @@
 # API de Chat
 
+## Listar conversas e contatos
+
+`GET /chats` e `GET /chats/contacts` exigem token Firebase e perfil
+`COLABORADOR`, `GESTOR` ou `GESTOR_WORKSPACE`. O usuário e o workspace são
+determinados pela identidade autenticada.
+
+`GET /chats` retorna HTTP 200 com um **array diretamente**, sem envelope
+`ApiResult`. Cada conversa tem `id`, `participant` (`id`, `name`, `role`,
+`profilePhotoUrl`, `avatarInitials`), `lastMessage` (`senderId`, `content`) e
+`unreadCount`. Inclui conversas válidas com dois participantes do mesmo
+workspace e ao menos uma mensagem; a ordenação é pela última mensagem mais
+recente e, em empate, pelo ID da conversa decrescente. O contador vem do Redis;
+valor ausente é zero. Sem conversas, retorna `[]`.
+
+`GET /chats/contacts` retorna `ApiResult` com array em `data`. Cada contato tem
+`id`, `name` e `role`. A consulta exclui o próprio usuário e considera usuários
+ativos em unidades ativas do mesmo workspace. Colaboradores podem consultar
+gestores; gestores podem consultar colaboradores e gestores. A conta solicitante
+também precisa estar ativa, em unidade ativa e com perfil coerente com o token.
+Os contatos são ordenados por nome e, em empate, por ID. Usuário inexistente
+retorna `404` e conta inelegível retorna `403`.
+
 ## WebSocket/STOMP para eventos privados
 
 O endpoint WebSocket é `GET /ws`. O handshake HTTP é permitido sem autenticação
