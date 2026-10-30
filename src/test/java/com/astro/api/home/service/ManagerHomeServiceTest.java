@@ -1,6 +1,7 @@
 package com.astro.api.home.service;
 
 import com.astro.api.home.mapper.WorkspaceHomeMapper;
+import com.astro.api.home.mapper.ManagerHomeMapper;
 import com.astro.api.home.service.WorkspaceHomeProfileService;
 
 import com.astro.api.auth.security.AuthenticatedUser;
@@ -33,7 +34,9 @@ class ManagerHomeServiceTest {
     private final ViewedService viewedService = mock(ViewedService.class);
     private final UserAvatarService userAvatarService = mock(UserAvatarService.class);
     private final HomeService service = new HomeService(homeRepository, JsonMapper.builder().build(),
-            mock(NotificationService.class), viewedService, formService, userAvatarService, new WorkspaceHomeMapper(JsonMapper.builder().build()), mock(WorkspaceHomeProfileService.class));
+            mock(NotificationService.class), viewedService, formService, userAvatarService,
+            new ManagerHomeMapper(), new WorkspaceHomeMapper(JsonMapper.builder().build()),
+            mock(WorkspaceHomeProfileService.class));
     private final AuthenticatedUser manager = new AuthenticatedUser("manager", "manager@astro.com", Role.GESTOR);
 
     @Test
