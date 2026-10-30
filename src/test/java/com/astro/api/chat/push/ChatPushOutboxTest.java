@@ -1,5 +1,6 @@
 package com.astro.api.chat.push;
 
+import com.astro.api.chat.model.ChatPushEvent;
 import com.mongodb.client.ClientSession;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
@@ -27,7 +28,7 @@ class ChatPushOutboxTest {
         ChatPushOutbox outbox = outbox();
         ClientSession session = mock(ClientSession.class);
         Instant now = Instant.parse("2026-10-30T10:00:00Z");
-        outbox.insert(session, new ChatPushEvent(1, "message", "conversation", "1", "2", "10",
+        outbox.insert(session, new ChatPushEvent(1, "message", "conversation", 1L, 2L, 10L,
                 "uid-2", "Gestor", "Olá", now));
         ArgumentCaptor<Document> document = ArgumentCaptor.forClass(Document.class);
         verify(events).insertOne(eq(session), document.capture());

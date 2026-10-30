@@ -103,7 +103,7 @@ class ChatMessageSendTest {
         order.verify(mongo).insertMessage(any(), any());
         order.verify(pushOutbox).insert(any(), org.mockito.ArgumentMatchers.argThat(event ->
                 event.recipientUid().equals("uid-2") && event.preview().equals("Olá")
-                        && event.senderId().equals("1") && event.recipientId().equals("2")));
+                        && event.senderId().equals(1L) && event.recipientId().equals(2L)));
         order.verify(redis).execute(any(), anyList(), any());
     }
 

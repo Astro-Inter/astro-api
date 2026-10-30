@@ -4,7 +4,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
-import org.bson.Document;
+import com.astro.api.chat.model.ChatPushEvent;
+import com.astro.api.chat.model.ChatPushOutboxEntry;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -17,8 +18,10 @@ class ChatPushDispatcherTest {
     private final ChatPushSettings settings = new ChatPushSettings(true,
             "https://push.example/internal/chat-messages", "test-secret-".repeat(4));
 
-    private Document queued() {
-        return new Document("_id", "message").append("payload", new Document("recipientId", "2")).append("attempts", 2);
+    private ChatPushOutboxEntry queued() {
+        ChatPushEvent event = new ChatPushEvent(1, "message", "conversation", 1L, 2L, 10L,
+                "uid-2", "Gestor", "Olá", Instant.now());
+        return new ChatPushOutboxEntry("message", event, 2);
     }
 
     @Test void disabledAndUnsafeDestinationsNeverClaimEvents() {

@@ -6,7 +6,8 @@ import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
 import com.astro.api.chat.mapper.ChatPushEventMapper;
 import java.util.List;
-import org.bson.Document;
+import com.astro.api.chat.model.ChatPushEvent;
+import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -18,23 +19,23 @@ class ChatPushEligibilityTest {
         ChatSendUserProjection sender = participant(1L, UserType.COLABORADOR);
         ChatSendUserProjection recipient = participant(2L, UserType.GESTOR);
         when(users.findChatSendUsers(eq("uid-2"), anyList())).thenReturn(List.of(sender, recipient));
-        Document payload = new Document("senderId", "1").append("recipientId", "2")
-                .append("workspaceId", "10").append("recipientUid", "uid-2");
+        ChatPushEvent event = new ChatPushEvent(1, "message", "conversation", 1L, 2L, 10L,
+                "uid-2", "Gestor", "Olá", Instant.now());
         ChatPushEligibility guard = new ChatPushEligibility(users);
-        assertTrue(guard.allows(payload));
+        assertTrue(guard.allows(event));
         when(recipient.getFirebaseUid()).thenReturn("changed");
-        assertFalse(guard.allows(payload));
+        assertFalse(guard.allows(event));
         when(recipient.getFirebaseUid()).thenReturn("uid-2");
         when(recipient.getWorkspaceId()).thenReturn(11L);
-        assertFalse(guard.allows(payload));
+        assertFalse(guard.allows(event));
         when(recipient.getWorkspaceId()).thenReturn(10L);
         when(recipient.getUnitActive()).thenReturn(false);
-        assertFalse(guard.allows(payload));
+        assertFalse(guard.allows(event));
         when(recipient.getUnitActive()).thenReturn(true);
         when(recipient.getType()).thenReturn(UserType.COLABORADOR);
-        assertFalse(guard.allows(payload));
+        assertFalse(guard.allows(event));
         when(users.findChatSendUsers(any(), anyList())).thenReturn(List.of(sender));
-        assertFalse(guard.allows(payload));
+        assertFalse(guard.allows(event));
     }
 
     @Test void previewNormalizesWhitespaceAndPreservesUnicodeCodePoints() {

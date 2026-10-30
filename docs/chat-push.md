@@ -37,6 +37,10 @@ version (número 1); messageId e conversationId (UUID); senderId, recipientId e
 workspaceId (strings decimais para preservar precisão); recipientUid (Firebase);
 senderName (até 80 pontos Unicode); preview (até 160); createdAt (ISO-8601).
 O mapper normaliza espaços e limita a prévia preservando Unicode.
+Internamente, ChatPushEvent usa IDs Long e ChatPushOutboxEntry representa o
+evento reivindicado com sua contagem de tentativas. Somente o mapper/repository
+conhecem BSON; elegibilidade e dispatcher recebem modelos tipados. O mapper
+mantém IDs como strings e a data ISO-8601 na persistência e no JSON do Worker.
 
 202 significa persistência durável no Worker, não entrega no dispositivo.
 Após aceite, a outbox remove payload e lease. O TTL elimina o recibo em até 24h
