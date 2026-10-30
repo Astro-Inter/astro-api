@@ -167,9 +167,11 @@ PostgreSQL descartável disponível, sempre dentro de um schema próprio.
 As respostas de criação, edição e listagem usam os campos de `UnitResponse` em
 inglês: `unitId`, `workspaceId`, `name`, `status`, `collaboratorCount`, `postalCode`,
 `street`, `city`, `neighborhood`, `state`, `addressLine2` e `number`.
-Não há anotações `@JsonProperty`; o JSON usa diretamente os nomes do DTO.
-Consumidores que liam os nomes anteriores em português precisam atualizar a
-integração. `number` corresponde à coluna `numero` e pode ser null em registros legados.
+Além desses campos, getters de compatibilidade expõem `id_unidade`,
+`id_workspace`, `nome` e `quantidade_colaboradores` com os mesmos valores de
+`unitId`, `workspaceId`, `name` e `collaboratorCount`, respectivamente. Isso
+vale para listagem, criação e edição. `number` corresponde à coluna `numero` e
+pode ser null em registros legados.
 
 Nas respostas de criação e edição, `collaboratorCount` usa o método derivado
 `UserRepository.countByUnit_IdAndTypeInAndStatus`. O service considera os tipos
