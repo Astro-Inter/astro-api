@@ -15,6 +15,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
+import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Instant;
@@ -114,7 +115,8 @@ public class HomeService {
 
     private CollaboratorHomeDatabaseDto readDatabaseHome(String json) {
         try {
-            return objectMapper.readValue(json, CollaboratorHomeDatabaseDto.class);
+            return objectMapper.rebuild().propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE).build()
+                    .readValue(json, CollaboratorHomeDatabaseDto.class);
         } catch (JacksonException exception) {
             throw new IllegalStateException("Não foi possível interpretar os dados da Home", exception);
         }
@@ -168,7 +170,8 @@ public class HomeService {
             throw new ResourceNotFoundException("Gestor inexistente, inativo ou sem permissão para acessar a Home");
         }
         try {
-            ManagerHomeDatabaseResponse response = objectMapper.readValue(json, ManagerHomeDatabaseResponse.class);
+            ManagerHomeDatabaseResponse response = objectMapper.rebuild().propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE).build()
+                    .readValue(json, ManagerHomeDatabaseResponse.class);
             if (response == null || response.username() == null || response.workspaceName() == null
                     || response.indicators() == null) {
                 throw new IllegalStateException("Dados da Home do gestor retornados pelo banco são inválidos");

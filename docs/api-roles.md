@@ -8,8 +8,7 @@ O `RoleManagementRepository` converte as projections em DTOs e traduz SQLSTATEs.
 O repositório JPA também mantém as importações e consultas já existentes.
 
 As rotas usam nomes em inglês, como os demais módulos da API: `/roles` para
-cargos e `/nrs/options` para as opções. Os campos JSON continuam seguindo os
-payloads da especificação. As mensagens das constraints das requests ficam em
+cargos e `/nrs/options` para as opções. Os campos JSON usam os nomes dos atributos dos DTOs. As mensagens das constraints das requests ficam em
 `src/main/resources/ValidationMessages.properties`.
 
 Todas as chamadas exigem `Authorization: Bearer <token Firebase>` e perfil `GESTOR`
@@ -32,27 +31,27 @@ os arrays, o cargo editado e o booleano de status ficam na propriedade `data`.
 Criação e edição recebem:
 
 ```json
-{"firebase_uid":"uid-do-gestor","nome":"Gerente","status":"Ativo"}
+{"firebaseUid":"uid-do-gestor","name":"Gerente","status":"Ativo"}
 ```
 
 O nome, após remover espaços nas extremidades, deve ter entre 2 e 255 caracteres.
 O status aceita `Ativo` ou `Inativo`, sem distinguir maiúsculas e minúsculas.
 A criação responde 201, sem objeto em `data`, pois a procedure não retorna um ID.
-A edição responde 200 com os campos de `vw_cargos`, mapeando `role` para `nome`.
+A edição responde 200 com os campos de `vw_cargos`, mapeando `role` para `name`.
 
-A alternância recebe `{"firebase_uid":"uid-do-gestor"}` e responde 200 com
+A alternância recebe `{"firebaseUid":"uid-do-gestor"}` e responde 200 com
 `data: true` quando ficou ativo ou `data: false` quando ficou inativo.
 A desativação executa os triggers existentes do banco, inclusive para usuários vinculados.
 
 A atualização de NRs recebe:
 
 ```json
-{"firebase_uid":"uid-do-gestor","nrs":[{"nr":1,"ativo":true},{"nr":17,"ativo":false}]}
+{"firebaseUid":"uid-do-gestor","nrs":[{"nr":1,"active":true},{"nr":17,"active":false}]}
 ```
 
 Cada item altera apenas a NR informada; NRs omitidas permanecem vinculadas.
 Uma lista vazia é permitida. Códigos devem ser inteiros positivos, sem repetição,
-e cada item exige `ativo` booleano. A procedure valida a existência dos códigos
+e cada item exige `active` booleano. A procedure valida a existência dos códigos
 em `nr_catalogo` e executa a alteração em uma transação.
 
 Antes de chamar a procedure, a API consulta os códigos no catálogo relacional. Uma

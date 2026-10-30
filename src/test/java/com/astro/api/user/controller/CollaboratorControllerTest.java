@@ -59,10 +59,10 @@ class CollaboratorControllerTest {
         when(service.findAll(principal, false)).thenReturn(List.of(new CollaboratorSummaryResponse(
                 2L, "Colaborador", "test@example.com", 5L, "Operador", 12L, "Matriz", UserStatus.PRE_CADASTRADO, null, "C", true)));
         mvc.perform(get("/collaborators").param("workspaceId", "999").param("firebase_uid", "untrusted"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].id_usuario").value(2))
-                .andExpect(jsonPath("$.data[0].nome").value("Colaborador"))
-                .andExpect(jsonPath("$.data[0].cargo_id").value(5))
-                .andExpect(jsonPath("$.data[0].unidade_id").value(12))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].id").value(2))
+                .andExpect(jsonPath("$.data[0].name").value("Colaborador"))
+                .andExpect(jsonPath("$.data[0].roleId").value(5))
+                .andExpect(jsonPath("$.data[0].unitId").value(12))
                 .andExpect(jsonPath("$.data[0].status").value("PRE_CADASTRADO"))
                 .andExpect(jsonPath("$.data[0].profilePhotoUrl").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.data[0].avatarInitials").value("C"))
@@ -88,7 +88,7 @@ class CollaboratorControllerTest {
                 5L, "Operador", 12L, "Matriz", 3L, "https://r2.example.com/foto.jpg", "C", true));
         mvc.perform(get("/collaborators/2"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.cpf").value("52998224725"))
-                .andExpect(jsonPath("$.data.modalidade").value("HIBRIDO"))
+                .andExpect(jsonPath("$.data.workModel").value("HIBRIDO"))
                 .andExpect(jsonPath("$.data.workspace_id").value(3))
                 .andExpect(jsonPath("$.data.profilePhotoUrl").value("https://r2.example.com/foto.jpg"))
                 .andExpect(jsonPath("$.data.avatarInitials").value("C"))

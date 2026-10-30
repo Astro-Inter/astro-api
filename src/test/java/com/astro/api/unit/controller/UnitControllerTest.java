@@ -106,15 +106,15 @@ class UnitControllerTest {
         when(service.findNrOptions(12L, user)).thenReturn(List.of(new UnitNrOptionResponse(1, "Disposições gerais", false)));
         mvc.perform(get("/units/12/nrs/associated"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].nr").value(17))
-                .andExpect(jsonPath("$.data[0].descricao").value("Ergonomia"));
+                .andExpect(jsonPath("$.data[0].description").value("Ergonomia"));
         mvc.perform(get("/units/12/nrs"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].nr").value(1))
-                .andExpect(jsonPath("$.data[0].ativo").value(false));
+                .andExpect(jsonPath("$.data[0].active").value(false));
     }
 
     @Test
     void acceptsTheRawArrayAndAnEmptyPatch() throws Exception {
-        for (String body : List.of("[]", "[{\"nr\":17,\"ativo\":false}]")) {
+        for (String body : List.of("[]", "[{\"nr\":17,\"active\":false}]")) {
             mvc.perform(post("/units/12/nrs").contentType(MediaType.APPLICATION_JSON).content(body))
                     .andExpect(status().isOk());
         }
@@ -124,9 +124,9 @@ class UnitControllerTest {
     @Test
     void rejectsNonArraysAndCoercedScalarTypes() throws Exception {
         for (String body : List.of("{}", "null", "{\"nrs\":[]}", "[1]", "[[]]",
-                "[{\"nr\":\"1\",\"ativo\":true}]", "[{\"nr\":1.0,\"ativo\":true}]",
-                "[{\"nr\":2147483648,\"ativo\":true}]", "[{\"nr\":1,\"ativo\":\"true\"}]",
-                "[{\"nr\":1,\"ativo\":1}]")) {
+                "[{\"nr\":\"1\",\"active\":true}]", "[{\"nr\":1.0,\"active\":true}]",
+                "[{\"nr\":2147483648,\"active\":true}]", "[{\"nr\":1,\"active\":\"true\"}]",
+                "[{\"nr\":1,\"active\":1}]")) {
             mvc.perform(post("/units/12/nrs").contentType(MediaType.APPLICATION_JSON).content(body))
                     .andExpect(status().isBadRequest());
         }
@@ -137,7 +137,7 @@ class UnitControllerTest {
     void resolvesResourceBundleMessagesForNestedValidation() throws Exception {
         assertValidationError("[null]", "Os itens da lista de NRs não podem ser nulos");
         assertValidationError("[{}]", "O código da NR é obrigatório");
-        assertValidationError("[{\"nr\":0,\"ativo\":true}]", "O código da NR deve ser um inteiro positivo");
+        assertValidationError("[{\"nr\":0,\"active\":true}]", "O código da NR deve ser um inteiro positivo");
         assertValidationError("[{\"nr\":1}]", "Informe se a NR deve ser vinculada à unidade");
         verifyNoInteractions(service);
     }
@@ -150,7 +150,7 @@ class UnitControllerTest {
         mvc.perform(patch("/units/12/status")).andExpect(status().isNotFound());
         doThrow(new BusinessException("NR inválida")).when(service).updateNrs(eq(12L), any(), eq(user));
         mvc.perform(post("/units/12/nrs").contentType(MediaType.APPLICATION_JSON)
-                        .content("[{\"nr\":999,\"ativo\":true}]"))
+                        .content("[{\"nr\":999,\"active\":true}]"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0]").value("NR inválida"));
     }
 

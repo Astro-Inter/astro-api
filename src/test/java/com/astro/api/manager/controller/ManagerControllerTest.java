@@ -45,8 +45,8 @@ class ManagerControllerTest {
                 "https://r2.example.com/photo?signature=abc&expires=123", "G")));
         mvc.perform(get("/managers").param("workspaceId", "999").param("firebase_uid", "attacker"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data[0].id_usuario").value(1))
-                .andExpect(jsonPath("$.data[0].unidade_id").value(10))
+                .andExpect(jsonPath("$.data[0].id").value(1))
+                .andExpect(jsonPath("$.data[0].unitId").value(10))
                 .andExpect(jsonPath("$.data[0].status").value("PRE_CADASTRADO"))
                 .andExpect(jsonPath("$.data[0].profilePhotoUrl").value("https://r2.example.com/photo?signature=abc&expires=123"))
                 .andExpect(jsonPath("$.data[0].avatarInitials").value("G"))
@@ -61,7 +61,7 @@ class ManagerControllerTest {
                 2L, "Cargo", 10L, "Unidade", 3L, null, "G"));
         mvc.perform(get("/managers/1")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.cpf").value("12345678900"))
-                .andExpect(jsonPath("$.data.cargo_id").value(2)).andExpect(jsonPath("$.data.workspace_id").value(3))
+                .andExpect(jsonPath("$.data.roleId").value(2)).andExpect(jsonPath("$.data.workspaceId").value(3))
                 .andExpect(jsonPath("$.data.profilePhotoUrl").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.data.avatarInitials").value("G"))
                 .andExpect(jsonPath("$.data.firebase_uid").doesNotExist()).andExpect(jsonPath("$.data.senha").doesNotExist());
@@ -87,8 +87,8 @@ class ManagerControllerTest {
     }
     @Test void putRequiresEveryEditableFieldAndUsesPortugueseValidationMessages() throws Exception {
         String valid = """
-                {"nome":"Gestor","cpf":"529.982.247-25","email":"manager@astro.com",
-                 "roleId":2,"unitId":10,"modalidade":"REMOTO","status":"ATIVO"}
+                {"name":"Gestor","cpf":"529.982.247-25","email":"manager@astro.com",
+                 "roleId":2,"unitId":10,"workModel":"REMOTO","status":"ATIVO"}
                 """;
         mvc.perform(put("/managers/1").contentType("application/json").content(valid)).andExpect(status().isOk());
         clearInvocations(service);

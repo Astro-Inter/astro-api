@@ -76,13 +76,15 @@ class ConformityControllerTest {
         verifyNoInteractions(service);
     }
 
-    @Test void putRequiresBothFieldsAndNullExplicitlyRemovesValidity() throws Exception {
+    @Test void putRequiresNrAndAllowsMissingOrNullValidity() throws Exception {
         when(service.update(eq(2L), any(), eq(principal))).thenReturn(response());
         mvc.perform(put("/conformities/collaborators/2").contentType("application/json").content("{\"nrId\":10,\"expiresAt\":null}"))
                 .andExpect(status().isOk());
         verify(service).update(2L, new com.astro.api.conformity.dto.request.UpdateConformityRequest(10, null), principal);
+        mvc.perform(put("/conformities/collaborators/2").contentType("application/json").content("{\"nrId\":10}"))
+                .andExpect(status().isOk());
         clearInvocations(service);
-        for (String body : List.of("{}", "{\"nrId\":10}", "{\"expiresAt\":null}", "{\"nrId\":0,\"expiresAt\":null}")) {
+        for (String body : List.of("{}", "{\"expiresAt\":null}", "{\"nrId\":0,\"expiresAt\":null}")) {
             mvc.perform(put("/conformities/collaborators/2").contentType("application/json").content(body)).andExpect(status().isBadRequest());
         }
         verifyNoInteractions(service);

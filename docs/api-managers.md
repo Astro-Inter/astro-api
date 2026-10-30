@@ -7,16 +7,16 @@ são exclusivamente `GESTOR`, protegendo a própria conta `GESTOR_WORKSPACE`.
 
 ## GET /managers — SCRUM-526
 
-Retorna HTTP 200 com `ApiResult` e uma lista de `id_usuario`, `nome`, `email`,
-`unidade_id`, `unidade`, `status`, `profilePhotoUrl` e `avatarInitials`. Consulta `vw_gestores` pelo workspace autorizado,
+Retorna HTTP 200 com `ApiResult` e uma lista de `id`, `name`, `email`,
+`unitId`, `unitName`, `status`, `profilePhotoUrl` e `avatarInitials`. Consulta `vw_gestores` pelo workspace autorizado,
 ordenada por nome e ID. Inclui PRE_CADASTRADO, ATIVO e DESATIVADO, com vínculos
 inativos e vários gestores por unidade. Não há paginação, filtros ou CPF na lista.
 Uma lista sem registros retorna `[]`. Senha e Firebase UID nunca são expostos.
 
 ## GET /managers/{id} — SCRUM-527
 
-Retorna HTTP 200 com `ApiResult` e `id_usuario`, `nome`, `cpf`, `email`,
-`modalidade`, `status`, `cargo_id`, `cargo`, `unidade_id`, `unidade`, `workspace_id`,
+Retorna HTTP 200 com `ApiResult` e `id`, `name`, `cpf`, `email`,
+`workModel`, `status`, `roleId`, `roleName`, `unitId`, `unitName`, `workspaceId`,
 `profilePhotoUrl` e `avatarInitials`.
 Modalidade pode ser nula em registros legados. ID inválido retorna 400;
 inexistente, outro perfil ou outro workspace retornam o mesmo 404.
@@ -36,8 +36,8 @@ DESATIVADO. `User.role` mapeia explicitamente a coluna existente `cargo_id`.
 
 ## PUT /managers/{id} — SCRUM-529
 
-Todos os campos são obrigatórios e `null` é inválido: `nome`, `cpf`, `email`,
-`roleId`, `unitId`, `modalidade`, `status`. Modalidade: HIBRIDO, REMOTO ou PRESENCIAL.
+Todos os campos são obrigatórios e `null` é inválido: `name`, `cpf`, `email`,
+`roleId`, `unitId`, `workModel`, `status`. Modalidade: HIBRIDO, REMOTO ou PRESENCIAL.
 Retorna 200 com os detalhes. Nome é aparado, CPF validado e armazenado com onze
 dígitos, e-mail aparado e convertido para minúsculas como na importação existente.
 Conflitos de CPF/e-mail retornam 409. ID, tipo, criado_em e Firebase UID são preservados.
@@ -85,11 +85,11 @@ Exemplo de item da listagem (dentro de `data`):
 
 ```json
 {
-  "id_usuario": 123,
-  "nome": "Lucas Ribeiro",
+  "id": 123,
+  "name": "Lucas Ribeiro",
   "email": "lucas@example.com",
-  "unidade_id": 10,
-  "unidade": "Matriz São Paulo",
+  "unitId": 10,
+  "unitName": "Matriz São Paulo",
   "status": "ATIVO",
   "profilePhotoUrl": "https://r2.example.com/foto?signature=...",
   "avatarInitials": "LR"

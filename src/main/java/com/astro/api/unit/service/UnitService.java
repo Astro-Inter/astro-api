@@ -98,7 +98,8 @@ public class UnitService {
             }
         }
         try {
-            String nrsJson = objectMapper.writeValueAsString(body.nrs());
+            String nrsJson = objectMapper.writeValueAsString(body.nrs().stream()
+                    .map(nr -> Map.of("nr", nr.nr(), "ativo", nr.active())).toList());
             executeDatabaseOperation(() -> {
                 unitRepository.updateNrs(firebaseUid, unitId, nrsJson);
                 return null;

@@ -40,17 +40,17 @@ O PATCH não exige body e retorna
 `data: true` para ativa e `data: false` para inativa. Os triggers PostgreSQL executam
 as regras de desativação dos usuários vinculados.
 
-As NRs associadas retornam `nr` e `descricao`, vindos de `codigo_nr` e `descricao`
+As NRs associadas retornam `nr` e `description`, vindos de `codigo_nr` e `descricao`
 da função. As opções usam o modelo `NrDocument` existente, consultando explicitamente
 a collection `NRs` (nome sensível a maiúsculas) com `usabilidade: "Empresa"`.
-Usam `_id` numérico e `descricao` do MongoDB e acrescentam `ativo` de acordo com
+Usam `_id` numérico e `descricao` do MongoDB e acrescentam `active` de acordo com
 as associações PostgreSQL. Essa consulta não depende do nome configurado para a
 collection dos outros módulos. As opções são ordenadas pelo código.
 
 O POST recebe diretamente um array:
 
 ```json
-[{"nr":1,"ativo":true},{"nr":17,"ativo":false}]
+[{"nr":1,"active":true},{"nr":17,"active":false}]
 ```
 
 Cada item altera apenas a NR informada; códigos omitidos permanecem associados.
