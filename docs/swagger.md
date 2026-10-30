@@ -36,6 +36,12 @@ As regras `@PreAuthorize` continuam nos controllers.
 esquema `bearerAuth`. Os guias Markdown complementam o contrato com fluxos e
 regras que precisam de mais contexto.
 
+Para primeiro acesso, consulte [pré-cadastro e acesso](api-access.md); para dados
+pessoais, [perfil](api-user-profile.md) e [conta](api-account.md). As consultas
+das telas iniciais estão em [Home do workspace](home-workspace.md) e
+[Home do colaborador e do gestor](home-pessoas.md). Consulte também
+[notificações](api-notifications.md) e [chat](api-chat.md).
+
 Ao adicionar ou alterar uma rota:
 
 - Atualize a assinatura da interface junto com o controller.

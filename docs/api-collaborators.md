@@ -88,8 +88,9 @@ inexistente ou fora do escopo retorna 404.
 existente já implementa a regra de eventos atribuídos ainda pendentes; não é
 necessário criar uma função SQL nova para este contrato. `nrs` usa o mesmo formato de `/user/me`:
 `code`, `validade`, `descricao`, `objetivo` e `aplicabilidade`. A validade vem
-da conformidade mais recente do usuário para cada NR vinculada ao cargo. NRs
-revogadas não são retornadas. A foto usa o serviço de avatar já compartilhado
+da conformidade de maior ID do usuário para cada NR vinculada ao cargo, mesmo
+que não esteja aplicável. NRs sem documento no MongoDB ou revogadas não são
+retornadas. A foto usa o serviço de avatar já compartilhado
 pelos demais endpoints de colaboradores.
 
 ## Eventos por colaborador

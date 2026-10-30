@@ -20,7 +20,7 @@ Java em inglês. As respostas seguem `ApiResult`, com o resultado em `data`.
 | SCRUM-508 | `GET /units` | `fn_seleciona_unidades(firebase_uid)` |
 | SCRUM-509 | `PATCH /units/{unitId}/status` | `fn_altera_status_unidade(firebase_uid, unitId)` |
 | SCRUM-510 | `GET /units/{unitId}/nrs/associated` | `fn_seleciona_unidade_nrs(firebase_uid, unitId)` |
-| SCRUM-511 | `GET /units/{unitId}/nrs` | MongoDB `NRs` + `fn_seleciona_unidade_nrs` |
+| SCRUM-511 | `GET /units/{unitId}/nrs` | MongoDB `nrs` + `fn_seleciona_unidade_nrs` |
 | SCRUM-512 | `POST /units/{unitId}/nrs` | `pr_alterar_unidade_nrs(firebase_uid, unitId, JSONB)` |
 
 A listagem retorna `unitId`, `workspaceId`, `name`, `status`, `collaboratorCount`,
@@ -42,7 +42,7 @@ as regras de desativação dos usuários vinculados.
 
 As NRs associadas retornam `nr` e `descricao`, vindos de `codigo_nr` e `descricao`
 da função. As opções usam o modelo `NrDocument` existente, consultando explicitamente
-a collection `NRs` (nome sensível a maiúsculas) com `usabilidade: "Empresa"`.
+a collection `nrs` (nome sensível a maiúsculas) com `usabilidade: "Empresa"`.
 Usam `_id` numérico e `descricao` do MongoDB e acrescentam `ativo` de acordo com
 as associações PostgreSQL. Essa consulta não depende do nome configurado para a
 collection dos outros módulos. As opções são ordenadas pelo código.
@@ -75,8 +75,9 @@ As mutações convertem `22023` em HTTP 400, `42501` em 403 e `P0002` em 404.
 Falhas de conexão, conflitos de integridade e falhas inesperadas mantêm o tratamento
 global existente de HTTP 503, 409 e 500. Os detalhes internos do SQL não são expostos.
 
-Não há novos endpoints de criação de unidades nem de alteração de nome/endereço.
-O fluxo existente de criação de unidades durante a importação de workspace foi mantido.
+Os endpoints de criação e edição de unidades foram implementados posteriormente.
+Consulte [configurações de workspace](api-workspace-settings.md) para os contratos
+`POST /units` e `PUT /units/{unitId}` e para a importação de workspace.
 
 ## Verificação
 
