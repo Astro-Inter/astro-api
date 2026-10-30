@@ -40,7 +40,7 @@ public class ChatPushOutbox {
         return ChatPushEventMapper.fromOutboxDocument(document);
     }
 
-    private synchronized void initialize() {
+    private void initialize() {
         if (initialized) return;
         events.createIndex(new Document("done", 1).append("nextAttempt", 1));
         events.createIndex(new Document("expiresAt", 1),

@@ -11,6 +11,7 @@ import com.astro.api.chat.model.ChatPushOutboxEntry;
 import com.astro.api.chat.mapper.ChatPushEventMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -22,13 +23,8 @@ public class ChatPushDispatcher {
     private final ChatPushEligibility eligibility;
     private final HttpClient client;
 
-    @org.springframework.beans.factory.annotation.Autowired
-    public ChatPushDispatcher(ChatPushSettings settings, ChatPushOutbox outbox, ChatPushEligibility eligibility) {
-        this(settings, outbox, eligibility, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5))
-                .followRedirects(HttpClient.Redirect.NEVER).build());
-    }
-
-    ChatPushDispatcher(ChatPushSettings settings, ChatPushOutbox outbox, ChatPushEligibility eligibility, HttpClient client) {
+    public ChatPushDispatcher(ChatPushSettings settings, ChatPushOutbox outbox, ChatPushEligibility eligibility,
+                              @Qualifier("chatPushHttpClient") HttpClient client) {
         this.settings = settings;
         this.outbox = outbox;
         this.eligibility = eligibility;
@@ -82,7 +78,7 @@ public class ChatPushDispatcher {
         }
     }
 
-    static long delay(int attempts) {
+    private static long delay(int attempts) {
         return Math.min(300, 1L << Math.min(9, Math.max(0, attempts - 1)));
     }
 }

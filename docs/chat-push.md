@@ -28,6 +28,12 @@ idempotentemente. Uma rodada reivindica até 10 eventos; lease atômico de 120s
 impede disputa normal entre réplicas. Falhas/HTTP diferente de 200/202 usam espera
 progressiva de 1s a 300s, até o evento expirar em 24h. Timeout HTTP de 10s,
 conexão de 5s. Nenhum token Firebase é enviado por essa integração.
+O cliente HTTP é um bean próprio injetado pelo único construtor público do
+dispatcher, sem @Autowired. A inicialização tardia dos índices não precisa de
+synchronized no fluxo atual: claim é chamado somente pelo dispatcher executado
+no chatPushScheduler de uma thread por instância. A exclusão entre réplicas
+permanece no findOneAndUpdate atômico e no lease Mongo. Falhas na criação dos
+índices deixam a inicialização pendente para a rodada seguinte.
 
 ## Contrato interno versão 1
 

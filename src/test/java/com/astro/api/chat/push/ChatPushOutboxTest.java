@@ -60,4 +60,23 @@ class ChatPushOutboxTest {
         assertEquals("lease", update.getValue().get("$set", Document.class).getString("lease"));
         assertEquals(now.plusSeconds(120), update.getValue().get("$set", Document.class).getDate("nextAttempt").toInstant());
     }
+
+    @Test void repeatedClaimsInitializeIndexesOnlyOnce() {
+        ChatPushOutbox outbox = outbox();
+        outbox.claim(Instant.now(), "first");
+        outbox.claim(Instant.now(), "second");
+        verify(events, times(1)).createIndex(new Document("done", 1).append("nextAttempt", 1));
+        verify(events, times(1)).createIndex(eq(new Document("expiresAt", 1)),
+                any(com.mongodb.client.model.IndexOptions.class));
+    }
+
+    @Test void failedIndexInitializationIsRetriedOnNextClaim() {
+        ChatPushOutbox outbox = outbox();
+        when(events.createIndex(any(Document.class))).thenThrow(new IllegalStateException("unavailable")).thenReturn("index");
+        assertThrows(IllegalStateException.class, () -> outbox.claim(Instant.now(), "first"));
+        outbox.claim(Instant.now(), "second");
+        verify(events, times(2)).createIndex(new Document("done", 1).append("nextAttempt", 1));
+        verify(events).findOneAndUpdate(any(Document.class), any(Document.class),
+                any(com.mongodb.client.model.FindOneAndUpdateOptions.class));
+    }
 }
