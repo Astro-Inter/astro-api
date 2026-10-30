@@ -60,6 +60,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("""
             select u.id as id, u.type as type, u.status as status,
+                   u.name as name, u.firebaseUid as firebaseUid,
                    unit.isActive as unitActive, workspace.id as workspaceId,
                    (u.firebaseUid = :firebaseUid) as authenticatedSender
             from User u join u.unit unit join unit.workspace workspace

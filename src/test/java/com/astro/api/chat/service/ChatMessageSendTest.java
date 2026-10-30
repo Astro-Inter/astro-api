@@ -36,9 +36,12 @@ class ChatMessageSendTest {
     private final StringRedisTemplate redis = mock(StringRedisTemplate.class);
     private final UserAvatarService avatars = mock(UserAvatarService.class);
     private final ChatMessagePublisher messagePublisher = mock(ChatMessagePublisher.class);
+    private final com.astro.api.chat.push.ChatPushSettings pushSettings = mock(com.astro.api.chat.push.ChatPushSettings.class);
+    private final com.astro.api.chat.push.ChatPushOutbox pushOutbox = mock(com.astro.api.chat.push.ChatPushOutbox.class);
     private final ChatPrincipal sender = new ChatPrincipal(1L, 10L, Role.COLABORADOR, "uid-1");
     private final ChatService service = new ChatService(users, mongo, redis, avatars,
-            new ChatMessageMapper(), messagePublisher);
+            new ChatMessageMapper(), messagePublisher,
+            pushSettings, pushOutbox);
 
     @BeforeEach
     void setUp() {
@@ -72,6 +75,7 @@ class ChatMessageSendTest {
 
     @Test
     void idempotentRetryReusesMessageAndRunsRedisDedupScriptAgain() {
+        when(pushSettings.enabled()).thenReturn(true);
         ChatSendRequest request = request(2L, "Olá", "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
         ConversationDocument conversation = new ConversationDocument("11111111-2222-4333-8444-555555555555",
                 List.of(1L, 2L));
@@ -85,7 +89,22 @@ class ChatMessageSendTest {
 
         assertEquals(original.id(), response.id());
         verify(mongo, never()).insertMessage(any(), any());
+        verify(pushOutbox, never()).insert(any(), any());
         verify(redis).execute(any(), anyList(), eq(original.id()));
+    }
+
+    @Test
+    void queuesPushInsideMessageTransactionAndKeepsItWhenRealtimeDeliveryFails() {
+        when(pushSettings.enabled()).thenReturn(true);
+        when(redis.execute(any(), anyList(), any())).thenThrow(new org.springframework.data.redis.RedisConnectionFailureException("offline"));
+        assertThrows(ChatUnreadCounterException.class, () -> service.send(sender,
+                request(2L, "Olá", "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")));
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(mongo, pushOutbox, redis);
+        order.verify(mongo).insertMessage(any(), any());
+        order.verify(pushOutbox).insert(any(), org.mockito.ArgumentMatchers.argThat(event ->
+                event.recipientUid().equals("uid-2") && event.preview().equals("Olá")
+                        && event.senderId().equals("1") && event.recipientId().equals("2")));
+        order.verify(redis).execute(any(), anyList(), any());
     }
 
     @Test
@@ -124,6 +143,8 @@ class ChatMessageSendTest {
         when(result.getUnitActive()).thenReturn(true);
         when(result.getWorkspaceId()).thenReturn(workspaceId);
         when(result.getAuthenticatedSender()).thenReturn(id == 1L);
+        when(result.getName()).thenReturn("Pessoa " + id);
+        when(result.getFirebaseUid()).thenReturn("uid-" + id);
         return result;
     }
 }
