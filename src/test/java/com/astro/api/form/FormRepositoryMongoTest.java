@@ -510,7 +510,7 @@ class FormRepositoryMongoTest {
         when(users.findByFirebaseUid("outsider")).thenReturn(Optional.of(manager(30, 2, UserType.GESTOR_WORKSPACE)));
         ViewedService viewedService = mock(ViewedService.class);
         Set<String> viewedKeys = new HashSet<>();
-        when(viewedService.findViewed(anyLong(), eq("formularios"), anyCollection())).thenAnswer(invocation -> {
+        when(viewedService.findViewed(anyLong(), eq("forms"), anyCollection())).thenAnswer(invocation -> {
             Long managerId = invocation.getArgument(0);
             Collection<?> formIds = invocation.getArgument(2);
             return formIds.stream().map(String::valueOf)
@@ -519,7 +519,7 @@ class FormRepositoryMongoTest {
         doAnswer(invocation -> {
             viewedKeys.add(invocation.getArgument(0) + ":" + invocation.getArgument(2));
             return null;
-        }).when(viewedService).markViewed(anyLong(), eq("formularios"), any());
+        }).when(viewedService).markViewed(anyLong(), eq("forms"), any());
         FormImageStorageService storage = mock(FormImageStorageService.class);
         FormImage image = new FormImage("test-image", "formularios/private/image.png", "camera.png", "image/png", 80);
         when(storage.upload(any(), any(), any())).thenReturn(image);
