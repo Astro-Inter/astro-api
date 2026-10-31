@@ -13,7 +13,7 @@ import com.astro.api.form.mapper.FormNumberConverter;
 import java.time.Instant;
 import java.util.List;
 
-@Document(collection = "forms")
+@Document(collection = "formularios")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -21,20 +21,23 @@ public class Form {
     @Id
     private String id;
 
-    @Field("id_workspace")
+    @Field("workspace_id")
     @ValueConverter(FormNumberConverter.class)
     private Long workspaceId;
 
-    @Field("id_gestor")
+    @Field("gestor_id")
     @ValueConverter(FormNumberConverter.class)
     private Long managerId;
 
-    @Field("id_gestor_remetente")
+    @Field("gestor_remetente_id")
     @ValueConverter(FormNumberConverter.class)
     private Long senderManagerId;
 
     @Field("titulo")
     private String title;
+
+    @Field("configuracao")
+    private FormAppearance appearance;
 
     @Field("descricao")
     private String description;
@@ -54,10 +57,10 @@ public class Form {
     @Field("respondido_em")
     private Instant respondedAt;
 
-    @Field("nr")
+    @Field("nr_id")
     private Integer nrCode;
 
-    @Field("id_unidade")
+    @Field("unidade_id")
     @ValueConverter(FormNumberConverter.class)
     private Long unitId;
 
@@ -65,7 +68,7 @@ public class Form {
     @ValueConverter(FormNumberConverter.class)
     private Long version;
 
-    @Field("id_envio")
+    @Field("envio_id")
     private String submissionId;
 
     @Field("consentimento_localizacao")
@@ -87,7 +90,7 @@ public class Form {
     @Setter
     @NoArgsConstructor
     public static class FormQuestion {
-        @Field("id_pergunta")
+        @Field("pergunta_id")
         @ValueConverter(FormNumberConverter.class)
         private Long id;
 
@@ -120,7 +123,7 @@ public class Form {
     @Setter
     @NoArgsConstructor
     public static class FormOption {
-        @Field("id_opcao")
+        @Field("opcao_id")
         @ValueConverter(FormNumberConverter.class)
         private Long id;
 

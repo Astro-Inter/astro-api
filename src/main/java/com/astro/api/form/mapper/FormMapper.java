@@ -8,6 +8,8 @@ import com.astro.api.form.dto.response.FormPageResponse;
 import com.astro.api.form.dto.response.FormRecipientsResponse;
 import com.astro.api.form.dto.response.FormSummaryResponse;
 import com.astro.api.form.model.Form;
+import com.astro.api.form.model.FormAppearance;
+import com.astro.api.form.dto.response.FormAppearanceResponse;
 import com.astro.api.form.model.FormQuestionType;
 import com.astro.api.unit.repository.UnitLocationProjection;
 import com.astro.api.user.repository.FormRecipientProjection;
@@ -26,6 +28,9 @@ public class FormMapper {
         List<Form.FormQuestion> previous = form.getQuestions() == null ? List.<Form.FormQuestion>of() : form.getQuestions();
         form.setQuestions(toQuestions(formRequest.questions() == null ? List.of() : formRequest.questions(), previous));
         form.setTitle(clean(formRequest.title()));
+        if (formRequest.appearance() != null) {
+            form.setAppearance(new FormAppearance(formRequest.appearance().icon(), formRequest.appearance().color()));
+        }
         form.setDescription(clean(formRequest.description()));
         form.setManagerId(formRequest.managerId());
         form.setNrCode(formRequest.nrCode());
@@ -80,7 +85,7 @@ public class FormMapper {
                         : question.getOptions().stream().map(option -> new FormOptionRequest(option.getId(), option.getText(), option.getOther())).toList(),
                         question.getMaxFiles(), question.getMaxFileSizeMb())).toList();
         return new FormRequest(form.getTitle(), form.getDescription(), form.getManagerId(), form.getNrCode(), form.getUnitId(),
-                form.getDueDate() == null ? null : form.getDueDate().atZone(FORM_ZONE).toLocalDate(), form.getStatus(), questions);
+                form.getDueDate() == null ? null : form.getDueDate().atZone(FORM_ZONE).toLocalDate(), form.getStatus(), questions, toAppearanceRequest(form));
     }
 
     public FormRecipientsResponse toRecipients(Long currentManagerId, List<FormRecipientProjection> recipients) {
@@ -92,7 +97,7 @@ public class FormMapper {
 
     public FormSummaryResponse toSummary(Form form) {
         return new FormSummaryResponse(form.getId(), form.getTitle(), form.getDescription(),
-                form.getQuestions() == null ? 0 : form.getQuestions().size(), form.getStatus());
+                form.getQuestions() == null ? 0 : form.getQuestions().size(), form.getStatus(), toAppearanceResponse(form));
     }
 
     public FormPageResponse toPage(List<Form> forms, int page, int size, long total) {
@@ -111,7 +116,17 @@ public class FormMapper {
                 form.getStatus(), form.getCreatedAt(), form.getUpdatedAt(), form.getRespondedAt(),
                 form.getQuestions() == null ? List.of() : form.getQuestions().stream().map(this::toQuestion).toList(),
                 unitLocation == null ? null : new FormDetailsResponse.UnitLocationResponse(
-                        unitLocation.getLatitude(), unitLocation.getLongitude()));
+                        unitLocation.getLatitude(), unitLocation.getLongitude()), toAppearanceResponse(form));
+    }
+
+    private FormAppearanceRequest toAppearanceRequest(Form form) {
+        if (form.getAppearance() == null) return null;
+        return new FormAppearanceRequest(form.getAppearance().icon(), form.getAppearance().color());
+    }
+
+    private FormAppearanceResponse toAppearanceResponse(Form form) {
+        if (form.getAppearance() == null) return null;
+        return new FormAppearanceResponse(form.getAppearance().icon(), form.getAppearance().color());
     }
 
     private QuestionResponse toQuestion(Form.FormQuestion question) {

@@ -38,6 +38,10 @@ public class FormValidationService {
         require(formRequest.managerId() == null || formRequest.managerId() > 0, "Gestor deve ter identificador positivo");
         require(formRequest.unitId() == null || formRequest.unitId() > 0, "Unidade deve ter identificador positivo");
         require(formRequest.nrCode() == null || formRequest.nrCode() > 0, "NR deve ter código positivo");
+        if (formRequest.appearance() != null) {
+            require(List.of("document", "calendar", "feedback", "person-outline", "security", "check", "building", "collaborators", "position", "clock").contains(formRequest.appearance().icon() == null ? "" : formRequest.appearance().icon()), "Escolha um ícone válido");
+            require(List.of("purple", "pink", "blue", "green", "teal", "indigo", "orange", "rose", "violet", "slate").contains(formRequest.appearance().color() == null ? "" : formRequest.appearance().color()), "Escolha uma cor válida");
+        }
         List<FormQuestionDefinitionRequest> questions = formRequest.questions() == null ? List.<FormQuestionDefinitionRequest>of() : formRequest.questions();
         require(questions.size() <= 100, "O formulário aceita até 100 perguntas");
         if (mode == FormValidationMode.PUBLISH) {

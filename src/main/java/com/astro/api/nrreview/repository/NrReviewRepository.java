@@ -26,7 +26,7 @@ import static com.mongodb.client.model.Filters.in;
 
 @Repository
 public class NrReviewRepository {
-    public static final String SQL_SYNC_COLLECTION = "nr_catalog_sql_sync";
+    public static final String SQL_SYNC_COLLECTION = "sincronizacoes_catalogo_nrs";
     private static final TransactionOptions TRANSACTION_OPTIONS = TransactionOptions.builder()
             .readConcern(ReadConcern.SNAPSHOT)
             .writeConcern(WriteConcern.MAJORITY)
@@ -85,8 +85,8 @@ public class NrReviewRepository {
 
     public void enqueueSqlSync(ClientSession session, String jobId, int nrId) {
         Document job = new Document("_id", jobId)
-                .append("nrId", nrId)
-                .append("createdAt", new Date());
+                .append("nr_id", nrId)
+                .append("criado_em", new Date());
         mongoDatabase.getCollection(SQL_SYNC_COLLECTION).insertOne(session, job);
     }
 
@@ -96,7 +96,7 @@ public class NrReviewRepository {
 
     public List<Document> findPendingSqlSyncJobs(int limit) {
         return mongoDatabase.getCollection(SQL_SYNC_COLLECTION).find()
-                .sort(new Document("createdAt", 1)).limit(limit).into(new ArrayList<>());
+                .sort(new Document("criado_em", 1)).limit(limit).into(new ArrayList<>());
     }
 
     public void deleteSqlSyncJob(String jobId) {

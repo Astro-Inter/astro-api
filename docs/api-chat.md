@@ -315,3 +315,7 @@ os pontinhos no outro, renovação durante a digitação e desaparecimento ao pa
 enviar, sair da tela ou desligar a rede. Usuários sem permissão e outros
 workspaces não devem receber eventos. API antiga deve manter o chat normal,
 com o indicador desativado por ausência do cabeçalho de capacidade.
+
+## Responsabilidades da persistência Mongo
+
+ChatMongoRepository encapsula consultas, projeções, cursores e gravações. ChatMongoMapper converte documentos BSON e modelos do chat, preservando resultados ausentes. A consulta por par retorna até duas conversas; ChatService valida a unicidade e responde com conflito quando há mais de uma. A busca por mensagem mantém o filtro de conversa e a sessão transacional no repository.

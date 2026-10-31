@@ -29,7 +29,7 @@ class ChatPushEventMapperTest {
 
     @Test void mapsClaimedDocumentToTypedEntryWithRetryCount() {
         Document document = new Document("_id", event().messageId())
-                .append("payload", ChatPushEventMapper.toDocument(event())).append("attempts", 3);
+                .append("evento", ChatPushEventMapper.toStoredDocument(event())).append("tentativas", 3);
         ChatPushOutboxEntry entry = ChatPushEventMapper.fromOutboxDocument(document);
         assertEquals(event().messageId(), entry.id());
         assertEquals(event(), entry.event());
@@ -39,7 +39,7 @@ class ChatPushEventMapperTest {
     @Test void handlesNoClaimAndLegacyDefaultAttemptCount() {
         assertNull(ChatPushEventMapper.fromOutboxDocument(null));
         Document document = new Document("_id", event().messageId())
-                .append("payload", ChatPushEventMapper.toDocument(event()));
+                .append("evento", ChatPushEventMapper.toStoredDocument(event()));
         assertEquals(1, ChatPushEventMapper.fromOutboxDocument(document).attempts());
     }
 }

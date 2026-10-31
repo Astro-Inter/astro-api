@@ -8,8 +8,8 @@ import org.springframework.data.mongodb.core.mapping.Field;
 @Document("mensagens")
 public record ChatMessageDocument(
         @Id String id,
-        @Field("id_conversa") String conversationId,
-        @Field("id_remetente") Long senderId,
+        @Field("conversa_id") String conversationId,
+        @Field("remetente_id") Long senderId,
         @Field("mensagem") String content,
         @Field("resposta_mensagem_id") String replyToMessageId,
         @Field("data") Instant createdAt
