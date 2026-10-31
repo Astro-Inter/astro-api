@@ -29,7 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class FormResponseService {
-    private static final String FORMS_RESOURCE = "formularios";
+    private static final String FORMS_RESOURCE = "forms";
     private static final Logger LOGGER = LoggerFactory.getLogger(FormResponseService.class);
     private final FormRepository formRepository;
     private final FormAccessService formAccessService;
