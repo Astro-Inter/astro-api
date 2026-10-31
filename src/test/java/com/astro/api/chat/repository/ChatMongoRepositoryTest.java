@@ -35,7 +35,7 @@ class ChatMongoRepositoryTest {
         Query query = queryCaptor.getValue();
         assertEquals(CONVERSATION_ID, query.getQueryObject().getString("_id"));
         assertTrue(query.getFieldsObject().containsKey("_id"));
-        assertTrue(query.getFieldsObject().containsKey("participantes"));
+        assertTrue(query.getFieldsObject().containsKey("participantes_ids"));
         assertEquals(2, query.getFieldsObject().size());
     }
 
@@ -49,10 +49,10 @@ class ChatMongoRepositoryTest {
         ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
         verify(mongoTemplate).find(queryCaptor.capture(), eq(ChatMessageDocument.class), eq("mensagens"));
         Query query = queryCaptor.getValue();
-        assertEquals(CONVERSATION_ID, query.getQueryObject().getString("id_conversa"));
+        assertEquals(CONVERSATION_ID, query.getQueryObject().getString("conversa_id"));
         assertEquals(new Document("data", -1).append("_id", -1), query.getSortObject());
         assertEquals(31, query.getLimit());
-        assertTrue(query.getFieldsObject().containsKey("id_remetente"));
+        assertTrue(query.getFieldsObject().containsKey("remetente_id"));
         assertTrue(query.getFieldsObject().containsKey("mensagem"));
         assertTrue(query.getFieldsObject().containsKey("resposta_mensagem_id"));
         assertTrue(query.getFieldsObject().containsKey("data"));
@@ -70,7 +70,7 @@ class ChatMongoRepositoryTest {
         ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
         verify(mongoTemplate).find(queryCaptor.capture(), eq(ChatMessageDocument.class), eq("mensagens"));
         Document query = queryCaptor.getValue().getQueryObject();
-        assertEquals(CONVERSATION_ID, query.getString("id_conversa"));
+        assertEquals(CONVERSATION_ID, query.getString("conversa_id"));
         List<Document> andTerms = (List<Document>) query.get("$and");
         Document cursor = andTerms.getFirst();
         List<Document> orTerms = (List<Document>) cursor.get("$or");

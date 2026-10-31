@@ -33,10 +33,26 @@ public final class ChatPushEventMapper {
                 Instant.parse(payload.getString("createdAt")));
     }
 
+    public static Document toStoredDocument(ChatPushEvent event) {
+        return new Document("versao", event.version()).append("mensagem_id", event.messageId())
+                .append("conversa_id", event.conversationId()).append("remetente_id", event.senderId().toString())
+                .append("destinatario_id", event.recipientId().toString()).append("workspace_id", event.workspaceId().toString())
+                .append("destinatario_uid", event.recipientUid()).append("nome_remetente", event.senderName())
+                .append("previa", event.preview()).append("criado_em", event.createdAt().toString());
+    }
+
+    public static ChatPushEvent fromStoredDocument(Document event) {
+        return new ChatPushEvent(event.getInteger("versao"), event.getString("mensagem_id"),
+                event.getString("conversa_id"), Long.valueOf(event.getString("remetente_id")),
+                Long.valueOf(event.getString("destinatario_id")), Long.valueOf(event.getString("workspace_id")),
+                event.getString("destinatario_uid"), event.getString("nome_remetente"), event.getString("previa"),
+                Instant.parse(event.getString("criado_em")));
+    }
+
     public static ChatPushOutboxEntry fromOutboxDocument(Document document) {
         if (document == null) return null;
-        ChatPushEvent event = fromDocument(document.get("payload", Document.class));
-        return new ChatPushOutboxEntry(document.getString("_id"), event, document.getInteger("attempts", 1));
+        ChatPushEvent event = fromStoredDocument(document.get("evento", Document.class));
+        return new ChatPushOutboxEntry(document.getString("_id"), event, document.getInteger("tentativas", 1));
     }
 
     public static String toJson(ChatPushEvent event) {

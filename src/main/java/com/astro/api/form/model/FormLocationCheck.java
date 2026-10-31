@@ -5,7 +5,7 @@ import org.springframework.data.convert.ValueConverter;
 import org.springframework.data.mongodb.core.mapping.Field;
 
 public record FormLocationCheck(
-        @Field("id_unidade") @ValueConverter(FormNumberConverter.class) Long unitId,
+        @Field("unidade_id") @ValueConverter(FormNumberConverter.class) Long unitId,
         @Field("latitude_unidade") double unitLatitude,
         @Field("longitude_unidade") double unitLongitude,
         @Field("raio_metros") int radiusMeters,

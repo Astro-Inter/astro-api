@@ -52,14 +52,14 @@ public class ChatMongoRepository {
     }
 
     public List<ConversationDocument> findConversationsFor(Long userId) {
-        Query query = Query.query(Criteria.where("participantes").is(userId).size(2));
-        query.fields().include("_id").include("participantes");
+        Query query = Query.query(Criteria.where("participantes_ids").is(userId).size(2));
+        query.fields().include("_id").include("participantes_ids");
         return mongoTemplate.find(query, ConversationDocument.class, CONVERSATIONS);
     }
 
     public ConversationDocument findConversation(String conversationId) {
         Query query = Query.query(Criteria.where("_id").is(conversationId));
-        query.fields().include("_id").include("participantes");
+        query.fields().include("_id").include("participantes_ids");
         return mongoTemplate.findOne(query, ConversationDocument.class, CONVERSATIONS);
     }
 
@@ -95,45 +95,45 @@ public class ChatMongoRepository {
 
     public ChatMessageDocument findMessageByIdempotency(Long senderId, String clientMessageId) {
         Document found = messages().find(new Document("_id", ChatMessageIds.forMessage(senderId, clientMessageId))
-                .append("id_remetente", senderId)).first();
+                .append("remetente_id", senderId)).first();
         return found == null ? null : message(found);
     }
 
     public ChatMessageDocument findMessage(ClientSession session, Long senderId, String clientMessageId) {
         Document found = messages().find(session, new Document("_id", ChatMessageIds.forMessage(senderId, clientMessageId))
-                .append("id_remetente", senderId)).first();
+                .append("remetente_id", senderId)).first();
         return found == null ? null : message(found);
     }
 
     public ChatMessageDocument findMessage(ClientSession session, String conversationId, String messageId) {
         Document found = messages().find(session, new Document("_id", messageId)
-                .append("id_conversa", conversationId)).first();
+                .append("conversa_id", conversationId)).first();
         return found == null ? null : message(found);
     }
 
     public ChatMessageDocument findMessage(String conversationId, String messageId) {
         Document found = messages().find(new Document("_id", messageId)
-                .append("id_conversa", conversationId)).first();
+                .append("conversa_id", conversationId)).first();
         return found == null ? null : message(found);
     }
 
     public void insertConversation(ClientSession session, ConversationDocument conversation) {
         conversations().insertOne(session, new Document("_id", conversation.id())
-                .append("participantes", conversation.participants())
+                .append("participantes_ids", conversation.participants())
                 );
     }
 
     public void insertMessage(ClientSession session, ChatMessageDocument message) {
         messages().insertOne(session, new Document("_id", message.id())
-                .append("id_conversa", message.conversationId())
-                .append("id_remetente", message.senderId())
+                .append("conversa_id", message.conversationId())
+                .append("remetente_id", message.senderId())
                 .append("mensagem", message.content())
                 .append("resposta_mensagem_id", message.replyToMessageId())
                 .append("data", Date.from(message.createdAt())));
     }
 
     private ConversationDocument conversation(Document document) {
-        List<?> rawParticipants = (List<?>) document.get("participantes");
+        List<?> rawParticipants = (List<?>) document.get("participantes_ids");
         List<Long> participants = rawParticipants == null ? List.of() : rawParticipants.stream()
                 .map(value -> ((Number) value).longValue()).toList();
         return new ConversationDocument(document.getString("_id"), participants);
@@ -141,13 +141,13 @@ public class ChatMongoRepository {
 
     private ChatMessageDocument message(Document document) {
         Date date = document.getDate("data");
-        return new ChatMessageDocument(document.getString("_id"), document.getString("id_conversa"),
-                ((Number) document.get("id_remetente")).longValue(), document.getString("mensagem"),
+        return new ChatMessageDocument(document.getString("_id"), document.getString("conversa_id"),
+                ((Number) document.get("remetente_id")).longValue(), document.getString("mensagem"),
                 document.getString("resposta_mensagem_id"), date.toInstant());
     }
 
     private static Document participantPairQuery(Long firstParticipantId, Long secondParticipantId) {
-        return new Document("participantes", new Document("$all", List.of(firstParticipantId, secondParticipantId))
+        return new Document("participantes_ids", new Document("$all", List.of(firstParticipantId, secondParticipantId))
                 .append("$size", 2));
     }
 
@@ -156,14 +156,14 @@ public class ChatMongoRepository {
 
     public List<ChatMessageDocument> findMessagesBefore(String conversationId, Instant cursorDate,
                                                         String cursorMessageId, int limit) {
-        Criteria criteria = Criteria.where("id_conversa").is(conversationId);
+        Criteria criteria = Criteria.where("conversa_id").is(conversationId);
         if (cursorDate != null && cursorMessageId != null) {
             criteria = criteria.andOperator(cursorCriteria(cursorDate, cursorMessageId));
         }
         Query query = Query.query(criteria)
                 .with(Sort.by(Sort.Order.desc("data"), Sort.Order.desc("_id")))
                 .limit(limit);
-        query.fields().include("_id").include("id_remetente").include("mensagem")
+        query.fields().include("_id").include("remetente_id").include("mensagem")
                 .include("resposta_mensagem_id").include("data");
         return mongoTemplate.find(query, ChatMessageDocument.class, MESSAGES);
     }
@@ -181,10 +181,10 @@ public class ChatMongoRepository {
             return List.of();
         }
         Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(Criteria.where("id_conversa").in(conversationIds)),
+                Aggregation.match(Criteria.where("conversa_id").in(conversationIds)),
                 Aggregation.sort(Sort.by(Sort.Order.desc("data"), Sort.Order.desc("_id"))),
-                Aggregation.group("id_conversa")
-                        .first("id_remetente").as("senderId")
+                Aggregation.group("conversa_id")
+                        .first("remetente_id").as("senderId")
                         .first("mensagem").as("content")
                         .first("data").as("date"),
                 Aggregation.project("senderId", "content", "date")

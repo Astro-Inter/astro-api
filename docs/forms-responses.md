@@ -185,7 +185,7 @@ Os objetos usam chaves geradas pelo servidor em
 `formularios/{formId}/perguntas/{questionId}/{imageUuid}.jpg` (ou `.png`).
 Em falha anterior à gravação ou conflito conhecido, o serviço remove os uploads
 da tentativa. Se a confirmação do Mongo se perder após a gravação, tenta recuperar
-o documento pelo `id_envio`. Sem confirmação possível, preserva as imagens e
+o documento pelo `envio_id`. Sem confirmação possível, preserva as imagens e
 registra os IDs para reconciliação, evitando apagar anexos de uma resposta possivelmente salva.
 
 ## Geolocalização da unidade
@@ -238,13 +238,13 @@ As coordenadas de `unitLocation` refletem o cadastro atual, não o GPS informado
 ## MongoDB e camadas
 
 Continua existindo apenas a collection `forms`; não são criadas collections de
-sequência, respostas, análises ou anexos. Novos envios usam `id_envio` (UUID interno para recuperação) e `analise`.
+sequência, respostas, análises ou anexos. Novos envios usam `envio_id` (UUID interno para recuperação) e `analise`.
 Não gravam `consentimento_localizacao`, `localizacoes` nem `validacao_localizacao`.
 Dados históricos de GPS permanecem legíveis, sem migração destrutiva.
 O campo histórico `validacao_localizacao` é preservado na leitura, mas não é criado nos novos envios.
-Análise usa `status: APROVADO|REPROVADO`, `id_gestor_revisor`, `analisado_em`.
+Análise usa `status: APROVADO|REPROVADO`, `gestor_revisor_id`, `analisado_em`.
 **`analise.descricao` só existe em reprovação**; antes da análise, `analise` é ausente.
-Fotos ficam em `perguntas[].resposta[]` com `id_imagem`, `chave_objeto`, `nome`,
+Fotos ficam em `perguntas[].resposta[]` com `imagem_id`, `chave_objeto`, `nome`,
 `tipo_conteudo`, `tamanho_bytes`. IDs numéricos continuam compactados para BSON
 int32 quando couberem, preservando int64 para valores maiores. Não há migração destrutiva.
 

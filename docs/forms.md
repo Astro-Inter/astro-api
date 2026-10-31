@@ -180,24 +180,24 @@ retornam 409. O destinatário passa a enxergar o formulário após a publicaçã
 
 ## Persistência e compatibilidade
 
-A collection é `forms`, com um documento por formulário e perguntas embutidas.
+A collection é `formularios`, com um documento por formulário e perguntas embutidas.
 Os documentos novos usam `_id` do tipo string UUID. IDs numéricos ou ObjectIds antigos exigem
 migração explícita, incluindo referências externas; a API não os converte automaticamente.
-O campo `id_workspace` é obrigatório para acesso pelas rotas web. Documentos antigos
+O campo `workspace_id` é obrigatório para acesso pelas rotas web. Documentos antigos
 sem esse vínculo não ficam acessíveis até uma migração explícita e conferida.
 A Home mobile passa a consultar somente documentos com `status: PENDENTE`.
 Documentos antigos precisam ter seu status definido antes de aparecer nessa consulta.
 Não inferimos conclusão a partir de perguntas opcionais sem resposta.
 Opções antigas como arrays de strings precisam ser migradas para objetos com
-`id_opcao`, `texto` e `outra` antes de usar a consulta completa/edição web.
+`opcao_id`, `texto` e `outra` antes de usar a consulta completa/edição web.
 
 Índices sugeridos para provisionamento no banco (a API não altera índices ao iniciar):
 
 ```javascript
-db.forms.createIndex({id_workspace: 1, criado_em: -1, _id: -1})
-db.forms.createIndex({id_workspace: 1, id_gestor_remetente: 1, criado_em: -1, _id: -1})
-db.forms.createIndex({id_workspace: 1, id_gestor: 1, status: 1, criado_em: -1, _id: -1})
-db.forms.createIndex({id_gestor: 1, status: 1, data_limite: 1, _id: 1})
+db.formularios.createIndex({workspace_id: 1, criado_em: -1, _id: -1})
+db.formularios.createIndex({workspace_id: 1, gestor_remetente_id: 1, criado_em: -1, _id: -1})
+db.formularios.createIndex({workspace_id: 1, gestor_id: 1, status: 1, criado_em: -1, _id: -1})
+db.formularios.createIndex({gestor_id: 1, status: 1, data_limite: 1, _id: 1})
 ```
 
 ## Organização do módulo
@@ -229,7 +229,7 @@ Os identificadores Java usam inglês, incluindo `nrCode`, `DRAFT`, `PENDING`,
 `COMPLETED`, `TEXT`, `OPTION`, `PHOTO` e `DATE`. Os DTOs usam diretamente os
 nomes Java no JSON, incluindo `nrCode`, `managerId`, `questions`, `required` e `answer`.
 Os campos físicos do MongoDB continuam mapeados por `@Field`, incluindo `nr`,
-`id_gestor`, `perguntas` e `resposta`; a remoção de `@JsonProperty` não exige migração
+`gestor_id`, `perguntas` e `resposta`; a remoção de `@JsonProperty` não exige migração
 dos documentos. Os valores de enum permanecem `RASCUNHO`, `PENDENTE`, `CONCLUIDO`,
 `texto`, `alternativa`, `foto` e `data`. A Home mobile mantém o contrato próprio
 existente; esta mudança se aplica aos bodies e respostas dos endpoints `/forms`.
@@ -254,3 +254,9 @@ A continuação do fluxo mobile, com envio de respostas/imagens e análise web, 
 - `FormQuestionDefinitionRequest` define cada pergunta dessa lista: tipo, enunciado, obrigatoriedade, opções e limites de fotos.
 
 Um formulário com cinco perguntas usa um `FormRequest` com cinco itens `FormQuestionDefinitionRequest` em `questions`. Os nomes distinguem as operações no formulário da definição de suas perguntas.
+
+## Aparência e nomes físicos no Mongo
+
+`POST /forms` e `PUT /forms/{id}` aceitam `appearance: { "icon": "calendar", "color": "orange" }`. Detalhes e itens da listagem retornam appearance opcional/null. Cor e ícone são validados pelo catálogo permitido. Sem appearance em uma edição, a configuração anterior é preservada. O bloqueio de alterações após respostas permanece.
+
+A coleção física passa a `formularios`, com `configuracao.icone` e `configuracao.cor`; o título tem até 100 caracteres e não contém marcadores de aparência. Referências usam sufixo `_id`, como `workspace_id`, `gestor_id`, `gestor_remetente_id`, `unidade_id` e `nr_id`. DTOs HTTP permanecem camelCase. Migrar os dados antigos antes de disponibilizar as novas versões; o procedimento está no repositório banco-de-dados, em mongo/docs/migracao-padronizacao.md.

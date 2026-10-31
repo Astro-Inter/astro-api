@@ -1,6 +1,6 @@
 # Push de chat — SCRUM-674
 
-ChatService grava chat_push_outbox na mesma sessão/transação Mongo da mensagem.
+ChatService grava fila_entregas_chat na mesma sessão/transação Mongo da mensagem.
 O _id é o ID determinístico da mensagem; a repetição de clientMessageId retorna a
 mensagem existente sem gerar outro evento. O envio HTTP ocorre fora dessa transação.
 Uma falha externa não desfaz uma mensagem persistida. Falha ao gravar a outbox
@@ -22,7 +22,7 @@ uma revogação posterior a esse aceite não cancela um push já encaminhado.
   armazenado no gerenciador de secrets da infraestrutura; nunca no repositório.
 - astro.chat.push.poll-ms: intervalo de consulta, padrão 1.000 ms.
 
-Provisionar a coleção chat_push_outbox e permitir inserts/updates e índices:
+Provisionar a coleção fila_entregas_chat e permitir inserts/updates e índices:
 composto done/nextAttempt e TTL expiresAt. O dispatcher também cria os índices
 idempotentemente. Uma rodada reivindica até 10 eventos; lease atômico de 120s
 impede disputa normal entre réplicas. Falhas/HTTP diferente de 200/202 usam espera
