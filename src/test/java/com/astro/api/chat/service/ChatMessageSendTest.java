@@ -68,8 +68,8 @@ class ChatMessageSendTest {
         verify(mongo).insertConversation(any(), any(ConversationDocument.class));
         verify(mongo).insertMessage(any(), any(ChatMessageDocument.class));
         verify(redis).execute(any(), eq(List.of(
-                "chat:unread:" + response.conversationId() + ":2",
-                "chat:unread:processed:" + response.conversationId())), eq(response.id()));
+                "conversa:nao_lidas:" + response.conversationId() + ":2",
+                "conversa:nao_lidas:processadas:" + response.conversationId())), eq(response.id()));
         verify(messagePublisher).publish(2L, response);
     }
 

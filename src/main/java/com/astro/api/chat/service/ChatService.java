@@ -66,7 +66,7 @@ public class ChatService {
     private final ChatMessagePublisher messagePublisher;
     private final ChatPushSettings pushSettings;
     private final ChatPushOutbox pushOutbox;
-    private static final String UNREAD_PROCESSED_KEY_PREFIX = "chat:unread:processed:";
+    private static final String UNREAD_PROCESSED_KEY_PREFIX = "conversa:nao_lidas:processadas:";
 
     public ChatService(UserRepository userRepository, ChatMongoRepository chatMongoRepository,
                        StringRedisTemplate redisTemplate, UserAvatarService userAvatarService,
@@ -261,7 +261,7 @@ public class ChatService {
     }
 
     private String unreadKey(String conversationId, Long userId) {
-        return "chat:unread:%s:%d".formatted(conversationId, userId);
+        return "conversa:nao_lidas:%s:%d".formatted(conversationId, userId);
     }
 
     private int parseCount(String count) {

@@ -11,7 +11,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 @Component
 public class RedisChatMessagePublisher implements ChatMessagePublisher {
-    public static final String DELIVERY_CHANNEL = "astro:chat:delivery:v1";
+    public static final String DELIVERY_CHANNEL = "astro:conversa:entrega:v1";
 
     private final StringRedisTemplate redisTemplate;
     private final JsonMapper jsonMapper;

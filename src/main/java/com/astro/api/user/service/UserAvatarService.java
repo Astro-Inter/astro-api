@@ -110,6 +110,6 @@ public class UserAvatarService {
     }
 
     private String key(Long userId) {
-        return "user:avatar:" + userId;
+        return "usuario:foto:" + userId;
     }
 }

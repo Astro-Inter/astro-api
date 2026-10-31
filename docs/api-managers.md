@@ -71,7 +71,7 @@ contrato dos colaboradores. A tela pode usar `profilePhotoUrl` no avatar e exibi
 em maiúsculas (por exemplo, `Lucas Ribeiro` → `LR`); um nome único gera uma inicial.
 
 A foto é a do próprio usuário: `UserAvatarService` gera links temporários de download
-do R2 e reutiliza o cache Redis compartilhado `user:avatar:{id}` até a expiração do
+do R2 e reutiliza o cache Redis compartilhado `usuario:foto:{id}` até a expiração do
 link. A listagem consulta cache e fotos ausentes em lote, após restringir os gestores
 ao workspace autorizado. Nos demais endpoints, somente o usuário já autorizado é
 consultado. Redis indisponível mantém a consulta de fotos e geração de links.
