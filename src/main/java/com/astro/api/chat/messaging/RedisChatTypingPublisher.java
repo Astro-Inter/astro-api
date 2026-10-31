@@ -9,7 +9,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 @Component
 public class RedisChatTypingPublisher implements ChatTypingPublisher {
-    public static final String TYPING_CHANNEL = "astro:chat:typing:v1";
+    public static final String TYPING_CHANNEL = "astro:conversa:digitacao:v1";
     private final StringRedisTemplate redis;
     private final JsonMapper mapper;
 
@@ -20,7 +20,7 @@ public class RedisChatTypingPublisher implements ChatTypingPublisher {
 
     @Override
     public void publish(Long recipientId, ChatTypingResponse event) {
-        String key = "chat:typing:throttle:" + event.senderId() + ":" + recipientId;
+        String key = "conversa:digitacao:limite:" + event.senderId() + ":" + recipientId;
         if (event.typing()) {
             Boolean allowed = redis.opsForValue().setIfAbsent(key, "1", Duration.ofMillis(1500));
             if (!Boolean.TRUE.equals(allowed)) return;

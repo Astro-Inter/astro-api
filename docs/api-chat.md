@@ -60,7 +60,7 @@ destination:/user/queue/messages
 
 Cada instância mantém um broker simples para as conexões WebSocket locais.
 Eventos destinados a outras instâncias passam pelo canal Redis Pub/Sub
-`astro:chat:delivery:v1`; cada instância encaminha o evento somente às sessões
+`astro:conversa:entrega:v1`; cada instância encaminha o evento somente às sessões
 locais do usuário destinatário. Todas as instâncias precisam usar o mesmo Redis
 e ter permissão de publicação e assinatura nesse canal. O Pub/Sub não armazena
 eventos para clientes desconectados; nesses casos, o histórico REST permite
@@ -126,8 +126,8 @@ persistida. A consulta de pares existentes não tem índice personalizado e
 pode percorrer a collection `conversas`.
 
 Após persistir, o backend executa um script Lua no Redis que consulta o ID da
-mensagem em `chat:unread:processed:{conversationId}`, faz `INCR`
-`chat:unread:{conversationId}:{recipientId}` e registra o ID processado com
+mensagem em `conversa:nao_lidas:processadas:{conversationId}`, faz `INCR`
+`conversa:nao_lidas:{conversationId}:{recipientId}` e registra o ID processado com
 `SADD`, numa única execução atômica. O incremento é repetido
 com o mesmo ID não conta de novo. Se o Redis estiver indisponível após a
 gravação MongoDB, o servidor retorna erro correlacionado; o Android deve
@@ -245,10 +245,10 @@ participante não é consultado como critério de autorização, então sua
 desativação não bloqueia a leitura do histórico existente.
 
 Após autorizar, a API executa uma única operação Redis `DEL` na chave
-`chat:unread:{conversationId}:{userId}`, usando o ID PostgreSQL do usuário
+`conversa:nao_lidas:{conversationId}:{userId}`, usando o ID PostgreSQL do usuário
 autenticado. Por exemplo, para a conversa
 `11111111-2222-4333-8444-555555555555` e usuário `25`, a chave removida é
-`chat:unread:11111111-2222-4333-8444-555555555555:25`. A chave do outro
+`conversa:nao_lidas:11111111-2222-4333-8444-555555555555:25`. A chave do outro
 participante não é alterada. A remoção é idempotente, inclusive se a chave já
 não existir; erros de conexão Redis são propagados pelo tratamento central de
 infraestrutura.
@@ -294,7 +294,7 @@ usando mensagens normalmente. Não foi adicionado endpoint HTTP.
   Uma conversa informada precisa existir e incluir o remetente. Para um contato
   autorizado, consulta a conversa existente pelo par antes de calcular um ID
   pela regra determinística. Nenhum documento é criado.
-- O canal Redis `astro:chat:typing:v1` distribui os eventos entre instâncias,
+- O canal Redis `astro:conversa:digitacao:v1` distribui os eventos entre instâncias,
   entregando somente na fila privada do destinatário. Eventos de início vencidos
   são descartados. Não há replay offline, outbox, contador de não lidas ou push.
 - Redis limita renovações de início a uma por par em 1,5 segundo; parar remove

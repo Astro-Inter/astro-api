@@ -60,7 +60,7 @@ class ChatTypingMessagingTest {
             publisher.publish(2L, new ChatTypingResponse("conversation", 1L, true, Instant.now().plusSeconds(5)));
             verify(redis, never()).convertAndSend(anyString(), anyString());
             publisher.publish(2L, new ChatTypingResponse("conversation", 1L, false, Instant.now()));
-            verify(redis).delete("chat:typing:throttle:1:2");
+            verify(redis).delete("conversa:digitacao:limite:1:2");
             verify(redis).convertAndSend(eq(RedisChatTypingPublisher.TYPING_CHANNEL), anyString());
         });
     }

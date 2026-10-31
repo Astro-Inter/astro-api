@@ -58,7 +58,7 @@ class UserAvatarServiceTest {
 
     @Test
     void reusesCachedUrlsWithoutDatabaseQueriesOrSigningAndDoesNotExtendTheirTtl() {
-        when(values.multiGet(List.of("user:avatar:20", "user:avatar:21")))
+        when(values.multiGet(List.of("usuario:foto:20", "usuario:foto:21")))
                 .thenReturn(List.of("https://r2.example.com/20", "https://r2.example.com/21"));
         assertEquals(Map.of(20L, "https://r2.example.com/20", 21L, "https://r2.example.com/21"),
                 service.findUrls(List.of(20L, 21L, 20L)));
@@ -80,7 +80,7 @@ class UserAvatarServiceTest {
         assertNull(result.get(22L));
         verify(photos, times(1)).findAllById(List.of(21L, 22L));
         ArgumentCaptor<Expiration> expiry = ArgumentCaptor.forClass(Expiration.class);
-        verify(commands).set(aryEq(bytes("user:avatar:21")), aryEq(bytes("https://r2.example.com/new")),
+        verify(commands).set(aryEq(bytes("usuario:foto:21")), aryEq(bytes("https://r2.example.com/new")),
                 any(SetCondition.class), expiry.capture());
         assertTrue(expiry.getValue().isUnixTimestamp());
         assertEquals(expiration.toEpochMilli(), expiry.getValue().getExpirationTimeInMilliseconds());
@@ -112,7 +112,7 @@ class UserAvatarServiceTest {
 
     @Test
     void regeneratesOnACacheMissAndTheNextRequestReusesTheResult() {
-        when(values.multiGet(List.of("user:avatar:20"))).thenReturn(Arrays.asList((String) null))
+        when(values.multiGet(List.of("usuario:foto:20"))).thenReturn(Arrays.asList((String) null))
                 .thenReturn(List.of("https://r2.example.com/new"));
         when(photos.findAllById(List.of(20L))).thenReturn(List.of(photo(20L)));
         when(storage.getPresignedDownload(anyString()))
@@ -153,7 +153,7 @@ class UserAvatarServiceTest {
     @Test
     void invalidatesOnlyTheUsersAvatarKey() {
         service.invalidate(20L);
-        verify(redis).delete("user:avatar:20");
+        verify(redis).delete("usuario:foto:20");
         verifyNoInteractions(photos, storage);
     }
 

@@ -12,7 +12,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class PreRegistrationQueueService {
     private static final Logger LOGGER = LoggerFactory.getLogger(PreRegistrationQueueService.class);
     private static final String COLLABORATOR_EMAIL_QUEUE = "processamento:email:colaborador";
-    private static final String WORKSPACE_EMAIL_QUEUE = "processamento:email:workspace";
+    private static final String WORKSPACE_EMAIL_QUEUE = "processamento:email:espaco_trabalho";
     private final StringRedisTemplate redisTemplate;
 
     public PreRegistrationQueueService(StringRedisTemplate redisTemplate) {

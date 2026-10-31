@@ -223,7 +223,7 @@ com `findAllById`, evitando uma consulta por colaborador. As URLs são assinadas
 pelo presigner R2 existente e gravadas em pipeline. A assinatura ocorre localmente;
 o navegador usa a URL para carregar o arquivo no Cloudflare.
 
-Cada chave `user:avatar:{id_usuario}` contém apenas uma string com a URL. A
+Cada chave `usuario:foto:{id_usuario}` contém apenas uma string com a URL. A
 expiração absoluta da chave coincide com a expiração da assinatura, usando
 `SET PXAT`; o tempo de geração e de comunicação não prolonga a validade no cache.
 O período segue `R2_PRESIGNED_URL_DURATION` (padrão `1d`, por exemplo `3d`, máximo

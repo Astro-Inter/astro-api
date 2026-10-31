@@ -77,7 +77,7 @@ class ChatServiceTest {
                         Instant.parse("2026-10-20T10:00:00Z")),
                 new LastMessageProjection("conv-new", 3L, "Concluí",
                         Instant.parse("2026-10-21T10:00:00Z"))));
-        when(values.multiGet(List.of("chat:unread:conv-new:1", "chat:unread:conv-old:1")))
+        when(values.multiGet(List.of("conversa:nao_lidas:conv-new:1", "conversa:nao_lidas:conv-old:1")))
                 .thenReturn(java.util.Arrays.asList("3", null));
         when(avatars.findUrls(anyCollection())).thenReturn(java.util.Map.of(2L, "https://cdn.example/ana.jpg"));
 
@@ -226,8 +226,8 @@ class ChatServiceTest {
 
         service.markAsRead(authenticatedUser(), conversationId);
 
-        verify(redis).delete("chat:unread:" + conversationId + ":1");
-        verify(redis, never()).delete("chat:unread:" + conversationId + ":2");
+        verify(redis).delete("conversa:nao_lidas:" + conversationId + ":1");
+        verify(redis, never()).delete("conversa:nao_lidas:" + conversationId + ":2");
         verify(mongo, never()).findMessagesBefore(org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.anyInt());
@@ -235,7 +235,7 @@ class ChatServiceTest {
         order.verify(users).findChatUserByFirebaseUid("uid");
         order.verify(mongo).findConversation(conversationId);
         order.verify(users).findChatUsersByIds(List.of(1L, 2L));
-        order.verify(redis).delete("chat:unread:" + conversationId + ":1");
+        order.verify(redis).delete("conversa:nao_lidas:" + conversationId + ":1");
     }
 
     @Test
@@ -250,7 +250,7 @@ class ChatServiceTest {
         service.markAsRead(authenticatedUser(), conversationId);
         service.markAsRead(authenticatedUser(), conversationId);
 
-        verify(redis, times(2)).delete("chat:unread:" + conversationId + ":1");
+        verify(redis, times(2)).delete("conversa:nao_lidas:" + conversationId + ":1");
     }
 
     @Test
@@ -295,7 +295,7 @@ class ChatServiceTest {
                 new ConversationDocument(conversationId, List.of(1L, 2L)));
         when(users.findChatUsersByIds(List.of(1L, 2L)))
                 .thenReturn(List.of(current, ana));
-        when(redis.delete("chat:unread:" + conversationId + ":1"))
+        when(redis.delete("conversa:nao_lidas:" + conversationId + ":1"))
                 .thenThrow(new IllegalStateException("Redis indisponível"));
 
         assertThrows(IllegalStateException.class,

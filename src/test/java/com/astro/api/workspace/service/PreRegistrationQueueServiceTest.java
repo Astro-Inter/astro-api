@@ -50,7 +50,7 @@ class PreRegistrationQueueServiceTest {
 
         service.enqueueManagerEmail("gestor@astro.com");
 
-        verify(listOperations).rightPush("processamento:email:workspace", "gestor@astro.com");
+        verify(listOperations).rightPush("processamento:email:espaco_trabalho", "gestor@astro.com");
         verifyNoMoreInteractions(listOperations);
     }
 }

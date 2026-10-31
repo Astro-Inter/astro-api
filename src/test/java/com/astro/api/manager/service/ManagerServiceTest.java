@@ -98,7 +98,7 @@ class ManagerServiceTest {
         org.springframework.data.redis.core.ValueOperations<String, String> values =
                 mock(org.springframework.data.redis.core.ValueOperations.class);
         when(redis.opsForValue()).thenReturn(values);
-        when(values.multiGet(List.of("user:avatar:4"))).thenReturn(List.of("https://r2.example.com/cached-collaborator"));
+        when(values.multiGet(List.of("usuario:foto:4"))).thenReturn(List.of("https://r2.example.com/cached-collaborator"));
         UserAvatarService sharedAvatars = new UserAvatarService(photos, redis, storage);
         String selectedPhoto = sharedAvatars.findUrl(4L);
         ManagerService withSharedCache = new ManagerService(repository, users, new ManagerMapper(), roles, units,
@@ -108,7 +108,7 @@ class ManagerServiceTest {
                 4L, com.astro.api.manager.dto.request.ManagerAccountStatus.ATIVO), principal);
         assertEquals(selectedPhoto, result.profilePhotoUrl());
         assertEquals("C", result.avatarInitials());
-        verify(values, times(2)).multiGet(List.of("user:avatar:4"));
+        verify(values, times(2)).multiGet(List.of("usuario:foto:4"));
         verifyNoInteractions(photos, storage);
         verify(redis, never()).delete(anyString());
     }

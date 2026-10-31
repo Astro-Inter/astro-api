@@ -28,7 +28,7 @@ class UserAvatarRedisTest {
     private final UserProfilePhotoRepository photos = mock(UserProfilePhotoRepository.class);
     private final R2StorageService storage = mock(R2StorageService.class);
     private final Long id = 951720L;
-    private final String key = "user:avatar:" + id;
+    private final String key = "usuario:foto:" + id;
 
     @BeforeEach
     void setUp() {
