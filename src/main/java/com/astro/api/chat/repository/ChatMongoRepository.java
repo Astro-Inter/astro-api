@@ -3,7 +3,7 @@ package com.astro.api.chat.repository;
 import com.astro.api.chat.model.ChatMessageDocument;
 import com.astro.api.chat.model.ConversationDocument;
 import com.astro.api.chat.model.ChatMessageIds;
-import com.astro.api.common.exception.ConflictException;
+import com.astro.api.chat.mapper.ChatMongoMapper;
 import com.mongodb.client.ClientSession;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
@@ -11,7 +11,6 @@ import com.mongodb.client.MongoDatabase;
 import com.mongodb.ReadConcern;
 import com.mongodb.TransactionOptions;
 import com.mongodb.WriteConcern;
-import java.util.Date;
 import java.util.function.Function;
 import org.bson.Document;
 import java.time.Instant;
@@ -69,81 +68,54 @@ public class ChatMongoRepository {
         }
     }
 
-    public ConversationDocument findConversationByPair(ClientSession session, Long firstParticipantId,
+    public List<ConversationDocument> findConversationsByPair(ClientSession session, Long firstParticipantId,
                                                         Long secondParticipantId) {
         List<Document> matches = conversations().find(session, participantPairQuery(firstParticipantId, secondParticipantId))
                 .limit(2).into(new ArrayList<>());
-        if (matches.size() > 1) {
-            throw new ConflictException("Há mais de uma conversa para o mesmo par de participantes.");
-        }
-        return matches.isEmpty() ? null : conversation(matches.getFirst());
+        return matches.stream().map(ChatMongoMapper::toConversation).toList();
     }
 
     public ConversationDocument findConversationById(ClientSession session, String conversationId) {
         Document found = conversations().find(session, new Document("_id", conversationId)).first();
-        return found == null ? null : conversation(found);
+        return ChatMongoMapper.toConversation(found);
     }
 
-    public ConversationDocument findConversationByPair(Long firstParticipantId, Long secondParticipantId) {
+    public List<ConversationDocument> findConversationsByPair(Long firstParticipantId, Long secondParticipantId) {
         List<Document> matches = conversations().find(participantPairQuery(firstParticipantId, secondParticipantId))
                 .limit(2).into(new ArrayList<>());
-        if (matches.size() > 1) {
-            throw new ConflictException("Há mais de uma conversa para o mesmo par de participantes.");
-        }
-        return matches.isEmpty() ? null : conversation(matches.getFirst());
+        return matches.stream().map(ChatMongoMapper::toConversation).toList();
     }
 
     public ChatMessageDocument findMessageByIdempotency(Long senderId, String clientMessageId) {
         Document found = messages().find(new Document("_id", ChatMessageIds.forMessage(senderId, clientMessageId))
                 .append("remetente_id", senderId)).first();
-        return found == null ? null : message(found);
+        return ChatMongoMapper.toMessage(found);
     }
 
     public ChatMessageDocument findMessage(ClientSession session, Long senderId, String clientMessageId) {
         Document found = messages().find(session, new Document("_id", ChatMessageIds.forMessage(senderId, clientMessageId))
                 .append("remetente_id", senderId)).first();
-        return found == null ? null : message(found);
+        return ChatMongoMapper.toMessage(found);
     }
 
     public ChatMessageDocument findMessage(ClientSession session, String conversationId, String messageId) {
         Document found = messages().find(session, new Document("_id", messageId)
                 .append("conversa_id", conversationId)).first();
-        return found == null ? null : message(found);
+        return ChatMongoMapper.toMessage(found);
     }
 
     public ChatMessageDocument findMessage(String conversationId, String messageId) {
         Document found = messages().find(new Document("_id", messageId)
                 .append("conversa_id", conversationId)).first();
-        return found == null ? null : message(found);
+        return ChatMongoMapper.toMessage(found);
     }
 
     public void insertConversation(ClientSession session, ConversationDocument conversation) {
-        conversations().insertOne(session, new Document("_id", conversation.id())
-                .append("participantes_ids", conversation.participants())
-                );
+        conversations().insertOne(session, ChatMongoMapper.toDocument(conversation));
     }
 
     public void insertMessage(ClientSession session, ChatMessageDocument message) {
-        messages().insertOne(session, new Document("_id", message.id())
-                .append("conversa_id", message.conversationId())
-                .append("remetente_id", message.senderId())
-                .append("mensagem", message.content())
-                .append("resposta_mensagem_id", message.replyToMessageId())
-                .append("data", Date.from(message.createdAt())));
-    }
-
-    private ConversationDocument conversation(Document document) {
-        List<?> rawParticipants = (List<?>) document.get("participantes_ids");
-        List<Long> participants = rawParticipants == null ? List.of() : rawParticipants.stream()
-                .map(value -> ((Number) value).longValue()).toList();
-        return new ConversationDocument(document.getString("_id"), participants);
-    }
-
-    private ChatMessageDocument message(Document document) {
-        Date date = document.getDate("data");
-        return new ChatMessageDocument(document.getString("_id"), document.getString("conversa_id"),
-                ((Number) document.get("remetente_id")).longValue(), document.getString("mensagem"),
-                document.getString("resposta_mensagem_id"), date.toInstant());
+        messages().insertOne(session, ChatMongoMapper.toDocument(message));
     }
 
     private static Document participantPairQuery(Long firstParticipantId, Long secondParticipantId) {

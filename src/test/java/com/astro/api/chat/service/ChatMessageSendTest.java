@@ -56,7 +56,7 @@ class ChatMessageSendTest {
     @Test
     void createsConversationAndPersistsMessageBeforeRedisAndPrivateDelivery() {
         ChatSendRequest request = request(2L, "Olá", "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
-        when(mongo.findConversationByPair(null, 1L, 2L)).thenReturn(null);
+        when(mongo.findConversationsByPair(null, 1L, 2L)).thenReturn(List.of());
         when(mongo.findMessage(null, 1L, request.getClientMessageId())).thenReturn(null);
 
         var response = service.send(sender, request);
@@ -82,7 +82,7 @@ class ChatMessageSendTest {
         ChatMessageDocument original = new ChatMessageDocument(
                 ChatMessageIds.forMessage(1L, request.getClientMessageId()),
                 conversation.id(), 1L, "Olá", null, Instant.parse("2026-10-26T10:00:00Z"));
-        when(mongo.findConversationByPair(null, 1L, 2L)).thenReturn(conversation);
+        when(mongo.findConversationsByPair(null, 1L, 2L)).thenReturn(List.of(conversation));
         when(mongo.findMessage(null, 1L, request.getClientMessageId())).thenReturn(original);
 
         var response = service.send(sender, request);
@@ -132,7 +132,7 @@ class ChatMessageSendTest {
         com.astro.api.chat.model.ChatTypingTarget target = service.authorizeTyping(sender, 2L, null);
         assertEquals(2L, target.recipientId());
         assertEquals(ChatMessageIds.forConversation(1L, 2L), target.conversationId());
-        verify(mongo).findConversationByPair(1L, 2L);
+        verify(mongo).findConversationsByPair(1L, 2L);
         verify(mongo, never()).inTransaction(any());
         org.mockito.Mockito.verifyNoInteractions(redis, pushOutbox, messagePublisher);
     }
@@ -140,7 +140,7 @@ class ChatMessageSendTest {
     @Test
     void typingUsesExistingConversationIdWhenSelectedByRecipient() {
         String id = "11111111-2222-4333-8444-555555555555";
-        when(mongo.findConversationByPair(1L, 2L)).thenReturn(new ConversationDocument(id, List.of(1L, 2L)));
+        when(mongo.findConversationsByPair(1L, 2L)).thenReturn(List.of(new ConversationDocument(id, List.of(1L, 2L))));
         assertEquals(id, service.authorizeTyping(sender, 2L, null).conversationId());
         verify(mongo, never()).inTransaction(any());
     }
@@ -166,6 +166,29 @@ class ChatMessageSendTest {
         assertThrows(org.springframework.security.access.AccessDeniedException.class,
                 () -> service.authorizeTyping(sender, null, id));
         verify(users, never()).findChatSendUsers(any(), anyList());
+    }
+
+    @Test
+    void rejectsDuplicateConversationsBeforePersistingMessage() {
+        ConversationDocument first = new ConversationDocument("first", List.of(1L, 2L));
+        ConversationDocument second = new ConversationDocument("second", List.of(1L, 2L));
+        when(mongo.findConversationsByPair(null, 1L, 2L)).thenReturn(List.of(first, second));
+        assertThrows(com.astro.api.common.exception.ConflictException.class,
+                () -> service.send(sender, request(2L, "Olá", "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")));
+        verify(mongo, never()).insertConversation(any(), any());
+        verify(mongo, never()).insertMessage(any(), any());
+        org.mockito.Mockito.verifyNoInteractions(redis, pushOutbox, messagePublisher);
+    }
+
+    @Test
+    void rejectsDuplicateConversationsDuringTypingAuthorization() {
+        ConversationDocument first = new ConversationDocument("first", List.of(1L, 2L));
+        ConversationDocument second = new ConversationDocument("second", List.of(1L, 2L));
+        when(mongo.findConversationsByPair(1L, 2L)).thenReturn(List.of(first, second));
+        assertThrows(com.astro.api.common.exception.ConflictException.class,
+                () -> service.authorizeTyping(sender, 2L, null));
+        verify(mongo, never()).inTransaction(any());
+        org.mockito.Mockito.verifyNoInteractions(redis, pushOutbox, messagePublisher);
     }
 
     private static ChatSendRequest request(Long recipientId, String content, String clientMessageId) {

@@ -20,6 +20,7 @@ import com.astro.api.chat.push.ChatPushOutbox;
 import com.astro.api.chat.repository.ChatMongoRepository;
 import com.astro.api.chat.repository.LastMessageProjection;
 import com.astro.api.common.exception.BusinessException;
+import com.astro.api.common.exception.ConflictException;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.user.mapper.UserAvatarMapper;
 import com.astro.api.user.repository.UserChatProjection;
@@ -315,7 +316,7 @@ public class ChatService {
         Long recipient = resolveRecipient(principal, recipientId, normalizedId);
         validateParticipants(principal, recipient);
         if (normalizedId == null) {
-            ConversationDocument existing = chatMongoRepository.findConversationByPair(principal.collaboratorId(), recipient);
+            ConversationDocument existing = uniqueConversation(chatMongoRepository.findConversationsByPair(principal.collaboratorId(), recipient));
             if (existing != null) normalizedId = existing.id();
             else normalizedId = ChatMessageIds.forConversation(principal.collaboratorId(), recipient);
         }
@@ -366,7 +367,7 @@ public class ChatService {
         return chatMongoRepository.inTransaction(session -> {
             ChatMessageDocument duplicate = chatMongoRepository.findMessage(session, senderId, clientMessageId);
             ConversationDocument conversation = requestedConversationId == null
-                    ? chatMongoRepository.findConversationByPair(session, senderId, recipientId)
+                    ? uniqueConversation(chatMongoRepository.findConversationsByPair(session, senderId, recipientId))
                     : chatMongoRepository.findConversationById(session, requestedConversationId);
             if (conversation == null) {
                 if (requestedConversationId != null) throw new ResourceNotFoundException("Conversa não encontrada");
@@ -404,8 +405,8 @@ public class ChatService {
                                                String clientMessageId, ChatPushParticipants pushParticipants) {
         ChatMessageDocument existing = chatMongoRepository.findMessageByIdempotency(senderId, clientMessageId);
         if (existing != null) {
-            ConversationDocument existingConversation = chatMongoRepository.findConversationByPair(
-                    senderId, recipientId);
+            ConversationDocument existingConversation = uniqueConversation(chatMongoRepository.findConversationsByPair(
+                    senderId, recipientId));
             if (existingConversation == null || !existing.conversationId().equals(existingConversation.id())
                     || !sameOperation(existing, requestedConversationId == null
                     ? existing.conversationId() : requestedConversationId, content, replyId)) {
@@ -419,12 +420,20 @@ public class ChatService {
         } catch (MongoException retryException) {
             ChatMessageDocument raced = chatMongoRepository.findMessageByIdempotency(senderId, clientMessageId);
             ConversationDocument racedConversation = raced == null ? null
-                    : chatMongoRepository.findConversationByPair(senderId, recipientId);
+                    : uniqueConversation(chatMongoRepository.findConversationsByPair(senderId, recipientId));
             if (raced != null && racedConversation != null && raced.conversationId().equals(racedConversation.id())
                     && sameOperation(raced, requestedConversationId == null
                     ? raced.conversationId() : requestedConversationId, content, replyId)) return raced;
             throw retryException;
         }
+    }
+
+    private ConversationDocument uniqueConversation(List<ConversationDocument> conversations) {
+        if (conversations.size() > 1) {
+            throw new ConflictException("Há mais de uma conversa para o mesmo par de participantes.");
+        }
+        if (conversations.isEmpty()) return null;
+        return conversations.getFirst();
     }
 
     private static boolean sameOperation(ChatMessageDocument message, String conversationId,
