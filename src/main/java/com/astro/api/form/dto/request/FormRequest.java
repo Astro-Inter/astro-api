@@ -16,5 +16,11 @@ public record FormRequest(
         LocalDate dueDate,
         FormStatus status,
         @Size(max = 100, message = "{form.questions.size}")
-        List<@NotNull(message = "{form.question.item.notNull}") @Valid FormQuestionDefinitionRequest> questions
-) {}
+        List<@NotNull(message = "{form.question.item.notNull}") @Valid FormQuestionDefinitionRequest> questions,
+        @Valid FormAppearanceRequest appearance
+) {
+    public FormRequest(String title, String description, Long managerId, Integer nrCode, Long unitId,
+                       LocalDate dueDate, FormStatus status, List<FormQuestionDefinitionRequest> questions) {
+        this(title, description, managerId, nrCode, unitId, dueDate, status, questions, null);
+    }
+}

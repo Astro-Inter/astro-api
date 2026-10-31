@@ -21,7 +21,8 @@ public record FormDetailsResponse(
         Instant updatedAt,
         Instant respondedAt,
         List<QuestionResponse> questions,
-        UnitLocationResponse unitLocation
+        UnitLocationResponse unitLocation,
+        FormAppearanceResponse appearance
 ) {
     public record UnitLocationResponse(Double latitude, Double longitude) {}
 

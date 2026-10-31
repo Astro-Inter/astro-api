@@ -29,7 +29,7 @@ class NrSqlCatalogSynchronizerTest {
     private final NrSqlCatalogRepository nrSqlCatalogRepository = mock(NrSqlCatalogRepository.class);
     private final NrSqlCatalogSynchronizer synchronizer = new NrSqlCatalogSynchronizer(
             nrReviewRepository, nrSqlCatalogRepository, new NrReviewMapper());
-    private final Document job = new Document("_id", "job-20").append("nrId", 20);
+    private final Document job = new Document("_id", "job-20").append("nr_id", 20);
 
     @Test
     void readsLatestPublishedVersionInsideLockAndRemovesJobAfterSynchronization() {

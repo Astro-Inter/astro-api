@@ -17,7 +17,7 @@ public class Notification {
     @MongoId
     private Object id;
 
-    @Field("id_usuario")
+    @Field("usuario_id")
     private Long userId;
 
     @Field("mensagem")
@@ -26,7 +26,7 @@ public class Notification {
     @Field("titulo")
     private String title;
 
-    @Field("id_evento")
+    @Field("evento_id")
     private Long eventId;
 
     @Field("data_criacao")

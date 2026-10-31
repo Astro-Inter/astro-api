@@ -33,7 +33,7 @@ public class FormAnswerMapper {
     }
 
     public Map<String, Object> toStoredImage(FormImage image) {
-        return Map.of("id_imagem", image.id(), "chave_objeto", image.objectKey(), "nome", image.name(),
+        return Map.of("imagem_id", image.id(), "chave_objeto", image.objectKey(), "nome", image.name(),
                 "tipo_conteudo", image.contentType(), "tamanho_bytes", storedNumber(image.sizeBytes()));
     }
 
@@ -43,7 +43,7 @@ public class FormAnswerMapper {
         for (Form.FormQuestion question : form.getQuestions()) {
             if (!FormQuestionType.PHOTO.value().equals(question.getType()) || question.getAnswer() == null) continue;
             for (Object value : question.getAnswer()) {
-                if (value instanceof Map<?, ?> image && image.get("id_imagem") instanceof String imageId
+                if (value instanceof Map<?, ?> image && image.get("imagem_id") instanceof String imageId
                         && image.get("chave_objeto") instanceof String objectKey
                         && image.get("nome") instanceof String name && image.get("tipo_conteudo") instanceof String contentType
                         && image.get("tamanho_bytes") instanceof Number size) {
@@ -60,7 +60,7 @@ public class FormAnswerMapper {
             if (value instanceof Map<?, ?> fields) {
                 if (FormQuestionType.PHOTO.value().equals(question.getType())) {
                     Map<String, Object> image = new LinkedHashMap<>();
-                    copyField(fields, image, "id_imagem", "id");
+                    copyField(fields, image, "imagem_id", "id");
                     copyField(fields, image, "nome", "name");
                     copyField(fields, image, "tipo_conteudo", "contentType");
                     copyField(fields, image, "tamanho_bytes", "sizeBytes");
