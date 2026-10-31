@@ -97,7 +97,7 @@ class FormResponseServiceTest {
         rejected.setReview(new FormReview(FormReviewStatus.REJECTED, 10L, Instant.now(), "Reprovado"));
         when(repository.findReceived(any(), isNull(), isNull(), isNull(), eq(0), eq(20)))
                 .thenReturn(new FormRepositoryCustom.Listing(List.of(form, rejected), 2));
-        when(viewedService.findViewed(20L, "formularios", List.of(form.getId(), rejected.getId())))
+        when(viewedService.findViewed(20L, "forms", List.of(form.getId(), rejected.getId())))
                 .thenReturn(Set.of(rejected.getId()));
         FormReceivedPageResponse page = service.findReceived(recipient, null, null, null, 0, 20);
         assertFalse(page.items().get(0).viewed()); assertTrue(page.items().get(1).viewed());
@@ -227,7 +227,7 @@ class FormResponseServiceTest {
         assertEquals(-46.6, result.form().unitLocation().longitude());
         assertFalse(result.locationPolicy().enforceUnitRadius());
         verify(repository, never()).submitResponse(any(), any());
-        verify(viewedService).markViewed(20L, "formularios", form.getId());
+        verify(viewedService).markViewed(20L, "forms", form.getId());
     }
 
     @Test void imageMustBelongToTheAuthorizedForm() {

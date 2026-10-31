@@ -55,8 +55,9 @@ Cada item tem `id`, `title`, `description`, `nrCode`, `unitId`, `senderManagerId
 `reviewStatus` e `viewed` (boolean). Lista vazia: sucesso com `items: []` e totais zero.
 Sem filtro de status, inclui pendentes e concluídos, inclusive aprovados e reprovados.
 Não existe status CANCELADO: reprovação é `status: CONCLUIDO` e `reviewStatus: rejected`.
-`viewed` é individual por usuário e reutiliza ViewedService (Redis), com a mesma chave
-`forms` da home. Abrir `GET /forms/received/{id}` marca como visualizado somente após
+`viewed` é individual por usuário e reutiliza ViewedService (Redis), com o mesmo identificador
+`forms` da home e a chave Redis `formularios:visualizados:{usuario}`.
+Abrir `GET /forms/received/{id}` marca como visualizado somente após
 validar o acesso e obter os detalhes. Listar não marca itens como visualizados.
 Parâmetros adicionais como `managerId=999&workspaceId=999` não alteram o escopo.
 
