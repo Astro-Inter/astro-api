@@ -6,6 +6,7 @@ import com.astro.api.chat.mapper.ChatContactMapper;
 import com.astro.api.chat.service.ChatContactService;
 import com.astro.api.chat.service.ChatService;
 import com.astro.api.user.repository.UserRepository;
+import com.astro.api.user.service.UserAvatarService;
 import java.lang.reflect.Proxy;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -56,7 +57,7 @@ class ChatControllerAuthorizationTest {
             UserRepository unusedRepository = (UserRepository) Proxy.newProxyInstance(
                     UserRepository.class.getClassLoader(), new Class<?>[]{UserRepository.class},
                     (proxy, method, args) -> { throw new UnsupportedOperationException(method.getName()); });
-            return new ChatContactService(unusedRepository, new ChatContactMapper());
+            return new ChatContactService(unusedRepository, new ChatContactMapper(), mock(UserAvatarService.class));
         }
         @Bean ChatService chatService() { return mock(ChatService.class); }
         @Bean ChatController chatController(ChatService chatService, ChatContactService service) {

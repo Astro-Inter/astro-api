@@ -9,19 +9,25 @@ import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.ChatContactProjection;
 import com.astro.api.user.repository.UserRepository;
+import com.astro.api.user.service.UserAvatarService;
 import com.astro.api.workspace.model.Workspace;
 import java.lang.reflect.Proxy;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class ChatContactServiceTest {
     private ChatContactService service;
     private User currentUser;
     private List<UserType> queriedTypes;
+    private UserAvatarService userAvatarService;
 
     @BeforeEach
     void setUp() {
@@ -34,6 +40,8 @@ class ChatContactServiceTest {
         currentUser.setId(8L);
         currentUser.setStatus(UserStatus.ATIVO);
         currentUser.setUnit(unit);
+        userAvatarService = mock(UserAvatarService.class);
+        when(userAvatarService.findUrls(anyCollection())).thenReturn(Map.of());
         service = service(repository(List.of()));
     }
 
@@ -75,7 +83,7 @@ class ChatContactServiceTest {
     }
 
     private ChatContactService service(UserRepository repository) {
-        return new ChatContactService(repository, new ChatContactMapper());
+        return new ChatContactService(repository, new ChatContactMapper(), userAvatarService);
     }
 
     private ChatContactProjection contact(Long id, String name, UserType type) {

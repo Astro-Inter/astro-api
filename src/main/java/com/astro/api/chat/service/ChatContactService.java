@@ -7,8 +7,11 @@ import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
+import com.astro.api.user.repository.ChatContactProjection;
 import com.astro.api.user.repository.UserRepository;
+import com.astro.api.user.service.UserAvatarService;
 import java.util.List;
+import java.util.Map;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,10 +20,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class ChatContactService {
     private final UserRepository userRepository;
     private final ChatContactMapper chatContactMapper;
+    private final UserAvatarService userAvatarService;
 
-    public ChatContactService(UserRepository userRepository, ChatContactMapper chatContactMapper) {
+    public ChatContactService(UserRepository userRepository, ChatContactMapper chatContactMapper,
+                              UserAvatarService userAvatarService) {
         this.userRepository = userRepository;
         this.chatContactMapper = chatContactMapper;
+        this.userAvatarService = userAvatarService;
     }
 
     @Transactional(readOnly = true)
@@ -45,9 +51,13 @@ public class ChatContactService {
         Long workspaceId = currentUser.getUnit().workspace.id;
         List<UserType> allowedTypes = ChatCommunicationPolicy.allowedRecipients(currentUser.getType());
 
-        return userRepository.findChatContacts(workspaceId, currentUser.getId(), UserStatus.ATIVO, allowedTypes)
-                .stream()
-                .map(chatContactMapper::toResponse)
+        List<ChatContactProjection> contacts = userRepository.findChatContacts(
+                workspaceId, currentUser.getId(), UserStatus.ATIVO, allowedTypes);
+        Map<Long, String> profilePhotoUrls = userAvatarService.findUrls(
+                contacts.stream().map(ChatContactProjection::getId).toList());
+
+        return contacts.stream()
+                .map(contact -> chatContactMapper.toResponse(contact, profilePhotoUrls.get(contact.getId())))
                 .toList();
     }
 }
