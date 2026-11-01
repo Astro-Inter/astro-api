@@ -65,7 +65,7 @@ Desativação bloqueia a conta nas próximas requisições, inclusive com o mesm
 
 ## PATCH /managers/{id}/demote — SCRUM-525
 
-Despromove um `GESTOR` para `COLABORADOR`. Não recebe corpo. Somente um
+Rebaixa um `GESTOR` para `COLABORADOR`. Não recebe corpo. Somente um
 `GESTOR_WORKSPACE` ativo pode executar a operação em seu próprio workspace.
 A API revalida o responsável no banco e bloqueia a linha do alvo com a consulta
 existente `findUserForUpdateInWorkspace` (`FOR UPDATE OF u`) dentro da transação.
@@ -88,11 +88,11 @@ preservada. O DTO não contém perfil; o sucesso confirma a mudança para
 - **400**: ID não numérico ou não positivo.
 - **403**: ausência de autenticação válida, perfil sem permissão ou responsável inativo.
 - **404**: alvo inexistente, de outro workspace ou com perfil diferente de `GESTOR`,
-  inclusive `GESTOR_WORKSPACE`. Repetir uma despromoção concluída retorna 404.
+  inclusive `GESTOR_WORKSPACE`. Repetir um rebaixamento concluído retorna 404.
 - Falhas de conexão de dados seguem o tratamento global (**503**).
 
 Exemplo de chamada: `PATCH /managers/123/demote`, com `Authorization: Bearer <ID token>`.
-O envelope de sucesso contém `success: true`, `message: "Gestor despromovido a colaborador com sucesso"`,
+O envelope de sucesso contém `success: true`, `message: "Gestor rebaixado a colaborador com sucesso"`,
 `data` com os detalhes e `path: "/managers/123/demote"`.
 
 ## Foto e iniciais para a tela web
@@ -163,13 +163,13 @@ colaboradores, dois Redis e o teste de contexto já desabilitado). O Docker esta
 indisponível nessa atualização; à época, o CI provisionava o banco isolado para
 executar os testes PostgreSQL de gestores.
 
-## Teste PostgreSQL da despromoção
+## Teste PostgreSQL do rebaixamento
 
 `ManagerDemotionPostgresTest` usa um schema aleatório em PostgreSQL descartável
 local e cria suas tabelas a partir das entidades JPA; remove somente esse schema
 ao terminar. Não depende do antigo `manager-fixture.sql` e não usa bancos remotos.
 Exercita os três status, preservação das colunas da conta, isolamento por workspace,
-proteção do gestor do workspace, rollback após flush e despromoções concorrentes.
+proteção do gestor do workspace, rollback após flush e rebaixamentos concorrentes.
 O CI reutiliza o PostgreSQL de testes já existente com `MANAGER_DEMOTION_TEST_JDBC_URL`.
 
 Para executar localmente, defina `MANAGER_DEMOTION_TEST_JDBC_URL` como
@@ -192,7 +192,7 @@ na atualização desta branch para resolver conflitos. A implementação está d
 no código; sua publicação não foi verificada nesta atualização.
 GET /roles e GET /units são reutilizados para a edição.
 
-## Validação da despromoção em 01/11/2026
+## Validação do rebaixamento em 01/11/2026
 
 Java 21, Maven Wrapper e PostgreSQL 16 descartável local: os 38 testes focados
 passaram sem falhas ou testes ignorados, incluindo seis de persistência real.
@@ -202,3 +202,6 @@ ajuste temporário de sockets do JDK no Windows, descrito com o comando exato e
 as limitações em [manager-demotion-review.md](manager-demotion-review.md).
 A revisão do diff conforme as skills de desenvolvimento e revisão da API não
 identificou achados acionáveis em aberto no escopo da mudança.
+
+A terminologia de mensagens e do OpenAPI usa “rebaixar”. A rota técnica
+`PATCH /managers/{id}/demote` permanece compatível com os clientes existentes.

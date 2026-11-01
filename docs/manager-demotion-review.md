@@ -1,4 +1,4 @@
-# Revisão da despromoção de gestores — SCRUM-525
+# Revisão do rebaixamento de gestores — SCRUM-525
 
 Revisão do diff da branch `feat/SCRUM-525-implementar-endpoints-gestores`
 contra `origin/main`, em 01/11/2026, seguindo `astro-api-development` e
@@ -31,7 +31,7 @@ o serviço existente. A transação não é apresentada como atômica com esses 
   **38 testes, zero falhas, zero erros, nenhum ignorado**, com Java 21.
 - Seis desses testes usam PostgreSQL 16 local descartável: os três status da
   conta, alvos protegidos/outro workspace, rollback após flush e duas
-  despromoções concorrentes. Conferem as colunas da conta antes/depois.
+  rebaixamentos concorrentes. Conferem as colunas da conta antes/depois.
 - MockMvc confere a rota PATCH sem corpo e os erros HTTP. A cadeia real de
   segurança rejeita os perfis sem permissão. O mesmo token deixa de acessar
   uma rota de gestor quando o perfil atual passa a ser colaborador.
@@ -61,13 +61,13 @@ pipe usa loopback TCP. A opção foi aplicada somente ao processo de testes,
 sem alteração no código da aplicação ou na configuração do projeto.
 Com as variáveis do PostgreSQL descartável, o resultado foi **BUILD SUCCESS**:
 **744 testes, zero falhas, zero erros e 59 ignorados** por condições de integração
-local/contexto desabilitado. Os seis testes PostgreSQL da despromoção executaram
+local/contexto desabilitado. Os seis testes PostgreSQL do rebaixamento executaram
 e passaram; o JAR Spring Boot foi empacotado. O teste de notificações que havia
 falhado passou nessa execução final.
 
 ## Não verificado
 
-Não foi exercitado login Firebase real nem despromoção em um ambiente publicado.
+Não foi exercitado login Firebase real nem rebaixamento em um ambiente publicado.
 Os contratos HTTP são testados localmente com MockMvc; não foi iniciado um
 servidor HTTP separado com as integrações de produção. As integrações de outros
 domínios dependem de suas variáveis e serviços próprios.
@@ -75,3 +75,14 @@ domínios dependem de suas variáveis e serviços próprios.
 ## Melhorias opcionais
 
 Nenhuma melhoria adicional é necessária para o escopo solicitado.
+
+## Complemento: terminologia “rebaixar”
+
+O ajuste posterior à integração das PRs originais altera mensagens, resumo e
+resposta OpenAPI e documentação. A revisão deste diff não identificou achados
+acionáveis em aberto. A rota, os DTOs e as regras de negócio foram preservados.
+
+Validação deste ajuste: `.\mvnw.cmd -o --batch-mode --no-transfer-progress -Dtest=ManagerControllerTest,SwaggerDocumentationTest -DargLine=-Djdk.net.unixdomain.tmpdir=C:/codex-unavailable-uds test`:
+**7 testes aprovados**, zero falhas/erros e nenhum ignorado. `git diff --check`
+aprovado. Os testes PostgreSQL e a suíte geral descritos acima pertencem à
+validação da implementação original; não foram repetidos para a troca textual.
