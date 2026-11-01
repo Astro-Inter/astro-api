@@ -44,6 +44,8 @@ class ManagerSecurityTest {
     @Test void rejectsMissingOrInvalidAuthenticationAndUnauthorizedProfiles() throws Exception {
         when(tokens.verify("invalid")).thenThrow(mock(com.google.firebase.auth.FirebaseAuthException.class));
         mvc.perform(get("/managers")).andExpect(status().isForbidden());
+        mvc.perform(patch("/managers/1/demote")).andExpect(status().isForbidden());
+        mvc.perform(patch("/managers/1/demote").header("Authorization", "Bearer invalid")).andExpect(status().isForbidden());
         mvc.perform(get("/managers").header("Authorization", "Bearer invalid")).andExpect(status().isForbidden());
         FirebaseToken token = mock(FirebaseToken.class);
         when(tokens.verify("valid")).thenReturn(token); when(token.getUid()).thenReturn("uid");
@@ -58,6 +60,7 @@ class ManagerSecurityTest {
                     .andExpect(status().isForbidden());
             mvc.perform(patch("/managers/1/status").header("Authorization", "Bearer valid").contentType("application/json")
                     .content("{\"status\":\"DESATIVADO\"}")).andExpect(status().isForbidden());
+            mvc.perform(patch("/managers/1/demote").header("Authorization", "Bearer valid")).andExpect(status().isForbidden());
         }
         verifyNoInteractions(service);
     }
@@ -65,6 +68,8 @@ class ManagerSecurityTest {
         FirebaseToken token = mock(FirebaseToken.class);
         when(tokens.verify("valid")).thenReturn(token); when(token.getUid()).thenReturn("uid");
         when(authorization.getRole("uid")).thenReturn(Optional.of(Role.GESTOR_WORKSPACE));
+        mvc.perform(patch("/managers/1/demote").header("Authorization", "Bearer valid")).andExpect(status().isOk());
+        verify(service).demote(eq(1L), any(AuthenticatedUser.class));
         when(service.findAll(any())).thenReturn(List.of());
         mvc.perform(get("/managers").header("Authorization", "Bearer valid"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data").isEmpty());
@@ -83,10 +88,13 @@ class ManagerSecurityTest {
         mvc.perform(get("/manager-access").header("Authorization", "Bearer same-token")).andExpect(status().isForbidden());
         type.set("GESTOR");
         mvc.perform(get("/manager-access").header("Authorization", "Bearer same-token")).andExpect(status().isOk());
+        type.set("COLABORADOR");
+        mvc.perform(get("/manager-access").header("Authorization", "Bearer same-token")).andExpect(status().isForbidden());
+        type.set("GESTOR");
         status.set(com.astro.api.user.model.UserStatus.DESATIVADO);
         mvc.perform(get("/manager-access").header("Authorization", "Bearer same-token")).andExpect(status().isForbidden());
-        verify(tokens, times(3)).verify("same-token");
-        verify(authRepository, times(3)).findAccessLevel("target");
+        verify(tokens, times(4)).verify("same-token");
+        verify(authRepository, times(4)).findAccessLevel("target");
     }
     @org.springframework.web.bind.annotation.RestController
     static class ProbeController {

@@ -63,9 +63,41 @@ conclui pré-cadastro. Solicitar o estado atual é idempotente. Ativação bloqu
 os vínculos e exige que ambos estejam ativos no workspace autorizado.
 Desativação bloqueia a conta nas próximas requisições, inclusive com o mesmo token.
 
+## PATCH /managers/{id}/demote — SCRUM-525
+
+Despromove um `GESTOR` para `COLABORADOR`. Não recebe corpo. Somente um
+`GESTOR_WORKSPACE` ativo pode executar a operação em seu próprio workspace.
+A API revalida o responsável no banco e bloqueia a linha do alvo com a consulta
+existente `findUserForUpdateInWorkspace` (`FOR UPDATE OF u`) dentro da transação.
+A consulta SQL é reutilizada para combinar isolamento por workspace e bloqueio,
+sem criar tabelas, views ou uma consulta adicional.
+
+Altera exclusivamente `User.type`. Preserva ID, status (inclusive `DESATIVADO`
+e `PRE_CADASTRADO`), nome, CPF, e-mail, modalidade, cargo, unidade, Firebase UID,
+criação, foto e histórico. Vínculos inativos podem ser mantidos. Não altera
+Firebase nem envia convite. O perfil e o status são lidos novamente nas próximas
+requisições protegidas: um colaborador ativo perde as permissões de gestor,
+e contas desativadas ou pré-cadastradas continuam sem acesso.
+
+Retorna **200** com `ApiResult<ManagerDetailsResponse>`: os mesmos campos
+administrativos em inglês de `GET /managers/{id}`, correspondentes à conta
+preservada. O DTO não contém perfil; o sucesso confirma a mudança para
+`COLABORADOR`. A conta deixa de aparecer em `GET /managers` e pode voltar
+à seleção de promoção se satisfizer as regras de elegibilidade.
+
+- **400**: ID não numérico ou não positivo.
+- **403**: ausência de autenticação válida, perfil sem permissão ou responsável inativo.
+- **404**: alvo inexistente, de outro workspace ou com perfil diferente de `GESTOR`,
+  inclusive `GESTOR_WORKSPACE`. Repetir uma despromoção concluída retorna 404.
+- Falhas de conexão de dados seguem o tratamento global (**503**).
+
+Exemplo de chamada: `PATCH /managers/123/demote`, com `Authorization: Bearer <ID token>`.
+O envelope de sucesso contém `success: true`, `message: "Gestor despromovido a colaborador com sucesso"`,
+`data` com os detalhes e `path: "/managers/123/demote"`.
+
 ## Foto e iniciais para a tela web
 
-Todos os cinco endpoints retornam `profilePhotoUrl` e `avatarInitials`, com o mesmo
+Os seis endpoints retornam `profilePhotoUrl` e `avatarInitials`, com o mesmo
 contrato dos colaboradores. A tela pode usar `profilePhotoUrl` no avatar e exibir
 `avatarInitials` quando a URL for nula. As iniciais vêm do primeiro e do último nome,
 em maiúsculas (por exemplo, `Lucas Ribeiro` → `LR`); um nome único gera uma inicial.
@@ -108,7 +140,7 @@ expiração dos links, invalidação e comportamento quando Redis está indispon
 ## Verificação local
 
 Executar `./mvnw --batch-mode --no-transfer-progress verify`.
-Os testes PostgreSQL de gestores e o script SQL que preparava seu banco foram
+Os testes PostgreSQL originais de gestores e o script SQL que preparava seu banco foram
 removidos da API. Permanecem os demais testes de gestores; o CI executa a mesma
 verificação sem provisionar o banco exclusivo dessa classe.
 MockMvc valida os contratos HTTP e a cadeia real de segurança. Firebase é simulado,
@@ -131,6 +163,23 @@ colaboradores, dois Redis e o teste de contexto já desabilitado). O Docker esta
 indisponível nessa atualização; à época, o CI provisionava o banco isolado para
 executar os testes PostgreSQL de gestores.
 
+## Teste PostgreSQL da despromoção
+
+`ManagerDemotionPostgresTest` usa um schema aleatório em PostgreSQL descartável
+local e cria suas tabelas a partir das entidades JPA; remove somente esse schema
+ao terminar. Não depende do antigo `manager-fixture.sql` e não usa bancos remotos.
+Exercita os três status, preservação das colunas da conta, isolamento por workspace,
+proteção do gestor do workspace, rollback após flush e despromoções concorrentes.
+O CI reutiliza o PostgreSQL de testes já existente com `MANAGER_DEMOTION_TEST_JDBC_URL`.
+
+Para executar localmente, defina `MANAGER_DEMOTION_TEST_JDBC_URL` como
+`jdbc:postgresql://127.0.0.1:<porta>/manager_demotion_test` e use
+`MANAGER_DEMOTION_TEST_DATABASE_USER` e `MANAGER_DEMOTION_TEST_DATABASE_PASSWORD`
+para as credenciais do banco descartável. Execute
+`./mvnw --batch-mode --no-transfer-progress verify` com Java 21.
+Sem a variável, somente a integração PostgreSQL é ignorada; testes unitários,
+MockMvc, segurança e OpenAPI continuam executando.
+
 ## Dependências
 
 A view pertence à SCRUM-524, PR Astro-Inter/banco-de-dados#33. A API não cria nem
@@ -142,3 +191,14 @@ GET /collaborators passou a integrar a main pela SCRUM-517 (PR #30), incorporada
 na atualização desta branch para resolver conflitos. A implementação está disponível
 no código; sua publicação não foi verificada nesta atualização.
 GET /roles e GET /units são reutilizados para a edição.
+
+## Validação da despromoção em 01/11/2026
+
+Java 21, Maven Wrapper e PostgreSQL 16 descartável local: os 38 testes focados
+passaram sem falhas ou testes ignorados, incluindo seis de persistência real.
+A suíte geral e o empacotamento também passaram: 744 testes, zero falhas/erros,
+59 ignorados por dependências de integração/contexto. A execução geral usou um
+ajuste temporário de sockets do JDK no Windows, descrito com o comando exato e
+as limitações em [manager-demotion-review.md](manager-demotion-review.md).
+A revisão do diff conforme as skills de desenvolvimento e revisão da API não
+identificou achados acionáveis em aberto no escopo da mudança.
