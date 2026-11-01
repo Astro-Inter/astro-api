@@ -142,7 +142,8 @@ a gravação MongoDB; os vínculos são conferidos a cada operação de escrita.
 ## Edição
 
 `PUT /forms/{id}` substitui os campos editáveis e toda a lista de perguntas, retornando
-200 com os detalhes. Campos opcionais omitidos são limpos. O status é preservado;
+200 com os detalhes. Campos opcionais omitidos são limpos, exceto `appearance`,
+que mantém o valor anterior quando omitido ou nulo. O status é preservado;
 se enviado, deve ser igual ao atual. Um rascunho só passa a pendente por publicação.
 
 Gestores comuns só alteram formulários dos quais são remetentes. O gestor do workspace
