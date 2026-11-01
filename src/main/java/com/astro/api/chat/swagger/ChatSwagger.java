@@ -21,7 +21,8 @@ public interface ChatSwagger {
     @ApiResponse(responseCode = "200", description = "Operação concluída com sucesso")
     List<ChatResponse> findChats( AuthenticatedUser authenticatedUser);
 
-    @Operation(summary = "Lista contatos disponíveis para o usuário autenticado")
+    @Operation(summary = "Lista contatos disponíveis para o usuário autenticado",
+            description = "Inclui a URL temporária da foto de perfil quando o contato possui uma foto.")
     @ApiResponse(responseCode = "200", description = "Operação concluída com sucesso")
     ResponseEntity<ApiResult<List<ChatContactResponse>>> findContacts(
              AuthenticatedUser authenticatedUser, HttpServletRequest request);

@@ -10,6 +10,7 @@ import com.astro.api.user.model.User;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.model.UserType;
 import com.astro.api.user.repository.UserRepository;
+import com.astro.api.user.service.UserAvatarService;
 import com.astro.api.workspace.model.Workspace;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -44,6 +45,9 @@ import javax.sql.DataSource;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @EnabledIfEnvironmentVariable(named = "CHAT_TEST_JDBC_URL",
         matches = "jdbc:postgresql://(localhost|127\\.0\\.0\\.1):[0-9]+/astro_chat_test")
@@ -70,7 +74,10 @@ class ChatContactsPostgresIntegrationTest {
                     """);
         }
         UserRepository userRepository = context.getBean(UserRepository.class);
-        ChatContactService service = new ChatContactService(userRepository, new ChatContactMapper());
+        UserAvatarService userAvatarService = mock(UserAvatarService.class);
+        when(userAvatarService.findUrls(anyCollection())).thenReturn(Map.of());
+        ChatContactService service = new ChatContactService(
+                userRepository, new ChatContactMapper(), userAvatarService);
         mockMvc = MockMvcBuilders.standaloneSetup(new ChatController(null, service))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();

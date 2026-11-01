@@ -15,7 +15,8 @@ recente e, em empate, pelo ID da conversa decrescente. O contador vem do Redis;
 valor ausente é zero. Sem conversas, retorna `[]`.
 
 `GET /chats/contacts` retorna `ApiResult` com array em `data`. Cada contato tem
-`id`, `name` e `role`. A consulta exclui o próprio usuário e considera usuários
+`id`, `name`, `role` e `profilePhotoUrl`, que contém uma URL temporária ou `null`
+quando não há foto cadastrada. A consulta exclui o próprio usuário e considera usuários
 ativos em unidades ativas do mesmo workspace. Colaboradores podem consultar
 gestores; gestores podem consultar colaboradores e gestores. A conta solicitante
 também precisa estar ativa, em unidade ativa e com perfil coerente com o token.

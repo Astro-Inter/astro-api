@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class ChatContactMapper {
-    public ChatContactResponse toResponse(ChatContactProjection projection) {
-        return new ChatContactResponse(projection.getId(), projection.getName(), projection.getRole());
+    public ChatContactResponse toResponse(ChatContactProjection projection, String profilePhotoUrl) {
+        return new ChatContactResponse(projection.getId(), projection.getName(), projection.getRole(), profilePhotoUrl);
     }
 }
