@@ -30,6 +30,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
                           @Param("newType") UserType newType,
                           @Param("expectedStatus") UserStatus expectedStatus);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.email = :email")
+    Optional<User> findForActivationByEmail(@Param("email") String email);
+
     Optional<User> findByFirebaseUid(String firebaseUid);
 
     @Query("""

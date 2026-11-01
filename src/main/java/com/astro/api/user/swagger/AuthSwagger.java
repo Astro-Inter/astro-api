@@ -24,9 +24,10 @@ public interface AuthSwagger {
     })
     ResponseEntity<ApiResult<IdentificatedUserResponseDto>> findUserTypeAndStatusByEmail(  EmailVerificationRequestDto dto, HttpServletRequest request);
 
-    @Operation(summary = "Ativa um colaborador", description = "Atualiza o UID do Firebase do colaborador identificado pelo e-mail. A trigger do banco atualiza o status para ATIVO.")
+    @Operation(summary = "Ativa um colaborador", description = "Vincula o UID do Firebase ao usuário identificado pelo e-mail somente quando o vínculo atual estiver vazio. A trigger do banco atualiza o status para ATIVO.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Colaborador ativado com sucesso"),
+            @ApiResponse(responseCode = "409", description = "Conta já vinculada ao Firebase"),
             @ApiResponse(responseCode = "404", description = "Colaborador não encontrado")
     })
     ResponseEntity<Void> activateCollaborator(  UserActivationRequestDto dto);

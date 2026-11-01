@@ -159,21 +159,23 @@ class UserServiceTest {
         verify(userRepository).findByEmail(dto.email());
     }
 
-    @Test
-    void shouldUpdateFirebaseUidWhenActivatingCollaborator() {
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", "  "})
+    void shouldUpdateFirebaseUidWhenActivatingCollaborator(String existingUid) {
         UserActivationRequestDto dto = new UserActivationRequestDto("colaborador@astro.com", "novo-firebase-uid");
         User user = new User();
-        user.setFirebaseUid("uid-anterior");
+        user.setFirebaseUid(existingUid);
         user.setStatus(UserStatus.PRE_CADASTRADO);
 
-        when(userRepository.findByEmail(dto.email()))
+        when(userRepository.findForActivationByEmail(dto.email()))
                 .thenReturn(Optional.of(user));
 
         userService.activateCollaborator(dto);
 
         assertEquals(dto.firebaseUid(), user.getFirebaseUid());
         assertEquals(UserStatus.PRE_CADASTRADO, user.getStatus());
-        verify(userRepository).findByEmail(dto.email());
+        verify(userRepository).findForActivationByEmail(dto.email());
         verify(userRepository).save(user);
     }
 
@@ -181,7 +183,7 @@ class UserServiceTest {
     void shouldThrowWhenActivatingCollaboratorThatDoesNotExist() {
         UserActivationRequestDto dto = new UserActivationRequestDto("inexistente@astro.com", "novo-firebase-uid");
 
-        when(userRepository.findByEmail(dto.email()))
+        when(userRepository.findForActivationByEmail(dto.email()))
                 .thenReturn(Optional.empty());
 
         ResourceNotFoundException exception = assertThrows(
@@ -190,8 +192,21 @@ class UserServiceTest {
         );
 
         assertEquals("Colaborador não encontrado", exception.getMessage());
-        verify(userRepository).findByEmail(dto.email());
+        verify(userRepository).findForActivationByEmail(dto.email());
         verifyNoMoreInteractions(userRepository);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"uid-anterior", "novo-firebase-uid"})
+    void shouldRejectActivationWhenTheAccountAlreadyHasAFirebaseUid(String existingUid) {
+        UserActivationRequestDto dto = new UserActivationRequestDto("colaborador@astro.com", "novo-firebase-uid");
+        User user = new User();
+        user.setFirebaseUid(existingUid);
+        when(userRepository.findForActivationByEmail(dto.email())).thenReturn(Optional.of(user));
+        assertThrows(com.astro.api.common.exception.ConflictException.class,
+                () -> userService.activateCollaborator(dto));
+        assertEquals(existingUid, user.getFirebaseUid());
+        verify(userRepository, org.mockito.Mockito.never()).save(org.mockito.ArgumentMatchers.any());
     }
 
     @ParameterizedTest

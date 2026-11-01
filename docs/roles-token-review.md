@@ -45,3 +45,25 @@ confere ausência do UID nos DTOs/query e ausência de corpo no PATCH.
 
 `git diff --check`: aprovado. Revisão do diff concluída sem achados acionáveis
 em aberto no escopo de cargos. Não há melhorias opcionais necessárias ao pedido.
+
+## Complemento solicitado: impedir reassociação na ativação mobile
+
+POST /activate mantém seu payload público e o sucesso 204, mas só grava o UID
+quando o valor atual for nulo, vazio ou apenas espaços. Qualquer UID preenchido,
+inclusive igual ao solicitado, causa ConflictException e 409 com ApiResult.
+A leitura usa lock pessimista por email dentro da transação do service para
+serializar ativações da mesma conta; não há mudança nos objetos SQL.
+
+Os testes de UserService cobrem UID nulo/vazio/espaços, conta inexistente e
+rejeição do UID existente (igual ou diferente). AuthControllerTest confere o
+novo 409 com envelope padrão. Swagger e api-access.md descrevem essa regra.
+
+Esta correção impede substituir vínculos existentes; a rota continua pública
+e não passa a comprovar titularidade de email para contas ainda sem UID.
+Essa validação de identidade continua fora do escopo do ajuste solicitado.
+A revisão do complemento não identificou achados acionáveis na regra implementada.
+
+Validação do complemento: mesmo comando verify descrito acima, **750 testes,
+zero falhas/erros e 63 ignorados**. Inclui 28 testes de UserService e 20 de
+AuthController, todos executados sem falhas. O bloqueio foi revisado no código;
+a concorrência específica de ativação não foi exercitada em PostgreSQL real.
