@@ -13,15 +13,16 @@ dos DTOs. As mensagens das constraints das requests ficam em
 `src/main/resources/ValidationMessages.properties`.
 
 Todas as chamadas exigem `Authorization: Bearer <token Firebase>` e perfil `GESTOR`
-ou `GESTOR_WORKSPACE`. O `firebase_uid` enviado deve corresponder ao token. O banco
+ou `GESTOR_WORKSPACE`. A identidade é obtida exclusivamente do token por `@AuthenticationPrincipal`.
+Não envie `firebaseUid` no corpo nem `firebase_uid` na query. O banco
 valida gestor ativo e workspace. As respostas usam `ApiResult`, como os demais módulos;
 os arrays, o cargo editado e o booleano de status ficam na propriedade `data`.
 
 | Task | Método e rota | Rotina / fonte |
 | --- | --- | --- |
-| SCRUM-482 | `GET /roles?firebase_uid=...` | `fn_seleciona_cargos(TEXT)` |
-| SCRUM-483 | `GET /roles/{roleId}/nrs?firebase_uid=...` | `fn_seleciona_cargo_nrs(TEXT, BIGINT)` |
-| SCRUM-484 | `GET /roles/{roleId}/nrs/options?firebase_uid=...` | Mongo + `fn_seleciona_cargo_nrs` |
+| SCRUM-482 | `GET /roles` | `fn_seleciona_cargos(TEXT)` |
+| SCRUM-483 | `GET /roles/{roleId}/nrs` | `fn_seleciona_cargo_nrs(TEXT, BIGINT)` |
+| SCRUM-484 | `GET /roles/{roleId}/nrs/options` | Mongo + `fn_seleciona_cargo_nrs` |
 | SCRUM-485 | `POST /roles` | `pr_inseri_cargo(TEXT, TEXT, TEXT)` |
 | SCRUM-486 | `PATCH /roles/{roleId}/status` | `fn_altera_status_cargo(TEXT, BIGINT)` |
 | SCRUM-487 | `PUT /roles/{roleId}` | `fn_altera_cargo(TEXT, BIGINT, TEXT, TEXT)` |
@@ -32,7 +33,7 @@ os arrays, o cargo editado e o booleano de status ficam na propriedade `data`.
 Criação e edição recebem:
 
 ```json
-{"firebaseUid":"uid-do-gestor","name":"Gerente","status":"Ativo"}
+{"name":"Gerente","status":"Ativo"}
 ```
 
 O nome, após remover espaços nas extremidades, deve ter entre 2 e 255 caracteres.
@@ -40,14 +41,14 @@ O status aceita `Ativo` ou `Inativo`, sem distinguir maiúsculas e minúsculas.
 A criação responde 201, sem objeto em `data`, pois a procedure não retorna um ID.
 A edição responde 200 com os campos de `vw_cargos`, mapeando `role` para `name`.
 
-A alternância recebe `{"firebaseUid":"uid-do-gestor"}` e responde 200 com
+A alternância não recebe corpo e responde 200 com
 `data: true` quando ficou ativo ou `data: false` quando ficou inativo.
 A desativação executa os triggers existentes do banco, inclusive para usuários vinculados.
 
 A atualização de NRs recebe:
 
 ```json
-{"firebaseUid":"uid-do-gestor","nrs":[{"nr":1,"active":true},{"nr":17,"active":false}]}
+{"nrs":[{"nr":1,"active":true},{"nr":17,"active":false}]}
 ```
 
 Cada item altera apenas a NR informada; NRs omitidas permanecem vinculadas.
@@ -100,3 +101,18 @@ Testes de serviço cobrem identidade, limites de nome, união das opções, alte
 parciais de NRs e duplicidades. Testes do repository verificam o mapeamento das projections JPA,
 os parâmetros JSONB e a tradução de SQLSTATE. Esses testes usam mocks e não substituem
 uma validação das rotinas instaladas em um ambiente PostgreSQL/MongoDB.
+
+## Identidade e compatibilidade
+
+Os sete endpoints usam o UID do `AuthenticatedUser` validado pelo filtro Firebase.
+O service recusa principal ausente, UID vazio e perfis diferentes de `GESTOR` e
+`GESTOR_WORKSPACE` antes de consultar dados. O UID confiável continua sendo passado
+às mesmas funções/procedures PostgreSQL, que validam gestor ativo e workspace.
+Não há alteração de assinatura das rotinas SQL ou ampliação de permissões.
+
+Os GETs funcionam sem query de identidade e ignoram um `firebase_uid` adicional.
+Os DTOs de criação/edição e NRs não contêm mais `firebaseUid`. A atualização
+coordenada do web remove a query e esse campo dos corpos; o PATCH de status envia
+somente o Bearer, sem corpo ou Content-Type JSON. Publique a API antes do novo web.
+
+Não há `@JsonProperty` adicionado. Os demais campos e o envelope ApiResult permanecem.

@@ -159,6 +159,18 @@ class AuthControllerTest {
     }
 
     @Test
+    void shouldReturnConflictWhenActivationTargetsAnAlreadyLinkedAccount() throws Exception {
+        UserActivationRequestDto dto = new UserActivationRequestDto("colaborador@astro.com", "firebase-uid");
+        org.mockito.Mockito.doThrow(new com.astro.api.common.exception.ConflictException("A conta já possui vínculo com o Firebase"))
+                .when(userService).activateCollaborator(dto);
+        mockMvc.perform(post("/activate").contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.path").value("/activate"));
+    }
+
+    @Test
     void shouldReturnBadRequestWhenFirebaseUidIsBlank() throws Exception {
         UserActivationRequestDto requestDto = new UserActivationRequestDto("colaborador@astro.com", "");
 

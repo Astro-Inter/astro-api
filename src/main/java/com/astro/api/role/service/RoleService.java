@@ -54,29 +54,29 @@ public class RoleService {
 
     @Transactional
     public void create(RoleRequest body, AuthenticatedUser user) {
-        checkIdentity(body.firebaseUid(), user);
+        String uid = requireAuthenticatedUid(user);
         checkName(body.name());
-        managementRepository.create(body.firebaseUid(), body.name().trim(), body.status().trim());
+        managementRepository.create(uid, body.name().trim(), body.status().trim());
     }
 
     @Transactional
-    public boolean toggleStatus(String uid, Long roleId, AuthenticatedUser user) {
-        checkIdentity(uid, user);
+    public boolean toggleStatus(Long roleId, AuthenticatedUser user) {
+        String uid = requireAuthenticatedUid(user);
         checkRoleId(roleId);
         return managementRepository.toggleStatus(uid, roleId);
     }
 
     @Transactional
     public RoleResponse update(Long roleId, RoleRequest body, AuthenticatedUser user) {
-        checkIdentity(body.firebaseUid(), user);
+        String uid = requireAuthenticatedUid(user);
         checkRoleId(roleId);
         checkName(body.name());
-        return managementRepository.update(body.firebaseUid(), roleId, body.name().trim(), body.status().trim());
+        return managementRepository.update(uid, roleId, body.name().trim(), body.status().trim());
     }
 
     @Transactional
     public void updateNrs(Long roleId, UpdateRoleNrsRequest body, AuthenticatedUser user) {
-        checkIdentity(body.firebaseUid(), user);
+        String uid = requireAuthenticatedUid(user);
         checkRoleId(roleId);
         Set<Integer> codes = new HashSet<>();
         for (RoleNrRequest nr : body.nrs()) {
@@ -119,7 +119,7 @@ public class RoleService {
                     }).toList());
 
             managementRepository.updateNrs(
-                    body.firebaseUid(),
+                    uid,
                     roleId,
                     changesJson
             );
@@ -135,21 +135,21 @@ public class RoleService {
     }
 
     @Transactional(readOnly = true)
-    public List<RoleResponse> findAll(String uid, AuthenticatedUser user) {
-        checkIdentity(uid, user);
+    public List<RoleResponse> findAll(AuthenticatedUser user) {
+        String uid = requireAuthenticatedUid(user);
         return managementRepository.findAll(uid);
     }
 
     @Transactional(readOnly = true)
-    public List<RoleNrResponse> findNrs(String uid, Long roleId, AuthenticatedUser user) {
-        checkIdentity(uid, user);
+    public List<RoleNrResponse> findNrs(Long roleId, AuthenticatedUser user) {
+        String uid = requireAuthenticatedUid(user);
         checkRoleId(roleId);
         return managementRepository.findNrs(uid, roleId);
     }
 
     @Transactional(readOnly = true)
-    public List<RoleNrOptionResponse> findNrOptions(String uid, Long roleId, AuthenticatedUser user) {
-        List<RoleNrResponse> linked = findNrs(uid, roleId, user);
+    public List<RoleNrOptionResponse> findNrOptions(Long roleId, AuthenticatedUser user) {
+        List<RoleNrResponse> linked = findNrs(roleId, user);
         List<NrDocument> documents = nrDocuments.findByUsability("Colaborador");
         Set<Integer> codes = documents.stream().map(NrDocument::getId).collect(Collectors.toSet());
         linked.stream().map(RoleNrResponse::nrCode).forEach(codes::add);
@@ -163,13 +163,13 @@ public class RoleService {
         return nrCatalog.findAllById(codes).stream().map(NrCatalog::getCodeNr).collect(Collectors.toSet());
     }
 
-    private void checkIdentity(String uid, AuthenticatedUser user) {
-        if (uid == null || uid.isBlank()) {
-            throw new BusinessException("firebase_uid é obrigatório");
+    private String requireAuthenticatedUid(AuthenticatedUser user) {
+        if (user == null || user.firebaseUid() == null || user.firebaseUid().isBlank()
+                || (user.role() != com.astro.api.auth.security.Role.GESTOR
+                && user.role() != com.astro.api.auth.security.Role.GESTOR_WORKSPACE)) {
+            throw new AccessDeniedException("Gestor autenticado necessário");
         }
-        if (user == null || !uid.equals(user.firebaseUid())) {
-            throw new AccessDeniedException("firebase_uid deve corresponder ao usuário autenticado");
-        }
+        return user.firebaseUid();
     }
 
     private void checkRoleId(Long roleId) {

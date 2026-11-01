@@ -86,10 +86,14 @@ public class UserService {
         );
     }
 
+    @Transactional
     public void activateCollaborator(UserActivationRequestDto dto) {
-        User user = userRepository.findByEmail(dto.email())
+        User user = userRepository.findForActivationByEmail(dto.email())
                 .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado"));
 
+        if (user.getFirebaseUid() != null && !user.getFirebaseUid().isBlank()) {
+            throw new com.astro.api.common.exception.ConflictException("A conta já possui vínculo com o Firebase");
+        }
         user.setFirebaseUid(dto.firebaseUid());
         userRepository.save(user);
     }

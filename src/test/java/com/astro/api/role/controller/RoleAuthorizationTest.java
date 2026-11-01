@@ -25,14 +25,14 @@ class RoleAuthorizationTest {
             var service = context.getBean(RoleService.class);
             for (String role : List.of("GESTOR", "GESTOR_WORKSPACE")) {
                 authenticate(role);
-                assertEquals(200, controller.findAll("gestor", null, new MockHttpServletRequest()).getStatusCode().value());
+                assertEquals(200, controller.findAll(null, new MockHttpServletRequest()).getStatusCode().value());
             }
             clearInvocations(service);
             authenticate("COLABORADOR");
             assertThrows(AccessDeniedException.class,
-                    () -> controller.findAll("gestor", null, new MockHttpServletRequest()));
+                    () -> controller.findAll(null, new MockHttpServletRequest()));
             assertThrows(AccessDeniedException.class,
-                    () -> controller.toggleStatus(12L, null, null, new MockHttpServletRequest()));
+                    () -> controller.toggleStatus(12L, null, new MockHttpServletRequest()));
             verifyNoInteractions(service);
         } finally {
             SecurityContextHolder.clearContext();

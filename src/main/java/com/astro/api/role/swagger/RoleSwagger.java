@@ -3,7 +3,6 @@ package com.astro.api.role.swagger;
 import com.astro.api.auth.security.AuthenticatedUser;
 import com.astro.api.common.response.ApiResult;
 import com.astro.api.role.dto.request.RoleRequest;
-import com.astro.api.role.dto.request.RoleStatusRequest;
 import com.astro.api.role.dto.request.UpdateRoleNrsRequest;
 import com.astro.api.role.dto.response.RoleNrOptionResponse;
 import com.astro.api.role.dto.response.RoleNrResponse;
@@ -26,7 +25,6 @@ public interface RoleSwagger {
     @Operation(summary = "Alterna o status do cargo entre ativo e inativo")
     @ApiResponse(responseCode = "200", description = "Operação concluída com sucesso")
     ResponseEntity<ApiResult<Boolean>> toggleStatus( Long roleId,
-              RoleStatusRequest body,
              AuthenticatedUser user, HttpServletRequest request);
 
     @Operation(summary = "Atualiza nome e status do cargo")
@@ -45,19 +43,18 @@ public interface RoleSwagger {
     @Operation(summary = "Lista cargos do workspace do gestor")
     @ApiResponse(responseCode = "200", description = "Operação concluída com sucesso")
     ResponseEntity<ApiResult<List<RoleResponse>>> findAll(
-             String uid,
              AuthenticatedUser user, HttpServletRequest request);
 
     @Operation(summary = "Consulta NRs vinculadas ao cargo")
     @ApiResponse(responseCode = "200", description = "Operação concluída com sucesso")
     ResponseEntity<ApiResult<List<RoleNrResponse>>> findNrs(
-             Long roleId,  String uid,
+             Long roleId,
              AuthenticatedUser user, HttpServletRequest request);
 
     @Operation(summary = "Lista opções de NRs e indica os vínculos do cargo",
             description = "Oferece NRs de colaboradores presentes no catálogo relacional e preserva as NRs já vinculadas para permitir sua remoção.")
     @ApiResponse(responseCode = "200", description = "Operação concluída com sucesso")
     ResponseEntity<ApiResult<List<RoleNrOptionResponse>>> findNrOptions(
-             Long roleId,  String uid,
+             Long roleId,
              AuthenticatedUser user, HttpServletRequest request);
 }

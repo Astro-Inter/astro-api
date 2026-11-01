@@ -9,7 +9,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.support.WebDataBinderFactory;
@@ -47,8 +46,8 @@ class RoleControllerTest {
 
     @Test
     void exposesPortugueseFieldsWithinTheStandardApiEnvelope() throws Exception {
-        when(service.findAll("gestor", user)).thenReturn(List.of(new RoleResponse(12L, 3L, "Gerente", 25, "Ativo")));
-        mvc.perform(get("/roles").param("firebase_uid", "gestor"))
+        when(service.findAll(user)).thenReturn(List.of(new RoleResponse(12L, 3L, "Gerente", 25, "Ativo")));
+        mvc.perform(get("/roles"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].roleId").value(12))
                 .andExpect(jsonPath("$.data[0].workspaceId").value(3))
@@ -58,36 +57,36 @@ class RoleControllerTest {
 
     @Test
     void resolvesNestedNrRoutesSeparately() throws Exception {
-        when(service.findNrs("gestor", 12L, user)).thenReturn(List.of());
-        when(service.findNrOptions("gestor", 12L, user)).thenReturn(List.of());
-        mvc.perform(get("/roles/12/nrs").param("firebase_uid", "gestor")).andExpect(status().isOk());
-        mvc.perform(get("/roles/12/nrs/options").param("firebase_uid", "gestor")).andExpect(status().isOk());
-        verify(service).findNrs("gestor", 12L, user);
-        verify(service).findNrOptions("gestor", 12L, user);
+        when(service.findNrs(12L, user)).thenReturn(List.of());
+        when(service.findNrOptions(12L, user)).thenReturn(List.of());
+        mvc.perform(get("/roles/12/nrs")).andExpect(status().isOk());
+        mvc.perform(get("/roles/12/nrs/options")).andExpect(status().isOk());
+        verify(service).findNrs(12L, user);
+        verify(service).findNrOptions(12L, user);
     }
 
     @Test
-    void returnsForbiddenForAnIdentityMismatch() throws Exception {
-        when(service.findAll("outro", user)).thenThrow(new AccessDeniedException("UID inválido"));
+    void ignoresForgedQueryIdentityAndUsesOnlyTheAuthenticatedPrincipal() throws Exception {
+        when(service.findAll(user)).thenReturn(List.of());
         mvc.perform(get("/roles").param("firebase_uid", "outro"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
+        verify(service).findAll(user);
     }
 
     @Test
     void exposesAllMutationRoutesAndTheFinalStatus() throws Exception {
         String body = """
-                {"firebaseUid":"gestor","name":"Gerente","status":"Ativo"}
+                {"name":"Gerente","status":"Ativo"}
                 """;
         mvc.perform(post("/roles").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated());
         mvc.perform(put("/roles/12").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk());
-        when(service.toggleStatus("gestor", 12L, user)).thenReturn(false);
-        mvc.perform(patch("/roles/12/status").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"firebaseUid\":\"gestor\"}"))
+        when(service.toggleStatus(12L, user)).thenReturn(false);
+        mvc.perform(patch("/roles/12/status"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data").value(false));
         mvc.perform(post("/roles/12/nrs").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"firebaseUid\":\"gestor\",\"nrs\":[{\"nr\":17,\"active\":false}]}"))
+                        .content("{\"nrs\":[{\"nr\":17,\"active\":false}]}"))
                 .andExpect(status().isOk());
         verify(service).create(any(), eq(user));
         verify(service).update(eq(12L), any(), eq(user));
@@ -97,11 +96,11 @@ class RoleControllerTest {
     @Test
     void rejectsInvalidStatusAndIncompleteNrChanges() throws Exception {
         mvc.perform(post("/roles").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"firebaseUid\":\"gestor\",\"name\":\"Gerente\",\"status\":\"desconhecido\"}"))
+                        .content("{\"name\":\"Gerente\",\"status\":\"desconhecido\"}"))
                 .andExpect(status().isBadRequest());
         for (String nrs : List.of("null", "[null]", "[{\"nr\":1}]", "[{\"nr\":0,\"active\":true}]")) {
             mvc.perform(post("/roles/12/nrs").contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"firebaseUid\":\"gestor\",\"nrs\":" + nrs + "}"))
+                            .content("{\"nrs\":" + nrs + "}"))
                     .andExpect(status().isBadRequest());
         }
         verifyNoInteractions(service);
@@ -110,15 +109,14 @@ class RoleControllerTest {
     @Test
     void permitsAnEmptyNrPatchWithoutReplacingExistingLinks() throws Exception {
         mvc.perform(post("/roles/12/nrs").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"firebaseUid\":\"gestor\",\"nrs\":[]}"))
+                        .content("{\"nrs\":[]}"))
                 .andExpect(status().isOk());
         verify(service).updateNrs(eq(12L), any(), eq(user));
     }
 
     @Test
-    void rejectsMissingUidAndMalformedRoleIdAsBadRequests() throws Exception {
-        mvc.perform(get("/roles")).andExpect(status().isBadRequest());
-        mvc.perform(get("/roles/abc/nrs").param("firebase_uid", "gestor"))
+    void rejectsMalformedRoleIdAsBadRequest() throws Exception {
+        mvc.perform(get("/roles/abc/nrs"))
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(service);
     }
@@ -126,16 +124,12 @@ class RoleControllerTest {
     @Test
     void resolvesRoleAndStatusValidationMessagesFromTheResourceBundle() throws Exception {
         mvc.perform(post("/roles").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"firebaseUid\":\"\",\"name\":\"\",\"status\":\"\"}"))
+                        .content("{\"name\":\"\",\"status\":\"\"}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors", hasItem(containsString("O Firebase UID é obrigatório"))))
                 .andExpect(jsonPath("$.errors", hasItem(containsString("O nome do cargo é obrigatório"))))
                 .andExpect(jsonPath("$.errors", hasItem(containsString("O status do cargo é obrigatório"))));
-        mvc.perform(patch("/roles/12/status").contentType(MediaType.APPLICATION_JSON).content("{}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors", hasItem(containsString("O Firebase UID é obrigatório"))));
         mvc.perform(put("/roles/12").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"firebaseUid\":\"gestor\",\"name\":\"Gerente\",\"status\":\"outro\"}"))
+                        .content("{\"name\":\"Gerente\",\"status\":\"outro\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors", hasItem(containsString("O status do cargo deve ser Ativo ou Inativo"))));
         verifyNoInteractions(service);
@@ -153,7 +147,7 @@ class RoleControllerTest {
 
     private void assertNrValidationError(String nrs, String message) throws Exception {
         mvc.perform(post("/roles/12/nrs").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"firebaseUid\":\"gestor\",\"nrs\":" + nrs + "}"))
+                        .content("{\"nrs\":" + nrs + "}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors", hasItem(containsString(message))));
     }

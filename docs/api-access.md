@@ -47,9 +47,12 @@ de conversão ou validação.
 {"email":"pessoa@example.com","firebaseUid":"uid-do-firebase"}
 ```
 
-O serviço localiza o usuário pelo e-mail, grava o UID informado e retorna `204`
+O serviço localiza e bloqueia o usuário pelo e-mail em uma transação. Somente
+quando o UID atual é nulo, vazio ou contém apenas espaços, grava o UID informado e retorna `204`
 sem body. A atualização de status depende da trigger do banco. Usuário não
-encontrado retorna `404`; dados inválidos retornam `400`. A implementação desta
+encontrado retorna `404`; dados inválidos retornam `400`. Conta com UID já
+preenchido retorna `409` com `ApiResult`, inclusive se o UID enviado for o mesmo.
+O bloqueio impede que duas ativações simultâneas substituam o vínculo. A implementação desta
 rota não recebe nem verifica a chave no mesmo pedido: a verificação descrita
 acima é uma chamada separada.
 

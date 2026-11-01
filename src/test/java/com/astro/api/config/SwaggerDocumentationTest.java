@@ -95,7 +95,15 @@ class SwaggerDocumentationTest {
             for (String code : new String[]{"200", "400", "403", "404"}) {
                 assertTrue(demotion.path("responses").has(code), code);
             }
+            for (String rolePath : new String[]{"/roles", "/roles/{roleId}/nrs", "/roles/{roleId}/nrs/options"}) {
+                for (JsonNode parameter : api.path("paths").path(rolePath).path("get").path("parameters")) {
+                    assertNotEquals("firebase_uid", parameter.path("name").asText());
+                }
+            }
+            assertFalse(api.path("paths").path("/roles/{roleId}/status").path("patch").has("requestBody"));
             JsonNode schemas = api.path("components").path("schemas");
+            assertFalse(schemas.path("RoleRequest").path("properties").has("firebaseUid"));
+            assertFalse(schemas.path("UpdateRoleNrsRequest").path("properties").has("firebaseUid"));
             JsonNode managedEvent = schemas.path("ManagedCollaboratorEventResponse").path("properties");
             assertTrue(managedEvent.has("eventId"));
             assertTrue(managedEvent.has("completionStatus"));
