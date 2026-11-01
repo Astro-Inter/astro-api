@@ -110,7 +110,13 @@ public class RoleService {
                 .toList();
 
         try {
-            String changesJson = objectMapper.writeValueAsString(changes);
+            String changesJson = objectMapper.writeValueAsString(changes.stream()
+                    .map(nr -> {
+                        Map<String, Object> serializedNr = new LinkedHashMap<>();
+                        serializedNr.put("nr", nr.nr());
+                        serializedNr.put("ativo", nr.active());
+                        return serializedNr;
+                    }).toList());
 
             managementRepository.updateNrs(
                     body.firebaseUid(),

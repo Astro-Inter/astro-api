@@ -13,7 +13,7 @@ Retorna HTTP 200 com os únicos campos de dados abaixo:
 {
   "success": true,
   "message": "Resumo da conta retornado com sucesso",
-  "data": { "nome": "Maria Rosa", "email": "maria@example.com", "profilePhotoUrl": null },
+  "data": { "name": "Maria Rosa", "email": "maria@example.com", "profilePhotoUrl": null },
   "errors": null,
   "path": "/user/me/account-summary"
 }
@@ -30,19 +30,19 @@ HTTP 200, mesmo envelope, com exatamente estes nove campos em `data`:
 
 ```json
 {
-  "nome": "Maria Rosa",
+  "name": "Maria Rosa",
   "cpf": null,
   "email": "maria@example.com",
   "roleId": 20,
-  "cargo": "Engenheira",
+  "roleName": "Engenheira",
   "unitId": 10,
-  "unidade": "Osasco",
-  "modalidade": "PRESENCIAL",
+  "unitName": "Osasco",
+  "workModel": "PRESENCIAL",
   "profilePhotoUrl": null
 }
 ```
 
-`modalidade` usa `HIBRIDO`, `REMOTO` ou `PRESENCIAL`, como no mobile; pode ser
+`workModel` usa `HIBRIDO`, `REMOTO` ou `PRESENCIAL`, como no mobile; pode ser
 `null` em cadastros antigos. Nome, CPF, cargo/roleId e foto também podem ser
 `null` quando ausentes. IDs e nomes vêm dos vínculos reais. Vínculos atuais
 inativos continuam visíveis; cargo de outro workspace bloqueia o acesso.
@@ -85,11 +85,11 @@ HTTP 200 retorna os mesmos nove campos de detalhes, atualizados, em `ApiResult`.
 A foto continua sendo enviada separadamente a `PUT /user/me/profile-photo`
 (multipart, campo `file`). Opções existentes: `GET /roles` e `GET /units`.
 
-O request usa os nomes Java em inglês, sem `@JsonProperty`: `name`, `cpf`,
+O request usa os nomes Java em inglês: `name`, `cpf`,
 `email`, `roleId`, `unitId` e `workModel`. O frontend deve enviar esses nomes;
 `nome` e `modalidade` são campos desconhecidos no PUT e retornam 400.
-As respostas GET/PUT mantêm os nomes documentados acima (`nome`, `cargo`,
-`unidade`, `modalidade`), assim como o contrato mobile existente.
+As respostas GET/PUT mantêm os nomes documentados acima (`name`, `roleName`,
+`unitName`, `workModel`).
 
 ### Autorização dos vínculos
 

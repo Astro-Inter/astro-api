@@ -238,7 +238,7 @@ As coordenadas de `unitLocation` refletem o cadastro atual, não o GPS informado
 
 ## MongoDB e camadas
 
-Continua existindo apenas a collection `forms`; não são criadas collections de
+Os formulários usam a collection `formularios`; não são criadas collections de
 sequência, respostas, análises ou anexos. Novos envios usam `envio_id` (UUID interno para recuperação) e `analise`.
 Não gravam `consentimento_localizacao`, `localizacoes` nem `validacao_localizacao`.
 Dados históricos de GPS permanecem legíveis, sem migração destrutiva.

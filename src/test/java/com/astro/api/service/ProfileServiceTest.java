@@ -70,10 +70,10 @@ class ProfileServiceTest {
 
         UserProfileResponse profile = userService.findProfileByFirebaseUid("firebase-uid");
 
-        assertEquals("Bruno Baptista", profile.nome());
-        assertEquals("Engenheiro de Segurança", profile.cargo());
-        assertEquals("Osasco", profile.unidade());
-        assertEquals("PRESENCIAL", profile.modalidade());
+        assertEquals("Bruno Baptista", profile.name());
+        assertEquals("Engenheiro de Segurança", profile.role());
+        assertEquals("Osasco", profile.unit());
+        assertEquals("PRESENCIAL", profile.workModel());
         assertEquals("bruno@astro.com", profile.email());
         assertEquals("https://r2.example.com/astro/usuarios/20/foto-perfil.jpg?X-Amz-Signature=signature",
                 profile.profilePhotoUrl());

@@ -29,7 +29,7 @@ O mapper converte os dados do banco para os campos em inglês do `UnitResponse`.
 A resposta também inclui `id_unidade`, `id_workspace`, `nome` e
 `quantidade_colaboradores`, com os mesmos valores de `unitId`, `workspaceId`,
 `name` e `collaboratorCount`. Getters JavaBean expõem esses nomes por descoberta
-automática do Jackson, sem `@JsonProperty` e sem duplicar estado no DTO.
+automática do Jackson e sem duplicar estado no DTO.
 
 Esses campos preservam a validação de `listUnits` do web publicado e o carregamento
 de opções do editor de formulários, que usa a mesma listagem. Os campos em inglês
@@ -40,22 +40,22 @@ O PATCH não exige body e retorna
 `data: true` para ativa e `data: false` para inativa. Os triggers PostgreSQL executam
 as regras de desativação dos usuários vinculados.
 
-As NRs associadas retornam `nr` e `descricao`, vindos de `codigo_nr` e `descricao`
+As NRs associadas retornam `nr` e `description`, vindos de `codigo_nr` e `descricao`
 da função. As opções usam o modelo `NrDocument` existente, consultando explicitamente
 a collection `nrs` (nome sensível a maiúsculas) com `usabilidade: "Empresa"`.
-Usam `_id` numérico e `descricao` do MongoDB e acrescentam `ativo` de acordo com
+Usam `_id` numérico e `descricao` do MongoDB e acrescentam `active` de acordo com
 as associações PostgreSQL. Essa consulta não depende do nome configurado para a
 collection dos outros módulos. As opções são ordenadas pelo código.
 
 O POST recebe diretamente um array:
 
 ```json
-[{"nr":1,"ativo":true},{"nr":17,"ativo":false}]
+[{"nr":1,"active":true},{"nr":17,"active":false}]
 ```
 
 Cada item altera apenas a NR informada; códigos omitidos permanecem associados.
 Um array vazio é permitido. `nr` deve ser um inteiro positivo dentro do intervalo
-Java/PostgreSQL INTEGER e `ativo` deve ser um booleano JSON. Strings, decimais,
+Java/PostgreSQL INTEGER e `active` deve ser um booleano JSON. Strings, decimais,
 itens nulos, campos ausentes e códigos repetidos são rejeitados. A procedure valida
 a existência da NR no catálogo PostgreSQL e altera as associações em uma transação.
 O sucesso responde HTTP 200 no envelope existente, sem resultado em `data`.
@@ -70,7 +70,7 @@ no PostgreSQL da API. Esta implementação não instala os scripts automaticamen
 
 As funções de consulta retornam lista vazia para UID/unidade sem acesso e para
 unidades sem associações, conforme o contrato SQL. A lista de opções continua
-retornando o catálogo elegível com `ativo: false` quando não há associações retornadas.
+retornando o catálogo elegível com `active: false` quando não há associações retornadas.
 As mutações convertem `22023` em HTTP 400, `42501` em 403 e `P0002` em 404.
 Falhas de conexão, conflitos de integridade e falhas inesperadas mantêm o tratamento
 global existente de HTTP 503, 409 e 500. Os detalhes internos do SQL não são expostos.

@@ -310,7 +310,7 @@ class CollaboratorServiceTest {
 
         assertEquals(2L, response.id());
         assertEquals("Ana Silva", response.name());
-        assertEquals("Operadora", response.roleName());
+        assertEquals("Operadora", response.role());
         assertEquals("https://r2.example.com/ana.jpg", response.profilePhotoUrl());
         assertEquals("Matriz", response.unitName());
         assertEquals(WorkModel.HIBRIDO, response.workModel());

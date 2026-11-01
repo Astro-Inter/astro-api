@@ -6,7 +6,7 @@ import java.util.List;
 public record CollaboratorProfileResponse(
         Long id,
         String name,
-        String roleName,
+        String role,
         String profilePhotoUrl,
         String unitName,
         WorkModel workModel,

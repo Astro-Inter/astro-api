@@ -23,8 +23,8 @@ Inclui usuários dos tipos `COLABORADOR`, `GESTOR` e `GESTOR_WORKSPACE`, conform
 o próprio usuário autenticado, antes da consulta de fotos. O padrão `false`
 preserva a própria conta nos seletores de conformidades e participantes.
 O parâmetro não altera o workspace nem as unidades autorizadas.
-O resultado em `data` contém `id_usuario`, `nome`, `email`, `cargo_id`, `cargo`,
-`unidade_id`, `unidade`, `status`, `profilePhotoUrl`, `avatarInitials` e `canManage`.
+O resultado em `data` contém `id`, `name`, `email`, `roleId`, `roleName`,
+`unitId`, `unitName`, `status`, `profilePhotoUrl`, `avatarInitials` e `canManage`.
 Cada colaborador aparece uma vez. A ausência
 de colaboradores autorizados resulta em `data: []`. CPF, senha e Firebase UID
 não fazem parte desse contrato.
@@ -68,7 +68,7 @@ foto continua sendo resolvida pela API.
 ## Detalhes — SCRUM-519
 
 `GET /collaborators/{collaboratorId}` consulta a mesma view e o mesmo escopo.
-Retorna os campos da listagem e acrescenta `cpf`, `modalidade` e `workspace_id`.
+Retorna os campos da listagem e acrescenta `cpf`, `workModel` e `workspaceId`.
 A modalidade pode ser nula para cadastros antigos. Os três tipos de usuário podem
 ser consultados. Registros inexistentes e usuários fora do escopo retornam 404, sem revelar sua
 existência. IDs não positivos retornam 400. A rota atende informações e edição,
@@ -140,7 +140,7 @@ existente de registrar o erro para reprocessamento operacional.
 
 `PUT /collaborators/{collaboratorId}` exige `name`, `cpf`, `email`, `roleId`,
 `unitId`, `workModel` e `status`. Cadastro e edição usam os nomes dos campos
-diretamente, sem `@JsonProperty`.
+diretamente.
 Todos são obrigatórios e não nulos: é uma substituição dos campos editáveis.
 O status pode ser mantido como `PRE_CADASTRADO` apenas se já estiver assim; não
 é permitido voltar ao pré-cadastro nem concluir o cadastro por esta rota.

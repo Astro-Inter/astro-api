@@ -12,11 +12,11 @@ O objeto `data` contém:
 
 | Campo | Conteúdo |
 | --- | --- |
-| `username`, `profilePhotoUrl`, `workspace_name` | Nome, URL temporária da foto e nome do workspace. |
-| `events_metrics` | Contadores `pending`, `under_analysis` e `done`. |
-| `status_message` | Indicador `URGENT`, `PENDENT`, `ANALYSIS` ou `OK`. |
-| `pending_events` | Até três itens com `id`, `title`, `limit_date` e `viewed`. |
-| `last_notifications` | Até três itens com `id`, `title`, `sent_at_in_hours` e `viewed`. |
+| `username`, `profilePhotoUrl`, `workspaceName` | Nome, URL temporária da foto e nome do workspace. |
+| `eventsMetrics` | Contadores `pending`, `underAnalysis` e `done`. |
+| `statusMessage` | Indicador `URGENT`, `PENDENT`, `ANALYSIS` ou `OK`. |
+| `pendingEvents` | Até três itens com `id`, `title`, `limitDate` e `viewed`. |
+| `lastNotifications` | Até três itens com `id`, `title`, `sentAtInHours` e `viewed`. |
 
 Os eventos e métricas vêm da função consultada no PostgreSQL; notificações vêm
 do MongoDB. A Home usa a mensagem da notificação no campo `title`. A leitura
@@ -34,17 +34,18 @@ da função instalada no ambiente.
 ## Gestor
 
 `GET /home/manager` aceita `GESTOR` e `GESTOR_WORKSPACE`. O objeto `data`
-contém `username`, `profilePhotoUrl`, `workspace_name`, `pending_validations`,
-`pending_forms` e `indicators`.
+contém `username`, `profilePhotoUrl`, `workspaceName`, `pendingValidations`,
+`pendingForms` e `indicators`.
 
-Cada validação contém `id`, `participantId`, `eventId`, `collaborator_name`,
-`event_title` e `viewed`. `participantId` identifica o usuário participante e
-`eventId` identifica o evento associado à conclusão pendente.
-Cada formulário contém `id`, `title`, `days_left` e `viewed`; são consultados
-até três formulários pendentes. `days_left` é a diferença em dias de calendário
+Cada validação contém `id`, `participantId`, `eventId`, `collaboratorName`,
+`eventTitle` e `viewed`. `participantId` identifica o usuário participante e
+`eventId` identifica o evento associado à conclusão pendente; ambos podem ser
+nulos quando a função SQL instalada não os fornece.
+Cada formulário contém `id`, `title`, `daysLeft` e `viewed`; são consultados
+até três formulários pendentes. `daysLeft` é a diferença em dias de calendário
 até o prazo, no fuso `America/Sao_Paulo`; pode ser negativo ou nulo. Os
-indicadores são `current_events`, `pending_validations` e
-`collaborators_with_pending_events`. O banco fornece indicadores e validações;
+indicadores são `currentEvents`, `pendingValidations` e
+`collaboratorsWithPendingEvents`. O banco fornece indicadores e validações;
 os formulários são consultados no MongoDB.
 
 Na função do banco disponível no repositório, as validações vêm dos eventos não

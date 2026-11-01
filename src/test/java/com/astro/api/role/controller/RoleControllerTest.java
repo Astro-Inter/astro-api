@@ -50,10 +50,10 @@ class RoleControllerTest {
         when(service.findAll("gestor", user)).thenReturn(List.of(new RoleResponse(12L, 3L, "Gerente", 25, "Ativo")));
         mvc.perform(get("/roles").param("firebase_uid", "gestor"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id_cargo").value(12))
-                .andExpect(jsonPath("$.data[0].id_workspace").value(3))
-                .andExpect(jsonPath("$.data[0].nome").value("Gerente"))
-                .andExpect(jsonPath("$.data[0].quantidade_colaboradores").value(25));
+                .andExpect(jsonPath("$.data[0].roleId").value(12))
+                .andExpect(jsonPath("$.data[0].workspaceId").value(3))
+                .andExpect(jsonPath("$.data[0].name").value("Gerente"))
+                .andExpect(jsonPath("$.data[0].collaboratorCount").value(25));
     }
 
     @Test
@@ -76,7 +76,7 @@ class RoleControllerTest {
     @Test
     void exposesAllMutationRoutesAndTheFinalStatus() throws Exception {
         String body = """
-                {"firebase_uid":"gestor","nome":"Gerente","status":"Ativo"}
+                {"firebaseUid":"gestor","name":"Gerente","status":"Ativo"}
                 """;
         mvc.perform(post("/roles").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated());
@@ -84,10 +84,10 @@ class RoleControllerTest {
                 .andExpect(status().isOk());
         when(service.toggleStatus("gestor", 12L, user)).thenReturn(false);
         mvc.perform(patch("/roles/12/status").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"firebase_uid\":\"gestor\"}"))
+                        .content("{\"firebaseUid\":\"gestor\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data").value(false));
         mvc.perform(post("/roles/12/nrs").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"firebase_uid\":\"gestor\",\"nrs\":[{\"nr\":17,\"ativo\":false}]}"))
+                        .content("{\"firebaseUid\":\"gestor\",\"nrs\":[{\"nr\":17,\"active\":false}]}"))
                 .andExpect(status().isOk());
         verify(service).create(any(), eq(user));
         verify(service).update(eq(12L), any(), eq(user));
@@ -97,11 +97,11 @@ class RoleControllerTest {
     @Test
     void rejectsInvalidStatusAndIncompleteNrChanges() throws Exception {
         mvc.perform(post("/roles").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"firebase_uid\":\"gestor\",\"nome\":\"Gerente\",\"status\":\"desconhecido\"}"))
+                        .content("{\"firebaseUid\":\"gestor\",\"name\":\"Gerente\",\"status\":\"desconhecido\"}"))
                 .andExpect(status().isBadRequest());
-        for (String nrs : List.of("null", "[null]", "[{\"nr\":1}]", "[{\"nr\":0,\"ativo\":true}]")) {
+        for (String nrs : List.of("null", "[null]", "[{\"nr\":1}]", "[{\"nr\":0,\"active\":true}]")) {
             mvc.perform(post("/roles/12/nrs").contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"firebase_uid\":\"gestor\",\"nrs\":" + nrs + "}"))
+                            .content("{\"firebaseUid\":\"gestor\",\"nrs\":" + nrs + "}"))
                     .andExpect(status().isBadRequest());
         }
         verifyNoInteractions(service);
@@ -110,7 +110,7 @@ class RoleControllerTest {
     @Test
     void permitsAnEmptyNrPatchWithoutReplacingExistingLinks() throws Exception {
         mvc.perform(post("/roles/12/nrs").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"firebase_uid\":\"gestor\",\"nrs\":[]}"))
+                        .content("{\"firebaseUid\":\"gestor\",\"nrs\":[]}"))
                 .andExpect(status().isOk());
         verify(service).updateNrs(eq(12L), any(), eq(user));
     }
@@ -126,7 +126,7 @@ class RoleControllerTest {
     @Test
     void resolvesRoleAndStatusValidationMessagesFromTheResourceBundle() throws Exception {
         mvc.perform(post("/roles").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"firebase_uid\":\"\",\"nome\":\"\",\"status\":\"\"}"))
+                        .content("{\"firebaseUid\":\"\",\"name\":\"\",\"status\":\"\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors", hasItem(containsString("O Firebase UID é obrigatório"))))
                 .andExpect(jsonPath("$.errors", hasItem(containsString("O nome do cargo é obrigatório"))))
@@ -135,7 +135,7 @@ class RoleControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors", hasItem(containsString("O Firebase UID é obrigatório"))));
         mvc.perform(put("/roles/12").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"firebase_uid\":\"gestor\",\"nome\":\"Gerente\",\"status\":\"outro\"}"))
+                        .content("{\"firebaseUid\":\"gestor\",\"name\":\"Gerente\",\"status\":\"outro\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors", hasItem(containsString("O status do cargo deve ser Ativo ou Inativo"))));
         verifyNoInteractions(service);
@@ -146,14 +146,14 @@ class RoleControllerTest {
         assertNrValidationError("null", "A lista de NRs é obrigatória");
         assertNrValidationError("[null]", "Os itens da lista de NRs não podem ser nulos");
         assertNrValidationError("[{}]", "O código da NR é obrigatório");
-        assertNrValidationError("[{\"nr\":0,\"ativo\":true}]", "O código da NR deve ser um inteiro positivo");
+        assertNrValidationError("[{\"nr\":0,\"active\":true}]", "O código da NR deve ser um inteiro positivo");
         assertNrValidationError("[{\"nr\":1}]", "Informe se a NR deve ser vinculada ao cargo");
         verifyNoInteractions(service);
     }
 
     private void assertNrValidationError(String nrs, String message) throws Exception {
         mvc.perform(post("/roles/12/nrs").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"firebase_uid\":\"gestor\",\"nrs\":" + nrs + "}"))
+                        .content("{\"firebaseUid\":\"gestor\",\"nrs\":" + nrs + "}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors", hasItem(containsString(message))));
     }
