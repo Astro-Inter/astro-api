@@ -139,7 +139,7 @@ existente de registrar o erro para reprocessamento operacional.
 
 `PUT /collaborators/{collaboratorId}` exige `name`, `cpf`, `email`, `roleId`,
 `unitId`, `workModel` e `status`. Cadastro e edição usam os nomes dos campos
-diretamente, sem `@JsonProperty`.
+diretamente.
 Todos são obrigatórios e não nulos: é uma substituição dos campos editáveis.
 O status pode ser mantido como `PRE_CADASTRADO` apenas se já estiver assim; não
 é permitido voltar ao pré-cadastro nem concluir o cadastro por esta rota.

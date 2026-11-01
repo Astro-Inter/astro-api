@@ -29,7 +29,7 @@ O mapper converte os dados do banco para os campos em inglês do `UnitResponse`.
 A resposta também inclui `id_unidade`, `id_workspace`, `nome` e
 `quantidade_colaboradores`, com os mesmos valores de `unitId`, `workspaceId`,
 `name` e `collaboratorCount`. Getters JavaBean expõem esses nomes por descoberta
-automática do Jackson, sem `@JsonProperty` e sem duplicar estado no DTO.
+automática do Jackson e sem duplicar estado no DTO.
 
 Esses campos preservam a validação de `listUnits` do web publicado e o carregamento
 de opções do editor de formulários, que usa a mesma listagem. Os campos em inglês

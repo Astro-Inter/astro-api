@@ -4,7 +4,7 @@ As rotas usam `Authorization: Bearer <Firebase ID token>` e o envelope `ApiResul
 Somente gestores ativos, com unidade ativa e workspace válido, têm acesso.
 O workspace e o remetente são determinados pela identidade validada.
 Os campos de request e response usam os nomes Java em inglês e camelCase,
-conforme os componentes dos DTOs, sem `@JsonProperty`.
+conforme os componentes dos DTOs.
 Clientes devem enviar `title`, `managerId`, `questions`, `dueDate` e os demais
 nomes dos exemplos abaixo; os nomes antigos em português não são aliases da API.
 
@@ -223,8 +223,7 @@ Os identificadores Java usam inglês, incluindo `nrCode`, `DRAFT`, `PENDING`,
 `COMPLETED`, `TEXT`, `OPTION`, `PHOTO` e `DATE`. Os DTOs usam diretamente os
 nomes Java no JSON, incluindo `nrCode`, `managerId`, `questions`, `required` e `answer`.
 Os campos físicos do MongoDB continuam mapeados por `@Field`, incluindo `nr`,
-`id_gestor`, `perguntas` e `resposta`; a remoção de `@JsonProperty` não exige migração
-dos documentos. Os valores de enum permanecem `RASCUNHO`, `PENDENTE`, `CONCLUIDO`,
+`id_gestor`, `perguntas` e `resposta`. Os valores de enum permanecem `RASCUNHO`, `PENDENTE`, `CONCLUIDO`,
 `texto`, `alternativa`, `foto` e `data`. A Home mobile mantém o contrato próprio
 existente; esta mudança se aplica aos bodies e respostas dos endpoints `/forms`.
 

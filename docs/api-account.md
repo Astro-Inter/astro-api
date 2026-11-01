@@ -85,7 +85,7 @@ HTTP 200 retorna os mesmos nove campos de detalhes, atualizados, em `ApiResult`.
 A foto continua sendo enviada separadamente a `PUT /user/me/profile-photo`
 (multipart, campo `file`). Opções existentes: `GET /roles` e `GET /units`.
 
-O request usa os nomes Java em inglês, sem `@JsonProperty`: `name`, `cpf`,
+O request usa os nomes Java em inglês: `name`, `cpf`,
 `email`, `roleId`, `unitId` e `workModel`. O frontend deve enviar esses nomes;
 `nome` e `modalidade` são campos desconhecidos no PUT e retornam 400.
 As respostas GET/PUT mantêm os nomes documentados acima (`name`, `roleName`,

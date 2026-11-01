@@ -166,8 +166,7 @@ PostgreSQL descartável disponível, sempre dentro de um schema próprio.
 
 As respostas de criação, edição e listagem usam os campos de `UnitResponse` em
 inglês: `unitId`, `workspaceId`, `name`, `status`, `collaboratorCount`, `postalCode`,
-`street`, `city`, `neighborhood`, `state`, `addressLine2` e `number`.
-Não há anotações `@JsonProperty`; o JSON usa diretamente os nomes do DTO.
+`street`, `city`, `neighborhood`, `state`, `addressLine2` e `number`. o JSON usa diretamente os nomes do DTO.
 Consumidores que liam os nomes anteriores em português precisam atualizar a
 integração. `number` corresponde à coluna `numero` e pode ser null em registros legados.
 
