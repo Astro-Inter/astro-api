@@ -103,6 +103,26 @@ class ManagerControllerTest {
         }
         verifyNoInteractions(service);
     }
+    @Test void demotionNeedsNoBodyAndReturnsTheStandardEnvelopeAndErrors() throws Exception {
+        when(service.demote(4L, principal)).thenReturn(new com.astro.api.manager.dto.response.ManagerDetailsResponse(
+                4L, "Colaborador", "12345678900", "user@astro.com", null, UserStatus.DESATIVADO,
+                2L, "Cargo", 10L, "Unidade", 3L, null, "C"));
+        mvc.perform(patch("/managers/4/demote"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Gestor despromovido a colaborador com sucesso"))
+                .andExpect(jsonPath("$.path").value("/managers/4/demote"))
+                .andExpect(jsonPath("$.data.id").value(4))
+                .andExpect(jsonPath("$.data.status").value("DESATIVADO"))
+                .andExpect(jsonPath("$.data.firebaseUid").doesNotExist());
+        when(service.demote(99L, principal)).thenThrow(new com.astro.api.common.exception.ResourceNotFoundException("Gestor não encontrado"));
+        mvc.perform(patch("/managers/99/demote")).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
+        when(service.demote(0L, principal)).thenThrow(new com.astro.api.common.exception.BusinessException("O identificador do usuário deve ser positivo"));
+        mvc.perform(patch("/managers/0/demote")).andExpect(status().isBadRequest());
+        mvc.perform(patch("/managers/abc/demote")).andExpect(status().isBadRequest());
+    }
+
     @Test void patchRequiresAnExplicitActiveOrInactiveStatus() throws Exception {
         mvc.perform(patch("/managers/1/status").contentType("application/json").content("{\"status\":\"DESATIVADO\"}"))
                 .andExpect(status().isOk());

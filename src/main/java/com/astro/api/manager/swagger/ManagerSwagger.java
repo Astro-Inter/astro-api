@@ -32,6 +32,17 @@ public interface ManagerSwagger {
     ResponseEntity<ApiResult<ManagerDetailsResponse>> promote(  PromoteManagerRequest body,
              AuthenticatedUser principal, HttpServletRequest request);
 
+    @Operation(summary = "Despromove um gestor do próprio workspace a colaborador",
+            description = "Exige gestor de workspace ativo. Altera somente o perfil GESTOR para COLABORADOR, "
+                    + "preservando status, conta, vínculos e histórico. Não recebe corpo. "
+                    + "Retorna os dados administrativos da conta preservada.")
+    @ApiResponse(responseCode = "200", description = "Gestor despromovido a colaborador com sucesso")
+    @ApiResponse(responseCode = "400", description = "Identificador inválido")
+    @ApiResponse(responseCode = "403", description = "Autenticação ou permissão insuficiente")
+    @ApiResponse(responseCode = "404", description = "Gestor inexistente, outro perfil ou fora do workspace")
+    ResponseEntity<ApiResult<ManagerDetailsResponse>> demote(Long managerId,
+            AuthenticatedUser principal, HttpServletRequest request);
+
     @Operation(summary = "Substitui todos os campos editáveis de um gestor do próprio workspace")
     @ApiResponse(responseCode = "200", description = "Operação concluída com sucesso")
     ResponseEntity<ApiResult<ManagerDetailsResponse>> update( Long managerId,

@@ -49,6 +49,13 @@ public class ManagerController implements ManagerSwagger {
                 "Colaborador promovido a gestor com sucesso", manager, request.getRequestURI()));
     }
 
+    @PatchMapping("/{managerId}/demote")
+    public ResponseEntity<ApiResult<ManagerDetailsResponse>> demote(@PathVariable("managerId") Long managerId,
+            @AuthenticationPrincipal AuthenticatedUser principal, HttpServletRequest request) {
+        return ResponseEntity.ok(ApiResult.success("Gestor despromovido a colaborador com sucesso",
+                service.demote(managerId, principal), request.getRequestURI()));
+    }
+
     @PutMapping("/{managerId}")
     public ResponseEntity<ApiResult<ManagerDetailsResponse>> update(@PathVariable("managerId") Long managerId,
             @Valid @RequestBody UpdateManagerRequest body, @AuthenticationPrincipal AuthenticatedUser principal,

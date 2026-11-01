@@ -126,6 +126,80 @@ class ManagerServiceTest {
         verify(avatars, never()).invalidate(any());
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(UserStatus.class)
+    void demotionChangesOnlyTheProfileAndPreservesEveryAccountStatus(UserStatus status) {
+        User manager = editableManager();
+        manager.setStatus(status);
+        manager.getRole().setActive(false);
+        manager.getUnit().isActive = false;
+        java.time.Instant createdAt = manager.getCreatedAt();
+        com.astro.api.role.model.Role originalRole = manager.getRole();
+        Unit originalUnit = manager.getUnit();
+        when(avatars.findUrl(4L)).thenReturn("https://r2.example.com/manager");
+
+        com.astro.api.manager.dto.response.ManagerDetailsResponse result = service.demote(4L, principal);
+
+        assertEquals(UserType.COLABORADOR, manager.getType());
+        assertEquals(status, manager.getStatus());
+        assertEquals(4L, manager.getId());
+        assertEquals("Colaborador", manager.getName());
+        assertEquals("12345678900", manager.getCpf());
+        assertEquals("collaborator@astro.com", manager.getEmail());
+        assertEquals("collaborator-uid", manager.getFirebaseUid());
+        assertEquals(WorkModel.REMOTO, manager.getWorkModel());
+        assertEquals(createdAt, manager.getCreatedAt());
+        assertSame(originalRole, manager.getRole());
+        assertSame(originalUnit, manager.getUnit());
+        assertEquals(4L, result.id());
+        assertEquals(status, result.status());
+        assertEquals("https://r2.example.com/manager", result.profilePhotoUrl());
+        assertEquals("C", result.avatarInitials());
+        verify(repository).findUserForUpdateInWorkspace(4L, 1L);
+        verify(repository).saveAndFlush(manager);
+        verify(repository, never()).lockRoleActive(any(), any());
+        verify(repository, never()).lockUnitActive(any(), any());
+        verifyNoInteractions(firebase, roles, units);
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,
+                () -> service.demote(4L, principal));
+        verify(repository, times(1)).saveAndFlush(any());
+    }
+
+    @Test void demotionRejectsInvalidMissingForeignAndProtectedTargetsWithoutWriting() {
+        for (Long id : java.util.Arrays.asList(null, 0L, -1L)) {
+            assertThrows(com.astro.api.common.exception.BusinessException.class,
+                    () -> service.demote(id, principal));
+        }
+        assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,
+                () -> service.demote(99L, principal));
+        verify(repository).findUserForUpdateInWorkspace(99L, 1L);
+        User target = editableManager();
+        for (UserType type : List.of(UserType.COLABORADOR, UserType.GESTOR_WORKSPACE)) {
+            target.setType(type);
+            assertThrows(com.astro.api.common.exception.ResourceNotFoundException.class,
+                    () -> service.demote(4L, principal));
+        }
+        verify(repository, never()).saveAndFlush(any());
+        verifyNoInteractions(avatars, firebase);
+    }
+
+    @Test void demotionRevalidatesTheRequesterProfileStatusAndWorkspace() {
+        assertThrows(AccessDeniedException.class, () -> service.demote(4L, null));
+        for (Role role : List.of(Role.COLABORADOR, Role.GESTOR, Role.ADMIN)) {
+            AuthenticatedUser unauthorized = new AuthenticatedUser(principal.firebaseUid(), principal.email(), role);
+            assertThrows(AccessDeniedException.class, () -> service.demote(4L, unauthorized));
+        }
+        requester.setStatus(UserStatus.DESATIVADO);
+        assertThrows(AccessDeniedException.class, () -> service.demote(4L, principal));
+        requester.setStatus(UserStatus.ATIVO);
+        requester.setType(UserType.GESTOR);
+        assertThrows(AccessDeniedException.class, () -> service.demote(4L, principal));
+        requester.setType(UserType.GESTOR_WORKSPACE);
+        requester.setUnit(null);
+        assertThrows(AccessDeniedException.class, () -> service.demote(4L, principal));
+        verifyNoInteractions(repository, avatars, firebase);
+    }
+
     User eligibleCollaborator() {
         User user = new User(); user.setId(4L); user.setName("Colaborador"); user.setCpf("12345678900");
         user.setEmail("collaborator@astro.com"); user.setFirebaseUid("collaborator-uid");

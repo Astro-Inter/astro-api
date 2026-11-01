@@ -104,6 +104,15 @@ public class ManagerService {
         return managerMapper.toDetails(saved, userAvatarService.findUrl(saved.getId()));
     }
 
+    @Transactional
+    public ManagerDetailsResponse demote(Long managerId, AuthenticatedUser principal) {
+        Long workspaceId = requireWorkspaceManager(principal).getUnit().workspace.id;
+        User manager = requireManager(managerId, workspaceId);
+        manager.setType(UserType.COLABORADOR);
+        User saved = managerRepository.saveAndFlush(manager);
+        return managerMapper.toDetails(saved, userAvatarService.findUrl(saved.getId()));
+    }
+
     private void requireActiveLinks(User user, Long workspaceId) {
         if (user.getRole() == null || user.getUnit() == null
                 || !Boolean.TRUE.equals(managerRepository.lockRoleActive(user.getRole().getId(), workspaceId))

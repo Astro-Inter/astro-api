@@ -89,6 +89,12 @@ class SwaggerDocumentationTest {
                     .path("content").has("multipart/form-data"));
             assertEquals("2026-11-01T00:00:00", api.path("paths").path("/events").path("get")
                     .path("parameters").get(0).path("example").asText());
+            JsonNode demotion = api.path("paths").path("/managers/{managerId}/demote").path("patch");
+            assertFalse(demotion.isMissingNode());
+            assertFalse(demotion.has("requestBody"));
+            for (String code : new String[]{"200", "400", "403", "404"}) {
+                assertTrue(demotion.path("responses").has(code), code);
+            }
             JsonNode schemas = api.path("components").path("schemas");
             JsonNode managedEvent = schemas.path("ManagedCollaboratorEventResponse").path("properties");
             assertTrue(managedEvent.has("eventId"));
