@@ -40,16 +40,16 @@ class RoleManagementServiceTest {
 
     @Test
     void rejectsAnotherManagersIdentityBeforeAccessingData() {
-        assertThrows(AccessDeniedException.class, () -> service.findAll("outro", user));
-        assertThrows(AccessDeniedException.class, () -> service.findNrs("outro", 12L, user));
-        assertThrows(AccessDeniedException.class, () -> service.findNrOptions("outro", 12L, user));
+        assertThrows(AccessDeniedException.class, () -> service.findAll(null));
+        assertThrows(AccessDeniedException.class, () -> service.findNrs(12L, null));
+        assertThrows(AccessDeniedException.class, () -> service.findNrOptions(12L, null));
         verifyNoInteractions(repository, documents, catalog);
     }
 
     @Test
     void rejectsBlankIdentityAndInvalidRoleId() {
-        assertThrows(BusinessException.class, () -> service.findAll(" ", user));
-        assertThrows(BusinessException.class, () -> service.findNrs("gestor", 0L, user));
+        assertThrows(AccessDeniedException.class, () -> service.findAll(new AuthenticatedUser(" ", "", Role.GESTOR)));
+        assertThrows(BusinessException.class, () -> service.findNrs(0L, user));
         verifyNoInteractions(repository, documents, catalog);
     }
 
@@ -59,7 +59,7 @@ class RoleManagementServiceTest {
         when(documents.findByUsability("Colaborador")).thenReturn(List.of(nr(17, "Ergonomia"), nr(1, "Mongo")));
         when(catalog.findAllById(Set.of(1, 17))).thenReturn(List.of(catalogNr(1), catalogNr(17)));
 
-        var options = service.findNrOptions("gestor", 12L, user);
+        var options = service.findNrOptions(12L, user);
 
         assertEquals(2, options.size());
         assertEquals(1, options.getFirst().nr());
@@ -72,19 +72,19 @@ class RoleManagementServiceTest {
     @Test
     void doesNotReadMongoWhenDatabaseRejectsTheRole() {
         when(repository.findNrs("gestor", 12L)).thenThrow(new BusinessException("Cargo fora do workspace"));
-        assertThrows(BusinessException.class, () -> service.findNrOptions("gestor", 12L, user));
+        assertThrows(BusinessException.class, () -> service.findNrOptions(12L, user));
         verifyNoInteractions(documents);
     }
 
     @Test
     void preservesFalseWhenDeactivatingRole() {
         when(repository.toggleStatus("gestor", 12L)).thenReturn(false);
-        assertFalse(service.toggleStatus("gestor", 12L, user));
+        assertFalse(service.toggleStatus(12L, user));
     }
 
     @Test
     void rejectsDuplicateNrsBeforeExecutingTheProcedure() {
-        var body = new UpdateRoleNrsRequest("gestor", List.of(
+        var body = new UpdateRoleNrsRequest(List.of(
                 new RoleNrRequest(1, true), new RoleNrRequest(1, false)));
         assertThrows(BusinessException.class, () -> service.updateNrs(12L, body, user));
         verifyNoInteractions(repository);
@@ -93,7 +93,7 @@ class RoleManagementServiceTest {
     @Test
     void serializesOnlyTheSpecifiedNrChangesAsJsonbPayload() throws Exception {
         when(catalog.findAllById(Set.of(1, 17))).thenReturn(List.of(catalogNr(1), catalogNr(17)));
-        var body = new UpdateRoleNrsRequest("gestor", List.of(
+        var body = new UpdateRoleNrsRequest(List.of(
                 new RoleNrRequest(1, true), new RoleNrRequest(17, false)));
         service.updateNrs(12L, body, user);
         var json = org.mockito.ArgumentCaptor.forClass(String.class);
@@ -107,23 +107,44 @@ class RoleManagementServiceTest {
 
     @Test
     void trimsNameBeforeApplyingDatabaseLengthLimits() {
-        service.create(new RoleRequest("gestor", "  Gerente  ", "Ativo"), user);
+        service.create(new RoleRequest("  Gerente  ", "Ativo"), user);
         verify(repository).create("gestor", "Gerente", "Ativo");
         assertThrows(BusinessException.class,
-                () -> service.create(new RoleRequest("gestor", " a ", "Ativo"), user));
+                () -> service.create(new RoleRequest(" a ", "Ativo"), user));
         assertThrows(BusinessException.class,
-                () -> service.update(12L, new RoleRequest("gestor", "x".repeat(256), "Ativo"), user));
+                () -> service.update(12L, new RoleRequest("x".repeat(256), "Ativo"), user));
     }
 
     @Test
-    void rejectsImpersonationForEveryMutation() {
-        var request = new RoleRequest("outro", "Gerente", "Ativo");
-        assertThrows(AccessDeniedException.class, () -> service.create(request, user));
-        assertThrows(AccessDeniedException.class, () -> service.update(12L, request, user));
-        assertThrows(AccessDeniedException.class, () -> service.toggleStatus("outro", 12L, user));
-        assertThrows(AccessDeniedException.class, () -> service.updateNrs(12L,
-                new UpdateRoleNrsRequest("outro", List.of()), user));
+    void rejectsMissingAndUnauthorizedPrincipalsForEveryMutation() {
+        RoleRequest request = new RoleRequest("Gerente", "Ativo");
+        for (AuthenticatedUser unauthorized : java.util.Arrays.asList(null,
+                new AuthenticatedUser("outro", "", Role.COLABORADOR),
+                new AuthenticatedUser("outro", "", Role.ADMIN),
+                new AuthenticatedUser("", "", Role.GESTOR))) {
+            assertThrows(AccessDeniedException.class, () -> service.create(request, unauthorized));
+            assertThrows(AccessDeniedException.class, () -> service.update(12L, request, unauthorized));
+            assertThrows(AccessDeniedException.class, () -> service.toggleStatus(12L, unauthorized));
+            assertThrows(AccessDeniedException.class, () -> service.updateNrs(12L,
+                    new UpdateRoleNrsRequest(List.of()), unauthorized));
+        }
         verifyNoInteractions(repository);
+    }
+
+    @Test
+    void sendsOnlyTheAuthenticatedUidToEveryDatabaseOperation() {
+        service.findAll(user);
+        service.findNrs(12L, user);
+        service.create(new RoleRequest("Gerente", "Ativo"), user);
+        service.update(12L, new RoleRequest("Gerente", "Ativo"), user);
+        service.toggleStatus(12L, user);
+        service.updateNrs(12L, new UpdateRoleNrsRequest(List.of()), user);
+        verify(repository).findAll("gestor");
+        verify(repository).findNrs("gestor", 12L);
+        verify(repository).create("gestor", "Gerente", "Ativo");
+        verify(repository).update("gestor", 12L, "Gerente", "Ativo");
+        verify(repository).toggleStatus("gestor", 12L);
+        verify(repository).updateNrs("gestor", 12L, "[]");
     }
 
     @Test
@@ -132,7 +153,7 @@ class RoleManagementServiceTest {
         when(documents.findByUsability("Colaborador")).thenReturn(List.of(nr(4, "Sem catálogo SQL"), nr(1, "Mongo")));
         when(catalog.findAllById(Set.of(1, 4))).thenReturn(List.of(catalogNr(1)));
 
-        var options = service.findNrOptions("gestor", 12L, user);
+        var options = service.findNrOptions(12L, user);
 
         assertEquals(1, options.size());
         assertEquals(1, options.getFirst().nr());
@@ -146,7 +167,7 @@ class RoleManagementServiceTest {
         when(documents.findByUsability("Colaborador")).thenReturn(List.of(nr(1, "Descrição Mongo")));
         when(catalog.findAllById(Set.of(1, 17))).thenReturn(List.of(catalogNr(1), catalogNr(17)));
 
-        var options = service.findNrOptions("gestor", 12L, user);
+        var options = service.findNrOptions(12L, user);
 
         assertEquals(List.of(1, 17), options.stream().map(option -> option.nr()).toList());
         assertFalse(options.getFirst().active());
@@ -157,7 +178,7 @@ class RoleManagementServiceTest {
     @Test
     void ignoresUnselectedMissingCodesFromAnOlderOptionsList() throws Exception {
         when(catalog.findAllById(Set.of(1, 4))).thenReturn(List.of(catalogNr(1)));
-        service.updateNrs(12L, new UpdateRoleNrsRequest("gestor", List.of(
+        service.updateNrs(12L, new UpdateRoleNrsRequest(List.of(
                 new RoleNrRequest(1, true), new RoleNrRequest(4, false))), user);
 
         var json = org.mockito.ArgumentCaptor.forClass(String.class);
@@ -172,7 +193,7 @@ class RoleManagementServiceTest {
     void rejectsAnUnavailableSelectedNrBeforeWritingAnyChanges() {
         when(catalog.findAllById(Set.of(1, 4))).thenReturn(List.of(catalogNr(1)));
         var exception = assertThrows(BusinessException.class, () -> service.updateNrs(12L,
-                new UpdateRoleNrsRequest("gestor", List.of(
+                new UpdateRoleNrsRequest(List.of(
                         new RoleNrRequest(1, true), new RoleNrRequest(4, true))), user));
 
         assertEquals("NRs indisponíveis no catálogo: 4. Atualize a lista e tente novamente.", exception.getMessage());
@@ -182,7 +203,7 @@ class RoleManagementServiceTest {
     @Test
     void keepsTheProcedureAuthorizationCheckWhenAllStaleItemsAreUnselected() {
         when(catalog.findAllById(Set.of(4))).thenReturn(List.of());
-        service.updateNrs(12L, new UpdateRoleNrsRequest("gestor", List.of(new RoleNrRequest(4, false))), user);
+        service.updateNrs(12L, new UpdateRoleNrsRequest(List.of(new RoleNrRequest(4, false))), user);
         verify(repository).updateNrs("gestor", 12L, "[]");
     }
 
@@ -191,7 +212,7 @@ class RoleManagementServiceTest {
         var failure = new DataAccessResourceFailureException("offline");
         when(catalog.findAllById(Set.of(1))).thenThrow(failure);
         assertSame(failure, assertThrows(DataAccessResourceFailureException.class, () -> service.updateNrs(12L,
-                new UpdateRoleNrsRequest("gestor", List.of(new RoleNrRequest(1, true))), user)));
+                new UpdateRoleNrsRequest(List.of(new RoleNrRequest(1, true))), user)));
         verifyNoInteractions(repository);
     }
 
@@ -202,8 +223,8 @@ class RoleManagementServiceTest {
         when(catalog.findAllById(Set.of(1, 4))).thenReturn(List.of(catalogNr(1)));
         when(catalog.findAllById(Set.of(1))).thenReturn(List.of(catalogNr(1)));
 
-        var options = service.findNrOptions("gestor", 12L, user);
-        service.updateNrs(12L, new UpdateRoleNrsRequest("gestor", options.stream()
+        var options = service.findNrOptions(12L, user);
+        service.updateNrs(12L, new UpdateRoleNrsRequest(options.stream()
                 .map(option -> new RoleNrRequest(option.nr(), true)).toList()), user);
 
         var json = org.mockito.ArgumentCaptor.forClass(String.class);
