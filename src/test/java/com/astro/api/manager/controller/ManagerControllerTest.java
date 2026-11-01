@@ -110,7 +110,7 @@ class ManagerControllerTest {
         mvc.perform(patch("/managers/4/demote"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("Gestor despromovido a colaborador com sucesso"))
+                .andExpect(jsonPath("$.message").value("Gestor rebaixado a colaborador com sucesso"))
                 .andExpect(jsonPath("$.path").value("/managers/4/demote"))
                 .andExpect(jsonPath("$.data.id").value(4))
                 .andExpect(jsonPath("$.data.status").value("DESATIVADO"))
