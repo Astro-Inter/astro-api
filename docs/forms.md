@@ -142,7 +142,8 @@ a gravação MongoDB; os vínculos são conferidos a cada operação de escrita.
 ## Edição
 
 `PUT /forms/{id}` substitui os campos editáveis e toda a lista de perguntas, retornando
-200 com os detalhes. Campos opcionais omitidos são limpos. O status é preservado;
+200 com os detalhes. Campos opcionais omitidos são limpos, exceto `appearance`,
+que mantém o valor anterior quando omitido ou nulo. O status é preservado;
 se enviado, deve ser igual ao atual. Um rascunho só passa a pendente por publicação.
 
 Gestores comuns só alteram formulários dos quais são remetentes. O gestor do workspace
@@ -228,7 +229,7 @@ gravação/exclusão, protegendo inclusive respostas recebidas após a leitura d
 Os identificadores Java usam inglês, incluindo `nrCode`, `DRAFT`, `PENDING`,
 `COMPLETED`, `TEXT`, `OPTION`, `PHOTO` e `DATE`. Os DTOs usam diretamente os
 nomes Java no JSON, incluindo `nrCode`, `managerId`, `questions`, `required` e `answer`.
-Os campos físicos do MongoDB continuam mapeados por `@Field`, incluindo `nr`,
+Os campos físicos do MongoDB continuam mapeados por `@Field`, incluindo `nr_id`,
 `gestor_id`, `perguntas` e `resposta`; a remoção de `@JsonProperty` não exige migração
 dos documentos. Os valores de enum permanecem `RASCUNHO`, `PENDENTE`, `CONCLUIDO`,
 `texto`, `alternativa`, `foto` e `data`. A Home mobile mantém o contrato próprio

@@ -193,12 +193,12 @@ tipo específico, preservando o acesso ao histórico quando esses atributos
 mudarem. O esquema atual não armazena o workspace no documento de conversa, por
 isso o escopo é inferido dos participantes relacionados no PostgreSQL.
 
-O campo `data` em `mensagens` é BSON Date e `_id`/`id_conversa` são strings UUID,
+O campo `data` em `mensagens` é BSON Date e `_id`/`conversa_id` são strings UUID,
 conforme a representação usada pelo módulo chat. O cursor URL-safe codifica a
 versão, conversa, data em epoch milliseconds e UUID da mensagem. O cursor é
 validado e vinculado à conversa, mas não concede autorização.
 
-MongoDB filtra `id_conversa` e, para páginas seguintes, aplica a comparação
+MongoDB filtra `conversa_id` e, para páginas seguintes, aplica a comparação
 estrita `(data < cursorDate) OR (data = cursorDate AND _id < cursorMessageId)`.
 Ordena por `data DESC, _id DESC`, limita em `limit + 1`, e projeta somente os
 campos da mensagem. A API remove o item excedente, cria `nextCursor` com a
