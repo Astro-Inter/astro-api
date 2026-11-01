@@ -81,6 +81,14 @@ public class CollaboratorController implements CollaboratorSwagger {
                 .body(ApiResult.success("Colaborador pré-cadastrado com sucesso", response, request.getRequestURI()));
     }
 
+    @PostMapping("/{collaboratorId}/access-key/resend")
+    public ResponseEntity<ApiResult<Void>> resendAccessKey(@PathVariable Long collaboratorId,
+            @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
+        service.resendAccessKey(collaboratorId, user);
+        return ResponseEntity.accepted().body(ApiResult.success("Reenvio da chave de acesso solicitado",
+                null, request.getRequestURI()));
+    }
+
     @PutMapping("/{collaboratorId}")
     public ResponseEntity<ApiResult<CollaboratorDetailsResponse>> update(@PathVariable Long collaboratorId,
             @Valid @RequestBody UpdateCollaboratorRequest body, @AuthenticationPrincipal AuthenticatedUser user,

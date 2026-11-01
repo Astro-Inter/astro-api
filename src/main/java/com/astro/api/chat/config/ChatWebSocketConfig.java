@@ -1,6 +1,7 @@
 package com.astro.api.chat.config;
 
 import com.astro.api.chat.security.ChatStompAuthInterceptor;
+import com.astro.api.chat.security.ChatCapabilitiesInterceptor;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -49,6 +50,11 @@ public class ChatWebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 .setTaskScheduler(chatHeartbeatScheduler);
         registry.setApplicationDestinationPrefixes("/app");
         registry.setUserDestinationPrefix("/user");
+    }
+
+    @Override
+    public void configureClientOutboundChannel(ChannelRegistration registration) {
+        registration.interceptors(new ChatCapabilitiesInterceptor());
     }
 
     @Override

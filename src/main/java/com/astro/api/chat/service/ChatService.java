@@ -10,11 +10,17 @@ import com.astro.api.chat.dto.response.ChatSendResponse;
 import com.astro.api.chat.dto.request.ChatSendRequest;
 import com.astro.api.chat.model.ChatMessageDocument;
 import com.astro.api.chat.model.ChatMessageIds;
+import com.astro.api.chat.model.ChatTypingTarget;
 import com.astro.api.chat.model.ConversationDocument;
 import com.astro.api.chat.mapper.ChatMessageMapper;
+import com.astro.api.chat.mapper.ChatPushEventMapper;
+import com.astro.api.chat.push.ChatPushParticipants;
+import com.astro.api.chat.push.ChatPushSettings;
+import com.astro.api.chat.push.ChatPushOutbox;
 import com.astro.api.chat.repository.ChatMongoRepository;
 import com.astro.api.chat.repository.LastMessageProjection;
 import com.astro.api.common.exception.BusinessException;
+import com.astro.api.common.exception.ConflictException;
 import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.user.mapper.UserAvatarMapper;
 import com.astro.api.user.repository.UserChatProjection;
@@ -59,17 +65,22 @@ public class ChatService {
     private final UserAvatarService userAvatarService;
     private final ChatMessageMapper chatMessageMapper;
     private final ChatMessagePublisher messagePublisher;
-    private static final String UNREAD_PROCESSED_KEY_PREFIX = "chat:unread:processed:";
+    private final ChatPushSettings pushSettings;
+    private final ChatPushOutbox pushOutbox;
+    private static final String UNREAD_PROCESSED_KEY_PREFIX = "conversa:nao_lidas:processadas:";
 
     public ChatService(UserRepository userRepository, ChatMongoRepository chatMongoRepository,
                        StringRedisTemplate redisTemplate, UserAvatarService userAvatarService,
-                       ChatMessageMapper chatMessageMapper, ChatMessagePublisher messagePublisher) {
+                       ChatMessageMapper chatMessageMapper, ChatMessagePublisher messagePublisher,
+                       ChatPushSettings pushSettings, ChatPushOutbox pushOutbox) {
         this.userRepository = userRepository;
         this.chatMongoRepository = chatMongoRepository;
         this.redisTemplate = redisTemplate;
         this.userAvatarService = userAvatarService;
         this.chatMessageMapper = chatMessageMapper;
         this.messagePublisher = messagePublisher;
+        this.pushSettings = pushSettings;
+        this.pushOutbox = pushOutbox;
     }
 
     @Transactional(readOnly = true)
@@ -251,7 +262,7 @@ public class ChatService {
     }
 
     private String unreadKey(String conversationId, Long userId) {
-        return "chat:unread:%s:%d".formatted(conversationId, userId);
+        return "conversa:nao_lidas:%s:%d".formatted(conversationId, userId);
     }
 
     private int parseCount(String count) {
@@ -271,27 +282,17 @@ public class ChatService {
         String conversationId = normalizeOptionalUuid(request.getConversationId(), "conversationId");
         String replyId = normalizeOptionalUuid(request.getReplyToMessageId(), "replyToMessageId");
         String clientMessageId = normalizeOptionalUuid(request.getClientMessageId(), "clientMessageId");
-        Long recipientId = request.getRecipientId();
-        if (conversationId != null) {
-            ConversationDocument conversation = chatMongoRepository.findConversation(conversationId);
-            if (conversation == null) throw new ResourceNotFoundException("Conversa não encontrada");
-            if (conversation.participants() == null || conversation.participants().size() != 2
-                    || !conversation.participants().contains(senderId)) {
-                throw new AccessDeniedException("Usuário não participa desta conversa");
-            }
-            recipientId = conversation.participants().stream().filter(id -> !senderId.equals(id)).findFirst()
-                    .orElseThrow(() -> new AccessDeniedException("Conversa inválida"));
-        }
-        validateParticipants(principal, recipientId);
+        Long recipientId = resolveRecipient(principal, request.getRecipientId(), conversationId);
+        ChatPushParticipants pushParticipants = validateParticipants(principal, recipientId);
         String selectedConversationId = conversationId;
         ChatMessageDocument message;
         try {
             message = persistSend(senderId, recipientId, selectedConversationId,
-                    request.getContent(), replyId, clientMessageId);
+                    request.getContent(), replyId, clientMessageId, pushParticipants);
         } catch (MongoException exception) {
             if (exception.getCode() != 11000 && exception.getCode() != 112) throw exception;
             message = recoverOrRetry(senderId, recipientId, selectedConversationId,
-                    request.getContent(), replyId, clientMessageId);
+                    request.getContent(), replyId, clientMessageId, pushParticipants);
         }
         String unreadKey = unreadKey(message.conversationId(), recipientId);
         String processedKey = UNREAD_PROCESSED_KEY_PREFIX + message.conversationId();
@@ -307,6 +308,36 @@ public class ChatService {
                 message.senderId(), message.content(), message.replyToMessageId(), message.createdAt());
         messagePublisher.publish(recipientId, response);
         return response;
+    }
+
+    @Transactional(readOnly = true)
+    public ChatTypingTarget authorizeTyping(ChatPrincipal principal, Long recipientId, String conversationId) {
+        String normalizedId = normalizeOptionalUuid(conversationId, "conversationId");
+        Long recipient = resolveRecipient(principal, recipientId, normalizedId);
+        validateParticipants(principal, recipient);
+        if (normalizedId == null) {
+            ConversationDocument existing = uniqueConversation(chatMongoRepository.findConversationsByPair(principal.collaboratorId(), recipient));
+            if (existing != null) normalizedId = existing.id();
+            else normalizedId = ChatMessageIds.forConversation(principal.collaboratorId(), recipient);
+        }
+        return new ChatTypingTarget(normalizedId, recipient);
+    }
+
+    private Long resolveRecipient(ChatPrincipal principal, Long recipientId, String conversationId) {
+        Long senderId = principal.collaboratorId();
+        if (conversationId != null) {
+            ConversationDocument conversation = chatMongoRepository.findConversation(conversationId);
+            if (conversation == null) throw new ResourceNotFoundException("Conversa não encontrada");
+            if (conversation.participants() == null || conversation.participants().size() != 2
+                    || conversation.participants().stream().anyMatch(Objects::isNull)
+                    || conversation.participants().getFirst().equals(conversation.participants().getLast())
+                    || !conversation.participants().contains(senderId)) {
+                throw new AccessDeniedException("Usuário não participa desta conversa");
+            }
+            recipientId = conversation.participants().stream().filter(id -> !senderId.equals(id)).findFirst()
+                    .orElseThrow(() -> new AccessDeniedException("Conversa inválida"));
+        }
+        return recipientId;
     }
 
     private UserChatProjection authorizeCurrentUser(AuthenticatedUser authenticatedUser) {
@@ -332,11 +363,11 @@ public class ChatService {
     }
 
     private ChatMessageDocument persistSend(Long senderId, Long recipientId, String requestedConversationId,
-                                           String content, String replyId, String clientMessageId) {
+                                           String content, String replyId, String clientMessageId, ChatPushParticipants pushParticipants) {
         return chatMongoRepository.inTransaction(session -> {
             ChatMessageDocument duplicate = chatMongoRepository.findMessage(session, senderId, clientMessageId);
             ConversationDocument conversation = requestedConversationId == null
-                    ? chatMongoRepository.findConversationByPair(session, senderId, recipientId)
+                    ? uniqueConversation(chatMongoRepository.findConversationsByPair(session, senderId, recipientId))
                     : chatMongoRepository.findConversationById(session, requestedConversationId);
             if (conversation == null) {
                 if (requestedConversationId != null) throw new ResourceNotFoundException("Conversa não encontrada");
@@ -361,17 +392,21 @@ public class ChatService {
             ChatMessageDocument message = new ChatMessageDocument(ChatMessageIds.forMessage(senderId, clientMessageId), conversation.id(),
                     senderId, content, replyId, Instant.now());
             chatMongoRepository.insertMessage(session, message);
+            if (pushSettings.enabled() && pushParticipants.recipient().getFirebaseUid() != null
+                    && !pushParticipants.recipient().getFirebaseUid().isBlank()) {
+                pushOutbox.insert(session, ChatPushEventMapper.from(message, pushParticipants));
+            }
             return message;
         });
     }
 
     private ChatMessageDocument recoverOrRetry(Long senderId, Long recipientId,
                                                String requestedConversationId, String content, String replyId,
-                                               String clientMessageId) {
+                                               String clientMessageId, ChatPushParticipants pushParticipants) {
         ChatMessageDocument existing = chatMongoRepository.findMessageByIdempotency(senderId, clientMessageId);
         if (existing != null) {
-            ConversationDocument existingConversation = chatMongoRepository.findConversationByPair(
-                    senderId, recipientId);
+            ConversationDocument existingConversation = uniqueConversation(chatMongoRepository.findConversationsByPair(
+                    senderId, recipientId));
             if (existingConversation == null || !existing.conversationId().equals(existingConversation.id())
                     || !sameOperation(existing, requestedConversationId == null
                     ? existing.conversationId() : requestedConversationId, content, replyId)) {
@@ -381,16 +416,24 @@ public class ChatService {
         }
         try {
             return persistSend(senderId, recipientId, requestedConversationId,
-                    content, replyId, clientMessageId);
+                    content, replyId, clientMessageId, pushParticipants);
         } catch (MongoException retryException) {
             ChatMessageDocument raced = chatMongoRepository.findMessageByIdempotency(senderId, clientMessageId);
             ConversationDocument racedConversation = raced == null ? null
-                    : chatMongoRepository.findConversationByPair(senderId, recipientId);
+                    : uniqueConversation(chatMongoRepository.findConversationsByPair(senderId, recipientId));
             if (raced != null && racedConversation != null && raced.conversationId().equals(racedConversation.id())
                     && sameOperation(raced, requestedConversationId == null
                     ? raced.conversationId() : requestedConversationId, content, replyId)) return raced;
             throw retryException;
         }
+    }
+
+    private ConversationDocument uniqueConversation(List<ConversationDocument> conversations) {
+        if (conversations.size() > 1) {
+            throw new ConflictException("Há mais de uma conversa para o mesmo par de participantes.");
+        }
+        if (conversations.isEmpty()) return null;
+        return conversations.getFirst();
     }
 
     private static boolean sameOperation(ChatMessageDocument message, String conversationId,
@@ -400,7 +443,7 @@ public class ChatService {
                 && Objects.equals(message.replyToMessageId(), replyId);
     }
 
-    private void validateParticipants(ChatPrincipal principal, Long recipientId) {
+    private ChatPushParticipants validateParticipants(ChatPrincipal principal, Long recipientId) {
         if (recipientId == null || recipientId <= 0) throw new BusinessException("recipientId inválido");
         if (principal == null || principal.collaboratorId() == null || principal.collaboratorId().equals(recipientId)) {
             throw new BusinessException("Não é permitido enviar mensagem para si mesmo");
@@ -427,6 +470,7 @@ public class ChatService {
         if (!ChatCommunicationPolicy.canCommunicate(sender.getType(), recipient.getType())) {
             throw new AccessDeniedException("Comunicação entre estes perfis não é permitida");
         }
+        return new ChatPushParticipants(sender, recipient);
     }
 
     private static void validatePayload(ChatSendRequest request) {

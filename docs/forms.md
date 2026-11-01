@@ -117,7 +117,13 @@ Cada alternativa aceita 2 a 100 opções, com no máximo uma marcada `other`.
 O texto de `other` é normalizado para `Outros`; seu campo de resposta pertence ao mobile.
 Fotos aceitam 1 a 10 arquivos e limites de 5, 10, 20, 50 ou 100 MB por arquivo.
 O padrão de foto é 1 arquivo de até 10 MB. Não há upload de fotos nessas rotas.
-Esses limites também se aplicam a rascunhos, que podem ter opções e enunciados vazios.
+Esses valores configuram a pergunta; no envio das respostas o limite efetivo é
+o menor entre o valor configurado e 50 MiB por imagem. O limite global da
+requisição multipart também se aplica. Consulte [respostas](forms-responses.md).
+Em rascunhos, os limites máximos e a regra de no máximo uma opção `other`
+continuam valendo, mas a pergunta de alternativa pode ter menos de duas opções;
+opções e enunciados podem estar vazios. Na publicação, opções comuns precisam
+ter texto não vazio.
 
 O `_id` dos formulários é um UUID versão 4 gerado por `UUID.randomUUID()` no Java,
 salvo como string no MongoDB e exposto como `id` na API, inclusive na Home mobile.
@@ -174,24 +180,24 @@ retornam 409. O destinatário passa a enxergar o formulário após a publicaçã
 
 ## Persistência e compatibilidade
 
-A collection é `forms`, com um documento por formulário e perguntas embutidas.
+A collection é `formularios`, com um documento por formulário e perguntas embutidas.
 Os documentos novos usam `_id` do tipo string UUID. IDs numéricos ou ObjectIds antigos exigem
 migração explícita, incluindo referências externas; a API não os converte automaticamente.
-O campo `id_workspace` é obrigatório para acesso pelas rotas web. Documentos antigos
+O campo `workspace_id` é obrigatório para acesso pelas rotas web. Documentos antigos
 sem esse vínculo não ficam acessíveis até uma migração explícita e conferida.
 A Home mobile passa a consultar somente documentos com `status: PENDENTE`.
 Documentos antigos precisam ter seu status definido antes de aparecer nessa consulta.
 Não inferimos conclusão a partir de perguntas opcionais sem resposta.
 Opções antigas como arrays de strings precisam ser migradas para objetos com
-`id_opcao`, `texto` e `outra` antes de usar a consulta completa/edição web.
+`opcao_id`, `texto` e `outra` antes de usar a consulta completa/edição web.
 
 Índices sugeridos para provisionamento no banco (a API não altera índices ao iniciar):
 
 ```javascript
-db.forms.createIndex({id_workspace: 1, criado_em: -1, _id: -1})
-db.forms.createIndex({id_workspace: 1, id_gestor_remetente: 1, criado_em: -1, _id: -1})
-db.forms.createIndex({id_workspace: 1, id_gestor: 1, status: 1, criado_em: -1, _id: -1})
-db.forms.createIndex({id_gestor: 1, status: 1, data_limite: 1, _id: 1})
+db.formularios.createIndex({workspace_id: 1, criado_em: -1, _id: -1})
+db.formularios.createIndex({workspace_id: 1, gestor_remetente_id: 1, criado_em: -1, _id: -1})
+db.formularios.createIndex({workspace_id: 1, gestor_id: 1, status: 1, criado_em: -1, _id: -1})
+db.formularios.createIndex({gestor_id: 1, status: 1, data_limite: 1, _id: 1})
 ```
 
 ## Organização do módulo
@@ -222,8 +228,8 @@ gravação/exclusão, protegendo inclusive respostas recebidas após a leitura d
 Os identificadores Java usam inglês, incluindo `nrCode`, `DRAFT`, `PENDING`,
 `COMPLETED`, `TEXT`, `OPTION`, `PHOTO` e `DATE`. Os DTOs usam diretamente os
 nomes Java no JSON, incluindo `nrCode`, `managerId`, `questions`, `required` e `answer`.
-Os campos físicos do MongoDB continuam mapeados por `@Field`, incluindo `nr`,
-`id_gestor`, `perguntas` e `resposta`. Os valores de enum permanecem `RASCUNHO`, `PENDENTE`, `CONCLUIDO`,
+Os campos físicos do MongoDB são mapeados por `@Field`, incluindo `nr_id`,
+`gestor_id`, `perguntas` e `resposta`. Os valores de enum permanecem `RASCUNHO`, `PENDENTE`, `CONCLUIDO`,
 `texto`, `alternativa`, `foto` e `data`. A Home mobile mantém o contrato próprio
 existente; esta mudança se aplica aos bodies e respostas dos endpoints `/forms`.
 
@@ -247,3 +253,11 @@ A continuação do fluxo mobile, com envio de respostas/imagens e análise web, 
 - `FormQuestionDefinitionRequest` define cada pergunta dessa lista: tipo, enunciado, obrigatoriedade, opções e limites de fotos.
 
 Um formulário com cinco perguntas usa um `FormRequest` com cinco itens `FormQuestionDefinitionRequest` em `questions`. Os nomes distinguem as operações no formulário da definição de suas perguntas.
+
+## Aparência e nomes físicos no Mongo
+
+`POST /forms` e `PUT /forms/{id}` aceitam `appearance: { "icon": "calendar", "color": "orange" }`. Detalhes e itens da listagem retornam appearance opcional/null. Cor e ícone são validados pelo catálogo permitido. Sem appearance em uma edição, a configuração anterior é preservada. O bloqueio de alterações após respostas permanece.
+
+A coleção física passa a `formularios`, com `configuracao.icone` e `configuracao.cor`; o título tem até 100 caracteres e não contém marcadores de aparência. Referências usam sufixo `_id`, como `workspace_id`, `gestor_id`, `gestor_remetente_id`, `unidade_id` e `nr_id`. DTOs HTTP permanecem camelCase. Migrar os dados antigos antes de disponibilizar as novas versões; o procedimento está no repositório banco-de-dados, em mongo/docs/migracao-padronizacao.md.
+
+Quando `appearance` é informado em POST ou PUT, `icon` e `color` devem estar presentes, não podem ser nulos ou conter apenas espaços e precisam pertencer aos catálogos permitidos. Valores inválidos retornam HTTP 400 com `success: false` e erros identificados como `appearance.icon` ou `appearance.color`, antes de chamar o service. Omitir `appearance` ou enviá-lo como null continua permitido.

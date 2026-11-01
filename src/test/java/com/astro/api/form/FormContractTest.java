@@ -77,9 +77,9 @@ class FormContractTest {
         assertEquals("Queda", response.get("questions").get(0).get("options").get(0).get("text").asString());
         assertEquals(3, response.get("questions").get(1).get("maxFiles").asInt());
         assertTrue(response.get("questions").get(0).get("answer").isArray());
-        assertFalse(response.has("id_gestor"));
+        assertFalse(response.has("gestor_id"));
         assertFalse(response.has("perguntas"));
-        assertFalse(response.get("questions").get(0).has("id_pergunta"));
+        assertFalse(response.get("questions").get(0).has("pergunta_id"));
     }
 
     @Test void englishEnumsKeepTheExistingJsonValues() {

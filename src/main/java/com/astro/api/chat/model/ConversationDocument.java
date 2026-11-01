@@ -8,5 +8,5 @@ import java.util.List;
 @Document("conversas")
 public record ConversationDocument(
         @Id String id,
-        @Field("participantes") List<Long> participants
+        @Field("participantes_ids") List<Long> participants
 ) { }

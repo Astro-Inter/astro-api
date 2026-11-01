@@ -11,6 +11,24 @@ import static org.mockito.Mockito.*;
 
 class PreRegistrationQueueServiceTest {
     @Test
+    void resendUsesTheExistingQueueAndRequiresRedisAcknowledgement() {
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        @SuppressWarnings("unchecked") ListOperations<String, String> operations = mock(ListOperations.class);
+        when(redis.opsForList()).thenReturn(operations);
+        PreRegistrationQueueService service = new PreRegistrationQueueService(redis);
+        when(operations.rightPush("processamento:email:colaborador", "ana@astro.com")).thenReturn(1L);
+        service.enqueueCollaboratorEmail("ana@astro.com");
+        verify(operations).rightPush("processamento:email:colaborador", "ana@astro.com");
+        when(operations.rightPush(anyString(), anyString())).thenReturn(null);
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessResourceFailureException.class,
+                () -> service.enqueueCollaboratorEmail("ana@astro.com"));
+        when(operations.rightPush(anyString(), anyString()))
+                .thenThrow(new org.springframework.data.redis.RedisConnectionFailureException("Indisponível"));
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.data.redis.RedisConnectionFailureException.class,
+                () -> service.enqueueCollaboratorEmail("ana@astro.com"));
+    }
+
+    @Test
     void sendsAllCollaboratorEmailsInOneRedisListOperation() {
         StringRedisTemplate redis = mock(StringRedisTemplate.class);
         @SuppressWarnings("unchecked") ListOperations<String, String> listOperations = mock(ListOperations.class);

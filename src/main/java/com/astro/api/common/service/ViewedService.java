@@ -31,6 +31,13 @@ public class ViewedService {
     }
 
     private String key(Long userId, String resource) {
-        return "%s:viewed:%d".formatted(resource, userId);
+        String resourceName = switch (resource) {
+            case "events" -> "eventos";
+            case "notifications" -> "notificacoes";
+            case "validations" -> "validacoes";
+            case "forms" -> "formularios";
+            default -> throw new IllegalArgumentException("Recurso de visualização inválido");
+        };
+        return "%s:visualizados:%d".formatted(resourceName, userId);
     }
 }

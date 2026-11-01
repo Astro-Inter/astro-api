@@ -1,6 +1,7 @@
 package com.astro.api.home.service;
 
 import com.astro.api.home.mapper.WorkspaceHomeMapper;
+import com.astro.api.home.mapper.ManagerHomeMapper;
 import com.astro.api.home.service.WorkspaceHomeProfileService;
 
 import com.astro.api.auth.security.AuthenticatedUser;
@@ -33,7 +34,9 @@ class ManagerHomeServiceTest {
     private final ViewedService viewedService = mock(ViewedService.class);
     private final UserAvatarService userAvatarService = mock(UserAvatarService.class);
     private final HomeService service = new HomeService(homeRepository, JsonMapper.builder().build(),
-            mock(NotificationService.class), viewedService, formService, userAvatarService, new WorkspaceHomeMapper(JsonMapper.builder().build()), mock(WorkspaceHomeProfileService.class));
+            mock(NotificationService.class), viewedService, formService, userAvatarService,
+            new ManagerHomeMapper(), new WorkspaceHomeMapper(JsonMapper.builder().build()),
+            mock(WorkspaceHomeProfileService.class));
     private final AuthenticatedUser manager = new AuthenticatedUser("manager", "manager@astro.com", Role.GESTOR);
 
     @Test
@@ -42,8 +45,8 @@ class ManagerHomeServiceTest {
                 {"username":"Ana Dias","workspace_name":"Metalúrgica Brasilfer Ltda",
                  "indicators":{"current_events":3,"pending_validations":15,"collaborators_with_pending_events":34},
                  "pending_validations":[
-                   {"id":201,"collaborator_name":"João Lima","event_title":"Treinamento de EPI"},
-                   {"id":202,"collaborator_name":"Maria Silva","event_title":"NR-12"}]}
+                   {"id":201,"user_id":11,"event_id":21,"collaborator_name":"João Lima","event_title":"Treinamento de EPI"},
+                   {"id":202,"participant_id":12,"event_id":22,"collaborator_name":"Maria Silva","event_title":"NR-12"}]}
                 """);
         when(homeRepository.findByFirebaseUid("manager")).thenReturn(Optional.of(userId(2L)));
         when(userAvatarService.findUrl(2L)).thenReturn("https://example.com/manager.jpg");
@@ -58,6 +61,10 @@ class ManagerHomeServiceTest {
         assertEquals("https://example.com/manager.jpg", response.profilePhotoUrl());
         assertEquals(15, response.indicators().pendingValidations());
         assertEquals(2, response.pendingValidations().size());
+        assertEquals(11L, response.pendingValidations().getFirst().participantId());
+        assertEquals(21L, response.pendingValidations().getFirst().eventId());
+        assertEquals(12L, response.pendingValidations().get(1).participantId());
+        assertEquals(22L, response.pendingValidations().get(1).eventId());
         assertFalse(response.pendingValidations().getFirst().viewed());
         assertTrue(response.pendingValidations().get(1).viewed());
         assertEquals("00000000-0000-0000-0000-00000000012d", response.pendingForms().getFirst().id());

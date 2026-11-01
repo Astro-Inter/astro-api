@@ -159,6 +159,17 @@ class ChatStompAuthInterceptorTest {
                 () -> interceptor.preSend(frame(StompCommand.CONNECT, "Bearer temporary-failure", null, null), channel));
     }
 
+    @Test
+    void allowsOnlyAuthenticatedTypingDestinations() {
+        ChatPrincipal principal = new ChatPrincipal(25L, 7L, Role.GESTOR_WORKSPACE, "uid");
+        interceptor.preSend(frame(StompCommand.SEND, null, "/app/chat.typing", principal), channel);
+        interceptor.preSend(frame(StompCommand.SUBSCRIBE, null, "/user/queue/typing", principal), channel);
+        assertThrows(AccessDeniedException.class,
+                () -> interceptor.preSend(frame(StompCommand.SEND, null, "/app/chat.typing", null), channel));
+        assertThrows(AccessDeniedException.class,
+                () -> interceptor.preSend(frame(StompCommand.SUBSCRIBE, null, "/queue/typing", principal), channel));
+    }
+
     private static ChatConnectionProjection connection(UserType type, UserStatus status, boolean unitActive) {
         ChatConnectionProjection projection = mock(ChatConnectionProjection.class);
         when(projection.getId()).thenReturn(25L);

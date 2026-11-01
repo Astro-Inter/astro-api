@@ -18,6 +18,16 @@ e a incluem nas pendentes. Consulte [o contrato completo](api-events.md).
 
 `GET /events/collaborator` inclui `participationStatus` para mostrar a situação da conclusão de cada colaborador: `PENDENTE` quando ainda não foi enviada, `EM_ANALISE` após o envio e enquanto aguarda validação, `CONCLUIDO` após aprovação e `REJEITADO` quando o gestor solicita correção. A situação da conclusão é independente do prazo da turma.
 
+A listagem retorna `data` como array de participações com `id` do evento,
+`eventTitle`, `classLimitDate`, `viewed`, `participationStatus`, `className` e
+`eventStatus`, ordenadas pelo término da turma decrescente. O detalhe retorna
+`eventId`, `eventTitle`, `classLimitDate`, `participationStatus`, `eventStatus`,
+`classStatus`, `eventDescription`, `complianceValidity`, `externalLink`,
+`managerId`, `managerName`, `evidenceMandatory`, `completionMode` e `evidences`.
+Para uma conclusão aprovada com NR, `complianceValidity` é lida da conformidade
+associada à conclusão; se não houver conformidade, é `null`. As evidências do
+detalhe são retornadas para conclusões aprovadas e incluem URLs temporárias.
+
 `GET /events/collaborator/{eventId}` retorna os detalhes apenas para um participante autorizado e não altera estado. Para registrar a visualização, o cliente chama `PATCH /events/collaborator/{eventId}/viewed`; assim, `viewed` na listagem passa a `true` e a Home deixa de exibir o evento como novo. Essa operação não cria nem envia uma conclusão: `participationStatus` permanece `PENDENTE` até o colaborador enviar a conclusão para validação.
 
 `PATCH /events/{eventId}/participants/{participantId}/rejection`

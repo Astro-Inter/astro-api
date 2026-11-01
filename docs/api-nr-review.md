@@ -4,7 +4,7 @@ Todas as rotas em `/admin/nrs` exigem token Firebase válido e perfil ADMIN cons
 
 ## Contrato HTTP
 
-As respostas usam o envelope `ApiResult`. Snapshots contêm `document`, `revision` e `approvedRevision`. O documento preserva os campos MongoDB em português. A revisão é SHA-256 do BSON com chaves ordenadas; `approvedRevision` vale `absent` quando não há versão publicada. Em consultas de catálogo, esse último campo não é usado e também vale `absent`.
+As respostas usam o envelope `ApiResult`. Snapshots contêm `document`, `revision` e `approvedRevision`. O documento preserva os campos MongoDB em português. A revisão é SHA-256 da representação JSON UTF-8 do documento BSON, com chaves de objetos ordenadas recursivamente; `approvedRevision` vale `absent` quando não há versão publicada. Em consultas de catálogo, esse último campo não é usado e também vale `absent`.
 
 | Método | Caminho | Operação |
 | --- | --- | --- |
@@ -33,7 +33,7 @@ O retorno acrescenta `sqlSynchronized`. Em falha SQL, a aprovação permanece co
 
 Não existe transação distribuída entre MongoDB e PostgreSQL. Cada tentativa obtém um bloqueio por NR pela API de chamadas de funções do Spring e lê a versão publicada atual após obter o bloqueio. A transação SQL tem limite de 10 segundos; repetições são idempotentes e removem somente o próprio job. Leituras, conflitos e rollback MongoDB não chamam a procedure.
 
-O sincronizador diário existente continua independente. Não existe endpoint para disparar a procedure separadamente.
+A API possui o agendador de repetição descrito acima. Não existe endpoint para disparar a procedure separadamente; eventual sincronizador externo deve ser conferido no ambiente onde é executado.
 
 ## Validação
 

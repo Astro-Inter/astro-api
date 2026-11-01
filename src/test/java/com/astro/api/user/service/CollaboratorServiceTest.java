@@ -59,13 +59,66 @@ class CollaboratorServiceTest {
     final PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
     final UserAvatarService avatars = mock(UserAvatarService.class);
     final UserService userService = mock(UserService.class);
+    final com.astro.api.workspace.service.PreRegistrationQueueService queue = mock(com.astro.api.workspace.service.PreRegistrationQueueService.class);
     final CollaboratorService service = new CollaboratorService(repository, users, new CollaboratorMapper(), roles, units,
-            events, identities, new CollaboratorStatusPolicy(), transactionManager, avatars, userService);
+            events, identities, new CollaboratorStatusPolicy(), transactionManager, avatars, userService, queue);
     final AuthenticatedUser principal = new AuthenticatedUser("manager", "manager@example.com", Role.GESTOR);
     User manager;
     Workspace workspace;
     com.astro.api.role.model.Role role;
     Unit destination;
+
+    @Test
+    void resendsOnlyTheStoredEmailWithoutChangingTheCollaboratorOrCreatingAnIdentity() {
+        User target = collaborator(UserStatus.PRE_CADASTRADO, null);
+        service.resendAccessKey(2L, principal);
+        verify(queue).enqueueCollaboratorEmail("old@example.com");
+        assertEquals(UserStatus.PRE_CADASTRADO, target.getStatus());
+        assertNull(target.getFirebaseUid());
+        verify(repository, never()).saveAndFlush(any());
+        verifyNoInteractions(events, identities, avatars);
+    }
+
+    @Test
+    void refusesResendForCompletedInactiveAndOtherProfileUsers() {
+        for (UserStatus status : List.of(UserStatus.ATIVO, UserStatus.DESATIVADO)) {
+            collaborator(status, null);
+            assertThrows(BusinessException.class, () -> service.resendAccessKey(2L, principal));
+        }
+        collaborator(UserStatus.PRE_CADASTRADO, "completed");
+        assertThrows(BusinessException.class, () -> service.resendAccessKey(2L, principal));
+        manager.setType(UserType.GESTOR_WORKSPACE);
+        AuthenticatedUser owner = new AuthenticatedUser("manager", "manager@example.com", Role.GESTOR_WORKSPACE);
+        for (UserType type : List.of(UserType.GESTOR, UserType.GESTOR_WORKSPACE)) {
+            User target = collaborator(UserStatus.PRE_CADASTRADO, null);
+            target.setType(type);
+            assertThrows(BusinessException.class, () -> service.resendAccessKey(2L, owner));
+        }
+        verifyNoInteractions(queue);
+    }
+
+    @Test
+    void refusesResendWithoutManagerPermissionOrScopedTarget() {
+        assertThrows(AccessDeniedException.class, () -> service.resendAccessKey(2L, null));
+        assertThrows(BusinessException.class, () -> service.resendAccessKey(0L, principal));
+        assertThrows(ResourceNotFoundException.class, () -> service.resendAccessKey(2L, principal));
+        User target = collaborator(UserStatus.PRE_CADASTRADO, null);
+        target.setType(UserType.GESTOR);
+        assertThrows(AccessDeniedException.class, () -> service.resendAccessKey(2L, principal));
+        manager.setStatus(UserStatus.DESATIVADO);
+        assertThrows(AccessDeniedException.class, () -> service.resendAccessKey(2L, principal));
+        verifyNoInteractions(queue);
+    }
+
+    @Test
+    void propagatesRedisFailureInsteadOfReportingAResend() {
+        collaborator(UserStatus.PRE_CADASTRADO, null);
+        doThrow(new org.springframework.data.redis.RedisConnectionFailureException("Redis indisponível"))
+                .when(queue).enqueueCollaboratorEmail(any());
+        assertThrows(org.springframework.data.redis.RedisConnectionFailureException.class,
+                () -> service.resendAccessKey(2L, principal));
+        verify(repository, never()).saveAndFlush(any());
+    }
 
     @BeforeEach
     void setUp() {

@@ -36,9 +36,12 @@ class ChatMessageSendTest {
     private final StringRedisTemplate redis = mock(StringRedisTemplate.class);
     private final UserAvatarService avatars = mock(UserAvatarService.class);
     private final ChatMessagePublisher messagePublisher = mock(ChatMessagePublisher.class);
+    private final com.astro.api.chat.push.ChatPushSettings pushSettings = mock(com.astro.api.chat.push.ChatPushSettings.class);
+    private final com.astro.api.chat.push.ChatPushOutbox pushOutbox = mock(com.astro.api.chat.push.ChatPushOutbox.class);
     private final ChatPrincipal sender = new ChatPrincipal(1L, 10L, Role.COLABORADOR, "uid-1");
     private final ChatService service = new ChatService(users, mongo, redis, avatars,
-            new ChatMessageMapper(), messagePublisher);
+            new ChatMessageMapper(), messagePublisher,
+            pushSettings, pushOutbox);
 
     @BeforeEach
     void setUp() {
@@ -53,7 +56,7 @@ class ChatMessageSendTest {
     @Test
     void createsConversationAndPersistsMessageBeforeRedisAndPrivateDelivery() {
         ChatSendRequest request = request(2L, "Olá", "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
-        when(mongo.findConversationByPair(null, 1L, 2L)).thenReturn(null);
+        when(mongo.findConversationsByPair(null, 1L, 2L)).thenReturn(List.of());
         when(mongo.findMessage(null, 1L, request.getClientMessageId())).thenReturn(null);
 
         var response = service.send(sender, request);
@@ -65,27 +68,43 @@ class ChatMessageSendTest {
         verify(mongo).insertConversation(any(), any(ConversationDocument.class));
         verify(mongo).insertMessage(any(), any(ChatMessageDocument.class));
         verify(redis).execute(any(), eq(List.of(
-                "chat:unread:" + response.conversationId() + ":2",
-                "chat:unread:processed:" + response.conversationId())), eq(response.id()));
+                "conversa:nao_lidas:" + response.conversationId() + ":2",
+                "conversa:nao_lidas:processadas:" + response.conversationId())), eq(response.id()));
         verify(messagePublisher).publish(2L, response);
     }
 
     @Test
     void idempotentRetryReusesMessageAndRunsRedisDedupScriptAgain() {
+        when(pushSettings.enabled()).thenReturn(true);
         ChatSendRequest request = request(2L, "Olá", "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
         ConversationDocument conversation = new ConversationDocument("11111111-2222-4333-8444-555555555555",
                 List.of(1L, 2L));
         ChatMessageDocument original = new ChatMessageDocument(
                 ChatMessageIds.forMessage(1L, request.getClientMessageId()),
                 conversation.id(), 1L, "Olá", null, Instant.parse("2026-10-26T10:00:00Z"));
-        when(mongo.findConversationByPair(null, 1L, 2L)).thenReturn(conversation);
+        when(mongo.findConversationsByPair(null, 1L, 2L)).thenReturn(List.of(conversation));
         when(mongo.findMessage(null, 1L, request.getClientMessageId())).thenReturn(original);
 
         var response = service.send(sender, request);
 
         assertEquals(original.id(), response.id());
         verify(mongo, never()).insertMessage(any(), any());
+        verify(pushOutbox, never()).insert(any(), any());
         verify(redis).execute(any(), anyList(), eq(original.id()));
+    }
+
+    @Test
+    void queuesPushInsideMessageTransactionAndKeepsItWhenRealtimeDeliveryFails() {
+        when(pushSettings.enabled()).thenReturn(true);
+        when(redis.execute(any(), anyList(), any())).thenThrow(new org.springframework.data.redis.RedisConnectionFailureException("offline"));
+        assertThrows(ChatUnreadCounterException.class, () -> service.send(sender,
+                request(2L, "Olá", "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")));
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(mongo, pushOutbox, redis);
+        order.verify(mongo).insertMessage(any(), any());
+        order.verify(pushOutbox).insert(any(), org.mockito.ArgumentMatchers.argThat(event ->
+                event.recipientUid().equals("uid-2") && event.preview().equals("Olá")
+                        && event.senderId().equals(1L) && event.recipientId().equals(2L)));
+        order.verify(redis).execute(any(), anyList(), any());
     }
 
     @Test
@@ -108,6 +127,70 @@ class ChatMessageSendTest {
         verify(mongo, never()).inTransaction(any());
     }
 
+    @Test
+    void typingUsesCurrentParticipantAuthorizationWithoutPersistingOrSendingPush() {
+        com.astro.api.chat.model.ChatTypingTarget target = service.authorizeTyping(sender, 2L, null);
+        assertEquals(2L, target.recipientId());
+        assertEquals(ChatMessageIds.forConversation(1L, 2L), target.conversationId());
+        verify(mongo).findConversationsByPair(1L, 2L);
+        verify(mongo, never()).inTransaction(any());
+        org.mockito.Mockito.verifyNoInteractions(redis, pushOutbox, messagePublisher);
+    }
+
+    @Test
+    void typingUsesExistingConversationIdWhenSelectedByRecipient() {
+        String id = "11111111-2222-4333-8444-555555555555";
+        when(mongo.findConversationsByPair(1L, 2L)).thenReturn(List.of(new ConversationDocument(id, List.of(1L, 2L))));
+        assertEquals(id, service.authorizeTyping(sender, 2L, null).conversationId());
+        verify(mongo, never()).inTransaction(any());
+    }
+
+    @Test
+    void typingRejectsAnotherWorkspaceAndInactiveParticipant() {
+        ChatSendUserProjection peer = participant(2L, UserType.GESTOR, 20L);
+        ChatSendUserProjection senderUser = participant(1L, UserType.COLABORADOR, 10L);
+        when(users.findChatSendUsers(eq("uid-1"), anyList())).thenReturn(List.of(senderUser, peer));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.authorizeTyping(sender, 2L, null));
+        when(peer.getWorkspaceId()).thenReturn(10L);
+        when(peer.getStatus()).thenReturn(UserStatus.DESATIVADO);
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.authorizeTyping(sender, 2L, null));
+        org.mockito.Mockito.verifyNoInteractions(mongo, redis, pushOutbox, messagePublisher);
+    }
+
+    @Test
+    void typingRejectsConversationOfAnotherUser() {
+        String id = "11111111-2222-4333-8444-555555555555";
+        when(mongo.findConversation(id)).thenReturn(new ConversationDocument(id, List.of(2L, 3L)));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.authorizeTyping(sender, null, id));
+        verify(users, never()).findChatSendUsers(any(), anyList());
+    }
+
+    @Test
+    void rejectsDuplicateConversationsBeforePersistingMessage() {
+        ConversationDocument first = new ConversationDocument("first", List.of(1L, 2L));
+        ConversationDocument second = new ConversationDocument("second", List.of(1L, 2L));
+        when(mongo.findConversationsByPair(null, 1L, 2L)).thenReturn(List.of(first, second));
+        assertThrows(com.astro.api.common.exception.ConflictException.class,
+                () -> service.send(sender, request(2L, "Olá", "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")));
+        verify(mongo, never()).insertConversation(any(), any());
+        verify(mongo, never()).insertMessage(any(), any());
+        org.mockito.Mockito.verifyNoInteractions(redis, pushOutbox, messagePublisher);
+    }
+
+    @Test
+    void rejectsDuplicateConversationsDuringTypingAuthorization() {
+        ConversationDocument first = new ConversationDocument("first", List.of(1L, 2L));
+        ConversationDocument second = new ConversationDocument("second", List.of(1L, 2L));
+        when(mongo.findConversationsByPair(1L, 2L)).thenReturn(List.of(first, second));
+        assertThrows(com.astro.api.common.exception.ConflictException.class,
+                () -> service.authorizeTyping(sender, 2L, null));
+        verify(mongo, never()).inTransaction(any());
+        org.mockito.Mockito.verifyNoInteractions(redis, pushOutbox, messagePublisher);
+    }
+
     private static ChatSendRequest request(Long recipientId, String content, String clientMessageId) {
         ChatSendRequest request = new ChatSendRequest();
         request.setRecipientId(recipientId);
@@ -124,6 +207,8 @@ class ChatMessageSendTest {
         when(result.getUnitActive()).thenReturn(true);
         when(result.getWorkspaceId()).thenReturn(workspaceId);
         when(result.getAuthenticatedSender()).thenReturn(id == 1L);
+        when(result.getName()).thenReturn("Pessoa " + id);
+        when(result.getFirebaseUid()).thenReturn("uid-" + id);
         return result;
     }
 }

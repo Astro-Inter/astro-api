@@ -1,5 +1,27 @@
 # API de Chat
 
+## Listar conversas e contatos
+
+`GET /chats` e `GET /chats/contacts` exigem token Firebase e perfil
+`COLABORADOR`, `GESTOR` ou `GESTOR_WORKSPACE`. O usuário e o workspace são
+determinados pela identidade autenticada.
+
+`GET /chats` retorna HTTP 200 com um **array diretamente**, sem envelope
+`ApiResult`. Cada conversa tem `id`, `participant` (`id`, `name`, `role`,
+`profilePhotoUrl`, `avatarInitials`), `lastMessage` (`senderId`, `content`) e
+`unreadCount`. Inclui conversas válidas com dois participantes do mesmo
+workspace e ao menos uma mensagem; a ordenação é pela última mensagem mais
+recente e, em empate, pelo ID da conversa decrescente. O contador vem do Redis;
+valor ausente é zero. Sem conversas, retorna `[]`.
+
+`GET /chats/contacts` retorna `ApiResult` com array em `data`. Cada contato tem
+`id`, `name` e `role`. A consulta exclui o próprio usuário e considera usuários
+ativos em unidades ativas do mesmo workspace. Colaboradores podem consultar
+gestores; gestores podem consultar colaboradores e gestores. A conta solicitante
+também precisa estar ativa, em unidade ativa e com perfil coerente com o token.
+Os contatos são ordenados por nome e, em empate, por ID. Usuário inexistente
+retorna `404` e conta inelegível retorna `403`.
+
 ## WebSocket/STOMP para eventos privados
 
 O endpoint WebSocket é `GET /ws`. O handshake HTTP é permitido sem autenticação
@@ -38,7 +60,7 @@ destination:/user/queue/messages
 
 Cada instância mantém um broker simples para as conexões WebSocket locais.
 Eventos destinados a outras instâncias passam pelo canal Redis Pub/Sub
-`astro:chat:delivery:v1`; cada instância encaminha o evento somente às sessões
+`astro:conversa:entrega:v1`; cada instância encaminha o evento somente às sessões
 locais do usuário destinatário. Todas as instâncias precisam usar o mesmo Redis
 e ter permissão de publicação e assinatura nesse canal. O Pub/Sub não armazena
 eventos para clientes desconectados; nesses casos, o histórico REST permite
@@ -104,8 +126,8 @@ persistida. A consulta de pares existentes não tem índice personalizado e
 pode percorrer a collection `conversas`.
 
 Após persistir, o backend executa um script Lua no Redis que consulta o ID da
-mensagem em `chat:unread:processed:{conversationId}`, faz `INCR`
-`chat:unread:{conversationId}:{recipientId}` e registra o ID processado com
+mensagem em `conversa:nao_lidas:processadas:{conversationId}`, faz `INCR`
+`conversa:nao_lidas:{conversationId}:{recipientId}` e registra o ID processado com
 `SADD`, numa única execução atômica. O incremento é repetido
 com o mesmo ID não conta de novo. Se o Redis estiver indisponível após a
 gravação MongoDB, o servidor retorna erro correlacionado; o Android deve
@@ -223,10 +245,10 @@ participante não é consultado como critério de autorização, então sua
 desativação não bloqueia a leitura do histórico existente.
 
 Após autorizar, a API executa uma única operação Redis `DEL` na chave
-`chat:unread:{conversationId}:{userId}`, usando o ID PostgreSQL do usuário
+`conversa:nao_lidas:{conversationId}:{userId}`, usando o ID PostgreSQL do usuário
 autenticado. Por exemplo, para a conversa
 `11111111-2222-4333-8444-555555555555` e usuário `25`, a chave removida é
-`chat:unread:11111111-2222-4333-8444-555555555555:25`. A chave do outro
+`conversa:nao_lidas:11111111-2222-4333-8444-555555555555:25`. A chave do outro
 participante não é alterada. A remoção é idempotente, inclusive se a chave já
 não existir; erros de conexão Redis são propagados pelo tratamento central de
 infraestrutura.
@@ -250,3 +272,50 @@ O histórico e a busca de conversas por participantes não dependem de índices
 personalizados criados pela API. Sem índices apropriados já existentes no
 MongoDB, essas consultas podem ficar mais lentas conforme as collections
 crescem.
+
+
+## Indicador temporário de digitação (SCRUM-261)
+
+A conexão STOMP autenticada existente anuncia `astro-typing:1` no frame
+`CONNECTED`, preservando versão, identidade e heartbeats. Clientes novos só
+ativam o recurso quando recebem esse cabeçalho; clientes antigos continuam
+usando mensagens normalmente. Não foi adicionado endpoint HTTP.
+
+- Publicar em `/app/chat.typing`.
+- Inscrever em `/user/queue/typing` após conectar e novamente após reconectar.
+- Entrada `ChatTypingRequest`: `typing` obrigatório (boolean) e exatamente um
+  seletor: `recipientId` (Long) ou `conversationId` (UUID). Campos desconhecidos,
+  inclusive identidade do remetente e texto digitado, são rejeitados.
+- Saída `ChatTypingResponse`: `conversationId`, `senderId`, `typing`, `expiresAt`.
+  A identidade vem do principal autenticado e o prazo é calculado no servidor:
+  cinco segundos para início/renovação, instante atual para encerramento.
+- A autorização revalida participantes, identidade Firebase, perfil, status e
+  unidade ativos, workspace e política de comunicação do envio de mensagens.
+  Uma conversa informada precisa existir e incluir o remetente. Para um contato
+  autorizado, consulta a conversa existente pelo par antes de calcular um ID
+  pela regra determinística. Nenhum documento é criado.
+- O canal Redis `astro:conversa:digitacao:v1` distribui os eventos entre instâncias,
+  entregando somente na fila privada do destinatário. Eventos de início vencidos
+  são descartados. Não há replay offline, outbox, contador de não lidas ou push.
+- Redis limita renovações de início a uma por par em 1,5 segundo; parar remove
+  essa chave temporária e publica o encerramento. O cliente limita a dois segundos.
+- Erros usam `/user/queue/errors`, com `clientMessageId:null` e códigos
+  `TYPING_FORBIDDEN`, `TYPING_INVALID_REQUEST` ou `TYPING_UNAVAILABLE`.
+  São independentes da confirmação de envio de mensagens.
+
+O mobile exibe somente três pontinhos animados no final da conversa, em um
+item temporário separado do histórico. Apagar o texto, enviar, sair da conversa,
+ficar em segundo plano ou desconectar limpa o sinal. Um destinatário limpa o
+indicador ao receber a mensagem ou expirar o prazo, mesmo sem evento de parada.
+A animação respeita a configuração de animações do Android.
+
+Para validar: publicar esta API; conectar dois usuários autorizados do mesmo
+workspace, abrir a conversa nos dois clientes e digitar em um deles. Conferir
+os pontinhos no outro, renovação durante a digitação e desaparecimento ao parar,
+enviar, sair da tela ou desligar a rede. Usuários sem permissão e outros
+workspaces não devem receber eventos. API antiga deve manter o chat normal,
+com o indicador desativado por ausência do cabeçalho de capacidade.
+
+## Responsabilidades da persistência Mongo
+
+ChatMongoRepository encapsula consultas, projeções, cursores e gravações. ChatMongoMapper converte documentos BSON e modelos do chat, preservando resultados ausentes. A consulta por par retorna até duas conversas; ChatService valida a unicidade e responde com conflito quando há mais de uma. A busca por mensagem mantém o filtro de conversa e a sessão transacional no repository.

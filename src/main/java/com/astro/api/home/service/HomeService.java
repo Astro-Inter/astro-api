@@ -6,6 +6,7 @@ import com.astro.api.common.service.ViewedService;
 import com.astro.api.form.model.Form;
 import com.astro.api.form.service.FormService;
 import com.astro.api.home.dto.response.*;
+import com.astro.api.home.mapper.ManagerHomeMapper;
 import com.astro.api.home.repository.HomeRepository;
 import com.astro.api.home.mapper.WorkspaceHomeMapper;
 import com.astro.api.notification.model.Notification;
@@ -38,18 +39,21 @@ public class HomeService {
     private final ViewedService viewedService;
     private final FormService formService;
     private final UserAvatarService userAvatarService;
+    private final ManagerHomeMapper managerHomeMapper;
     private final WorkspaceHomeMapper workspaceHomeMapper;
     private final WorkspaceHomeProfileService workspaceHomeProfileService;
 
     public HomeService(HomeRepository homeRepository, JsonMapper objectMapper, NotificationService notificationService,
                        ViewedService viewedService, FormService formService, UserAvatarService userAvatarService,
-                       WorkspaceHomeMapper workspaceHomeMapper, WorkspaceHomeProfileService workspaceHomeProfileService) {
+                       ManagerHomeMapper managerHomeMapper, WorkspaceHomeMapper workspaceHomeMapper,
+                       WorkspaceHomeProfileService workspaceHomeProfileService) {
         this.homeRepository = homeRepository;
         this.objectMapper = objectMapper;
         this.notificationService = notificationService;
         this.viewedService = viewedService;
         this.formService = formService;
         this.userAvatarService = userAvatarService;
+        this.managerHomeMapper = managerHomeMapper;
         this.workspaceHomeMapper = workspaceHomeMapper;
         this.workspaceHomeProfileService = workspaceHomeProfileService;
     }
@@ -140,9 +144,7 @@ public class HomeService {
 
         return new ManagerHomeResponse(
                 databaseHome.username(), userAvatarService.findUrl(managerId), databaseHome.workspaceName(),
-                validations.stream().map(validation -> new PendingValidationResponse(
-                        validation.id(), validation.collaboratorName(), validation.eventTitle(),
-                        viewedValidations.contains(String.valueOf(validation.id())))).toList(),
+                managerHomeMapper.toPendingValidationResponses(validations, viewedValidations),
                 forms.stream().map(form -> new PendingFormResponse(
                         form.getId(), form.getTitle(), daysLeft(form.getDueDate()),
                         viewedForms.contains(String.valueOf(form.getId())))).toList(),

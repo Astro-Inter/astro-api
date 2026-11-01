@@ -55,7 +55,7 @@ public class NrSqlCatalogSynchronizer {
     private boolean synchronizeJob(Document job) {
         String jobId = job.getString("_id");
         try {
-            int nrId = job.getInteger("nrId");
+            int nrId = job.getInteger("nr_id");
             nrSqlCatalogRepository.synchronizeLocked(nrId, () -> latestPublishedPayload(nrId));
             nrReviewRepository.deleteSqlSyncJob(jobId);
             return true;

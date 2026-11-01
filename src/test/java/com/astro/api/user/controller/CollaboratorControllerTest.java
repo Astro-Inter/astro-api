@@ -51,6 +51,30 @@ class CollaboratorControllerTest {
                 new UsernamePasswordAuthenticationToken(principal, null, List.of()));
     }
 
+    @Test
+    void acceptsResendUsingOnlyThePathAndAuthenticatedManager() throws Exception {
+        mvc.perform(post("/collaborators/2/access-key/resend").param("email", "untrusted@example.com"))
+                .andExpect(status().isAccepted()).andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.path").value("/collaborators/2/access-key/resend"));
+        verify(service).resendAccessKey(2L, principal);
+    }
+
+    @Test
+    void reportsResendBusinessScopeAndQueueFailures() throws Exception {
+        doThrow(new com.astro.api.common.exception.BusinessException("Pré-cadastro necessário"))
+                .when(service).resendAccessKey(2L, principal);
+        mvc.perform(post("/collaborators/2/access-key/resend"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false));
+        doThrow(new ResourceNotFoundException("Colaborador não encontrado"))
+                .when(service).resendAccessKey(2L, principal);
+        mvc.perform(post("/collaborators/2/access-key/resend")).andExpect(status().isNotFound());
+        doThrow(new org.springframework.data.redis.RedisConnectionFailureException("Redis indisponível"))
+                .when(service).resendAccessKey(2L, principal);
+        mvc.perform(post("/collaborators/2/access-key/resend"))
+                .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.success").value(false));
+    }
+
     @AfterEach
     void cleanUp() { SecurityContextHolder.clearContext(); }
 

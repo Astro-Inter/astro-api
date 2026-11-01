@@ -7,5 +7,10 @@ public record FormSummaryResponse(
         String title,
         String description,
         int questionCount,
-        FormStatus status
-) {}
+        FormStatus status,
+        FormAppearanceResponse appearance
+) {
+    public FormSummaryResponse(String id, String title, String description, int questionCount, FormStatus status) {
+        this(id, title, description, questionCount, status, null);
+    }
+}

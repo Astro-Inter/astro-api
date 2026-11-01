@@ -22,6 +22,7 @@ import com.astro.api.role.repository.RoleRepository;
 import com.astro.api.unit.model.Unit;
 import com.astro.api.unit.repository.UnitRepository;
 import com.astro.api.workspace.event.PreRegisteredCollaboratorsCreatedEvent;
+import com.astro.api.workspace.service.PreRegistrationQueueService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import com.astro.api.auth.service.FirebaseIdentityService;
@@ -57,6 +58,7 @@ public class CollaboratorService {
     private final TransactionTemplate transactionTemplate;
     private final UserAvatarService userAvatarService;
     private final UserService userService;
+    private final PreRegistrationQueueService preRegistrationQueueService;
 
     public CollaboratorService(CollaboratorRepository collaboratorRepository, UserRepository userRepository,
                                CollaboratorMapper collaboratorMapper, RoleRepository roleRepository,
@@ -64,7 +66,7 @@ public class CollaboratorService {
                                FirebaseIdentityService firebaseIdentityService,
                                CollaboratorStatusPolicy collaboratorStatusPolicy,
                                PlatformTransactionManager transactionManager, UserAvatarService userAvatarService,
-                               UserService userService) {
+                               UserService userService, PreRegistrationQueueService preRegistrationQueueService) {
         this.collaboratorRepository = collaboratorRepository;
         this.userRepository = userRepository;
         this.collaboratorMapper = collaboratorMapper;
@@ -77,6 +79,7 @@ public class CollaboratorService {
         this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.userAvatarService = userAvatarService;
         this.userService = userService;
+        this.preRegistrationQueueService = preRegistrationQueueService;
     }
 
     @Transactional(readOnly = true)
@@ -170,6 +173,18 @@ public class CollaboratorService {
         User saved = persist(collaboratorMapper.toNewUser(body, role, unit));
         eventPublisher.publishEvent(new PreRegisteredCollaboratorsCreatedEvent(List.of(saved.getEmail())));
         return collaboratorMapper.toDetails(saved, null, true);
+    }
+
+    @Transactional
+    public void resendAccessKey(Long collaboratorId, AuthenticatedUser principal) {
+        User manager = requireManager(principal);
+        User collaborator = requireCollaborator(collaboratorId, principal, manager);
+        if (collaborator.getType() != UserType.COLABORADOR
+                || collaborator.getStatus() != UserStatus.PRE_CADASTRADO
+                || (collaborator.getFirebaseUid() != null && !collaborator.getFirebaseUid().isBlank())) {
+            throw new BusinessException("O reenvio da chave de acesso está disponível apenas para colaboradores pré-cadastrados");
+        }
+        preRegistrationQueueService.enqueueCollaboratorEmail(collaborator.getEmail());
     }
 
     private Role requireRole(Long roleId, Long workspaceId, boolean requireActive) {

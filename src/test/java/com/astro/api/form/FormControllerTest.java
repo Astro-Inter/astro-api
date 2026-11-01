@@ -7,6 +7,13 @@ import com.astro.api.common.exception.ResourceNotFoundException;
 import com.astro.api.common.handler.GlobalExceptionHandler;
 import com.astro.api.form.controller.FormController;
 import com.astro.api.form.dto.request.FormRequest;
+import com.astro.api.form.dto.request.FormAppearanceRequest;
+import com.astro.api.form.model.FormAppearance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import java.util.stream.Stream;
 import com.astro.api.form.dto.response.*;
 import com.astro.api.form.mapper.FormMapper;
 import com.astro.api.form.model.Form;
@@ -146,4 +153,72 @@ class FormControllerTest {
                 .andExpect(jsonPath("$.errors[0]").value(Matchers.containsString("O tipo da pergunta é obrigatório")));
         verifyNoInteractions(service);
     }
+    @ParameterizedTest
+    @MethodSource("invalidAppearances")
+    void rejectsInvalidAppearanceBeforeCallingCreateOrUpdate(String appearance, String field, String message) throws Exception {
+        String body = "{\"title\":\"Rascunho\",\"appearance\":" + appearance + "}";
+        String updatePath = "/forms/" + formId(1);
+        for (org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder request : List.of(
+                post("/forms"), put(updatePath))) {
+            mvc.perform(request.contentType("application/json").content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.errors").value(Matchers.hasItem(
+                            Matchers.containsString("appearance." + field + ": " + message))));
+        }
+        verifyNoInteractions(service);
+    }
+
+    static Stream<Arguments> invalidAppearances() {
+        return Stream.of(
+                Arguments.of("{\"icon\": null, \"color\": \"blue\"}", "icon", "Escolha um ícone válido."),
+                Arguments.of("{\"icon\": \"\", \"color\": \"blue\"}", "icon", "Escolha um ícone válido."),
+                Arguments.of("{\"icon\": \" \", \"color\": \"blue\"}", "icon", "Escolha um ícone válido."),
+                Arguments.of("{\"icon\": \"script\", \"color\": \"blue\"}", "icon", "Escolha um ícone válido."),
+                Arguments.of("{\"icon\": \"calendar\", \"color\": null}", "color", "Escolha uma cor válida."),
+                Arguments.of("{\"icon\": \"calendar\", \"color\": \"\"}", "color", "Escolha uma cor válida."),
+                Arguments.of("{\"icon\": \"calendar\", \"color\": \" \"}", "color", "Escolha uma cor válida."),
+                Arguments.of("{\"icon\": \"calendar\", \"color\": \"invalid\"}", "color", "Escolha uma cor válida."),
+                Arguments.of("{}", "icon", "Escolha um ícone válido."));
+    }
+
+    @Test
+    void validAppearanceReachesTheServiceAndIsReturnedInCreateAndUpdate() throws Exception {
+        Form form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.DRAFT);
+        form.setAppearance(new FormAppearance("calendar", "orange"));
+        when(service.create(any(), eq(principal))).thenReturn(new FormMapper().toDetails(form));
+        when(service.update(eq(formId(1)), any(), eq(principal))).thenReturn(new FormMapper().toDetails(form));
+        String body = "{\"title\":\"Rascunho\",\"appearance\":{\"icon\":\"calendar\",\"color\":\"orange\"}}";
+        mvc.perform(post("/forms").contentType("application/json").content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.appearance.icon").value("calendar"))
+                .andExpect(jsonPath("$.data.appearance.color").value("orange"));
+        mvc.perform(put("/forms/" + formId(1)).contentType("application/json").content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appearance.icon").value("calendar"))
+                .andExpect(jsonPath("$.data.appearance.color").value("orange"));
+        ArgumentCaptor<FormRequest> request = ArgumentCaptor.forClass(FormRequest.class);
+        verify(service).create(request.capture(), eq(principal));
+        verify(service).update(eq(formId(1)), request.capture(), eq(principal));
+        for (FormRequest captured : request.getAllValues()) {
+            assertEquals(new FormAppearanceRequest("calendar", "orange"), captured.appearance());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "{\"appearance\":null}"})
+    void appearanceRemainsOptionalOnCreateAndUpdate(String body) throws Exception {
+        Form form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.DRAFT);
+        when(service.create(any(), eq(principal))).thenReturn(new FormMapper().toDetails(form));
+        when(service.update(eq(formId(1)), any(), eq(principal))).thenReturn(new FormMapper().toDetails(form));
+        mvc.perform(post("/forms").contentType("application/json").content(body)).andExpect(status().isCreated());
+        mvc.perform(put("/forms/" + formId(1)).contentType("application/json").content(body)).andExpect(status().isOk());
+        ArgumentCaptor<FormRequest> request = ArgumentCaptor.forClass(FormRequest.class);
+        verify(service).create(request.capture(), eq(principal));
+        verify(service).update(eq(formId(1)), request.capture(), eq(principal));
+        for (FormRequest captured : request.getAllValues()) {
+            org.junit.jupiter.api.Assertions.assertNull(captured.appearance());
+        }
+    }
+
 }
