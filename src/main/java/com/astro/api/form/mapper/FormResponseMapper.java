@@ -52,7 +52,6 @@ public class FormResponseMapper {
     }
 
     public String reviewStatus(Form form) {
-        if (form.getReview() != null) return form.getReview().status().value();
-        return form.getStatus() == FormStatus.COMPLETED ? "awaiting_review" : "awaiting_response";
+        return formMapper.reviewStatus(form);
     }
 }

@@ -11,6 +11,7 @@ import com.astro.api.form.model.Form;
 import com.astro.api.form.model.FormAppearance;
 import com.astro.api.form.dto.response.FormAppearanceResponse;
 import com.astro.api.form.model.FormQuestionType;
+import com.astro.api.form.model.FormStatus;
 import com.astro.api.unit.repository.UnitLocationProjection;
 import com.astro.api.user.repository.FormRecipientProjection;
 import java.time.ZoneId;
@@ -97,7 +98,12 @@ public class FormMapper {
 
     public FormSummaryResponse toSummary(Form form) {
         return new FormSummaryResponse(form.getId(), form.getTitle(), form.getDescription(),
-                form.getQuestions() == null ? 0 : form.getQuestions().size(), form.getStatus(), toAppearanceResponse(form));
+                form.getQuestions() == null ? 0 : form.getQuestions().size(), form.getStatus(), toAppearanceResponse(form), reviewStatus(form));
+    }
+
+    public String reviewStatus(Form form) {
+        if (form.getReview() != null) return form.getReview().status().value();
+        return form.getStatus() == FormStatus.COMPLETED ? "awaiting_review" : "awaiting_response";
     }
 
     public FormPageResponse toPage(List<Form> forms, int page, int size, long total) {

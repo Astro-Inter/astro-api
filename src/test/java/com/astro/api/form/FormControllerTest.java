@@ -52,11 +52,12 @@ class FormControllerTest {
 
     @Test void listsWithExplicitPagingAndValidatedIdentity() throws Exception {
         when(service.findAll(principal, "Clima", FormStatus.PENDING, 1, 4)).thenReturn(
-                new FormPageResponse(List.of(new FormSummaryResponse(formId(1), "Clima", "Pesquisa", 3, FormStatus.PENDING)), 1, 4, 9, 3));
+                new FormPageResponse(List.of(new FormSummaryResponse(formId(1), "Clima", "Pesquisa", 3, FormStatus.PENDING, null, "awaiting_response")), 1, 4, 9, 3));
         mvc.perform(get("/forms").param("search", "Clima").param("status", "PENDENTE").param("page", "1").param("size", "4")
                         .param("workspaceId", "999").param("firebaseUid", "fake"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].title").value("Clima"))
                 .andExpect(jsonPath("$.data.items[0].questionCount").value(3))
+                .andExpect(jsonPath("$.data.items[0].reviewStatus").value("awaiting_response"))
                 .andExpect(jsonPath("$.data.items[0].questions").doesNotExist())
                 .andExpect(jsonPath("$.data.totalPages").value(3));
         verify(service).findAll(principal, "Clima", FormStatus.PENDING, 1, 4);

@@ -8,9 +8,6 @@ public record FormSummaryResponse(
         String description,
         int questionCount,
         FormStatus status,
-        FormAppearanceResponse appearance
-) {
-    public FormSummaryResponse(String id, String title, String description, int questionCount, FormStatus status) {
-        this(id, title, description, questionCount, status, null);
-    }
-}
+        FormAppearanceResponse appearance,
+        String reviewStatus
+) {}

@@ -48,7 +48,8 @@ public interface FormSwagger {
              String id,  AuthenticatedUser principal,
             HttpServletRequest request);
 
-    @Operation(summary = "Lista formulários acessíveis com busca, status e paginação")
+    @Operation(summary = "Lista formulários acessíveis com busca, status e paginação",
+            description = "Cada item inclui reviewStatus: awaiting_response, awaiting_review, approved ou rejected. O status principal permanece inalterado.")
     @ApiResponse(responseCode = "200", description = "Operação concluída com sucesso")
     ResponseEntity<ApiResult<FormPageResponse>> findAll(
              AuthenticatedUser principal,
