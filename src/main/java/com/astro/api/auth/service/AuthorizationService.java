@@ -5,6 +5,7 @@ import com.astro.api.auth.security.Role;
 import com.astro.api.user.model.UserStatus;
 import com.astro.api.user.service.UserService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -37,5 +38,10 @@ public class AuthorizationService {
         }
 
         return Optional.of(Role.valueOf(accessLevel));
+    }
+
+    @Transactional
+    public void registerDailyAccess(String firebaseUid) {
+        authRepository.registerDailyAccess(firebaseUid);
     }
 }

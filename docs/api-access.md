@@ -5,6 +5,38 @@ fluxo de primeiro acesso; o login com senha ocorre no Firebase do cliente.
 Consulte também [verificação de e-mail](api-verify-email.md) e
 [cadastro de workspace](api-workspace-registration.md).
 
+## Acesso diário nas requisições autenticadas
+
+O `FirebaseAuthenticationFilter` chama `fn_registrar_acesso_diario(VARCHAR)`
+depois de validar o token Firebase e criar o principal da requisição HTTP.
+O parâmetro é o `firebaseUid` do token validado; nenhum ID interno precisa ser
+consultado para registrar o acesso. Todos os perfis elegíveis, incluindo `ADMIN`,
+participam. O fluxo especial de formulários também registra identidades para as
+quais o filtro permite autenticação sem papel.
+
+A tabela `acesso` possui chave primária `(data, firebase_uid)`. A função usa
+`CURRENT_DATE` da sessão PostgreSQL e `ON CONFLICT DO NOTHING`: chamadas repetidas
+no dia não criam registros adicionais. O banco atualmente usa GMT; a API não
+converte essa data para o fuso do dispositivo.
+
+O registro acontece antes da autorização específica da operação. Uma identidade
+autenticada conta como ativa mesmo se o endpoint depois retornar `403`, `404` ou
+outro erro. Requisições sem bearer válido ou sem principal não registram acesso.
+Rotas públicas só registram se houver token válido e o filtro criar um principal.
+Frames STOMP do WebSocket possuem autenticação própria e não passam por esse
+registro HTTP.
+
+A gravação usa uma transação de serviço antes do controller. Falhas de acesso
+ao banco ou de transação são registradas em log apenas pelo tipo da exceção,
+sem token ou UID, e a requisição continua autenticada. Não há fila de reenvio;
+uma nova requisição tenta novamente. Os contratos HTTP permanecem os mesmos.
+
+Antes de publicar esta versão da API, aplique a migração
+`database/scripts/6_migrar_acesso_firebase_uid.sql` e a função
+`database/functions/02_fn_registrar_acesso_diario.sql` do repositório
+[astro-database](https://github.com/Astro-Inter/astro-database) na mesma transação.
+A assinatura antiga com `BIGINT` deve ser removida pela migração.
+
 ## Enfileirar e-mail do gestor
 
 `POST /add-manager-email` recebe JSON com `email` válido e não vazio:

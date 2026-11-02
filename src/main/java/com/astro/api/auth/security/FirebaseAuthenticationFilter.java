@@ -8,12 +8,16 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.TransactionException;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -22,6 +26,8 @@ import java.util.Optional;
 
 @Component
 public class FirebaseAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(FirebaseAuthenticationFilter.class);
 
     private final FirebaseTokenService firebaseTokenService;
     private final AuthorizationService authorizationService;
@@ -65,6 +71,11 @@ public class FirebaseAuthenticationFilter extends OncePerRequestFilter {
                     ? List.of(new SimpleGrantedAuthority("ROLE_" + role.get().name())) : List.of();
             Authentication authentication = new UsernamePasswordAuthenticationToken(principal, null, authorities);
             SecurityContextHolder.getContext().setAuthentication(authentication);
+            try {
+                authorizationService.registerDailyAccess(principal.firebaseUid());
+            } catch (DataAccessException | TransactionException exception) {
+                LOGGER.warn("Falha ao registrar acesso diário (tipo={})", exception.getClass().getSimpleName());
+            }
         }
 
         filterChain.doFilter(request, response);
