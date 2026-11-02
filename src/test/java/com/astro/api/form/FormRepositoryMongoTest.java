@@ -119,6 +119,26 @@ class FormRepositoryMongoTest {
         assertEquals(1, repository.findAll(formAccessService.readFilter(manager), null, FormStatus.PENDING, 0, 20).total());
     }
 
+    @Test void listingIncludesReviewDecisionWithoutAnswersOrReviewerDetails() {
+        for (FormReviewStatus status : FormReviewStatus.values()) {
+            Form value = form(status.ordinal() + 1, 1, 10, 20, FormStatus.COMPLETED);
+            value.setReview(new FormReview(status, 10L, Instant.now(), null));
+            mongo.insert(value);
+        }
+        FormRepositoryCustom.Listing result = repository.findAll(
+                formAccessService.readFilter(new FormScope(10L, 1L, false)), null, null, 0, 20);
+        assertEquals(2, result.total());
+        FormMapper mapper = new FormMapper();
+        assertEquals(Set.of("approved", "rejected"), result.forms().stream()
+                .map(value -> mapper.toSummary(value).reviewStatus()).collect(Collectors.toSet()));
+        for (Form value : result.forms()) {
+            assertEquals(FormStatus.COMPLETED, value.getStatus());
+            assertNull(value.getReview().reviewerManagerId());
+            assertNull(value.getReview().reviewedAt());
+            assertNull(value.getQuestions().getFirst().getAnswer());
+        }
+    }
+
     @Test void homeFindsOnlyPublishedPendingFormsIncludingThoseWithNoRequiredQuestions() {
         mongo.insert(form(1, 1, 10, 20, FormStatus.DRAFT));
         mongo.insert(form(2, 1, 10, 20, FormStatus.COMPLETED));

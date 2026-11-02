@@ -49,7 +49,14 @@ A página começa em zero, `size` aceita 1 a 100 e a busca até 240 caracteres.
 A ordenação é por criação decrescente e, em caso de empate, identificador decrescente.
 
 `data` contém `items`, `page`, `size`, `totalElements` e `totalPages` (zero sem resultados).
-Cada item contém `id`, `title`, `description`, `questionCount` e `status`.
+Cada item contém `id`, `title`, `description`, `questionCount`, `status`, `appearance` e `reviewStatus`.
+
+`reviewStatus` informa `awaiting_response` para rascunhos/pendentes sem análise,
+`awaiting_review` para concluídos sem análise, ou `approved`/`rejected` conforme
+a decisão registrada. Usa a mesma regra de `GET /forms/{id}/responses`, sem
+retornar respostas, revisor ou justificativa na listagem. O campo `status`, os
+filtros, a paginação e as permissões permanecem inalterados. Os cards podem
+mostrar a decisão sem consultar as respostas de cada formulário.
 Não são carregadas respostas na listagem.
 
 O gestor do workspace consulta todos os formulários do seu workspace. Outros gestores

@@ -82,7 +82,7 @@ public class FormRepositoryCustomImpl implements FormRepositoryCustom {
         long total = mongoTemplate.count(Query.query(criteria), Form.class);
         Query query = Query.query(criteria).with(Sort.by(Sort.Order.desc("criado_em"), Sort.Order.desc("_id")))
                 .skip((long) page * size).limit(size);
-        query.fields().include("_id", "titulo", "descricao", "status", "configuracao", "perguntas.pergunta_id");
+        query.fields().include("_id", "titulo", "descricao", "status", "configuracao", "perguntas.pergunta_id", "analise.status");
         return new Listing(mongoTemplate.find(query, Form.class), total);
     }
 

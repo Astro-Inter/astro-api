@@ -7,6 +7,9 @@ import com.astro.api.form.dto.request.FormResponseRequest;
 import com.astro.api.form.dto.request.FormQuestionAnswerRequest;
 import com.astro.api.form.dto.request.FormReviewRequest;
 import com.astro.api.form.mapper.FormMapper;
+import com.astro.api.form.mapper.FormResponseMapper;
+import com.astro.api.form.model.FormReview;
+import com.astro.api.form.model.FormReviewStatus;
 import com.astro.api.form.model.Form;
 import com.astro.api.form.model.FormQuestionType;
 import com.astro.api.form.model.FormStatus;
@@ -31,6 +34,25 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class FormContractTest {
+    @Test void summaryIncludesTheSameReviewStatusAsResponsesAndPreservesMainStatus() {
+        FormMapper mapper = new FormMapper();
+        FormResponseMapper responseMapper = new FormResponseMapper(mapper);
+        for (FormStatus status : FormStatus.values()) {
+            Form form = FormTestFixtures.form(1, 1, 10, 20, status);
+            String expected = status == FormStatus.COMPLETED ? "awaiting_review" : "awaiting_response";
+            assertEquals(expected, mapper.toSummary(form).reviewStatus());
+            assertEquals(responseMapper.reviewStatus(form), mapper.toSummary(form).reviewStatus());
+            assertEquals(status, mapper.toSummary(form).status());
+        }
+        for (FormReviewStatus status : FormReviewStatus.values()) {
+            Form form = FormTestFixtures.form(1, 1, 10, 20, FormStatus.COMPLETED);
+            form.setReview(new FormReview(status, 10L, null, null));
+            assertEquals(status.value(), mapper.toSummary(form).reviewStatus());
+            assertEquals(responseMapper.reviewStatus(form), mapper.toSummary(form).reviewStatus());
+            assertEquals(FormStatus.COMPLETED, mapper.toSummary(form).status());
+        }
+    }
+
     @Test void requestsAndResponsesUseCamelCaseIncludingNestedQuestionsAndOptions() {
         JsonMapper mapper = JsonMapper.builder().build();
         FormRequest request = mapper.readValue("""
