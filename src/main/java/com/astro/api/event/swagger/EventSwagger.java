@@ -35,7 +35,7 @@ import org.springframework.web.multipart.MultipartFile;
 public interface EventSwagger {
 
     @Operation(summary = "Lista os eventos criados pelo gestor autenticado",
-            description = "Retorna todos os status em ordem decrescente de pendências, com ID decrescente como desempate. Os dados e pendências vêm da view vw_eventos_gestor; o gestor é identificado pela autenticação Firebase.")
+            description = "Retorna todos os status em ordem decrescente de pendências, com ID decrescente como desempate. Inclui lastClassLimitDate, o maior término entre as turmas do evento (null quando não houver turmas). Os dados e pendências vêm da view vw_eventos_gestor; o gestor é identificado pela autenticação Firebase.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lista de eventos no envelope ApiResult, ou lista vazia",
                     content = @Content(mediaType = "application/json",

@@ -156,7 +156,7 @@ class EventControllerIntegrationTest {
     void listsMyEventsAsDirectArrayAndReturnsAnEmptyArrayWhenThereAreNone() throws Exception {
         when(eventService.findMyEvents("integration-manager")).thenReturn(List.of(
                 new MyEventResponse(101L, "Treinamento de EPI", EventStatus.ATIVO,
-                        CompletionMode.COLABORADOR, 4L)));
+                        CompletionMode.COLABORADOR, 4L, null)));
 
         mockMvc.perform(get("/events/my-events"))
                 .andExpect(status().isOk())

@@ -196,7 +196,7 @@ class EventServiceTest {
         List<MyEventResponse> response = service.findMyEvents("manager");
 
         assertEquals(List.of(new MyEventResponse(101L, "Treinamento de EPI", EventStatus.ATIVO,
-                CompletionMode.COLABORADOR, 4L)), response);
+                CompletionMode.COLABORADOR, 4L, null)), response);
         verify(eventRepository).findMyEvents(1L);
     }
 
