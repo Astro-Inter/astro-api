@@ -21,7 +21,7 @@ participação descritas em [solicitação de conclusão](api-event-completions.
 | `POST /events/{eventId}/participants/{participantId}/manager-conclusion` | Registra a conclusão do participante pelo gestor |
 | `PATCH /events/{eventId}/participants/{participantId}/collaborator-conclusion/approval` | Aprova a conclusão enviada pelo colaborador |
 | `PATCH /events/{eventId}/participants/{participantId}/rejection` | Rejeita a conclusão enviada pelo colaborador |
-| `GET /events/my-events` | Eventos criados pelo gestor autenticado, com pendências calculadas pela view `vw_eventos_gestor` |
+| `GET /events/my-events` | Eventos do gestor autenticado, com pendências e prazo de término da última turma |
 | `GET /events/collaborator/{eventId}` | Detalhes para o colaborador autenticado; consulta sem alterar estado |
 | `PATCH /events/collaborator/{eventId}/viewed` | Marca como visualizado um evento de que o usuário autenticado participa |
 | `GET /events?startDate=...&endDate=...` | Uma entrada por turma que sobrepõe o intervalo, incluindo status |
@@ -182,14 +182,16 @@ um `ApiResult<List<MyEventResponse>>` com os eventos criados pelo próprio usuá
 em ordem decrescente de `pendingCount`, com ID decrescente como desempate. Inclui eventos
 de todos os status e não recebe parâmetros de paginação, filtro ou pesquisa.
 Cada item contém `id`, `title`, `status`,
-`completionMode` e `pendingCount`.
+`completionMode`, `pendingCount` e `lastClassLimitDate`, que corresponde ao maior
+término entre as turmas do evento. O campo é `null` quando o evento não possui turmas.
 
-A consulta usa exclusivamente a view PostgreSQL `vw_eventos_gestor` e filtra
-`id_gestor` pelo `id_usuario` resolvido a partir do UID Firebase autenticado. A
-view fornece `qtd_pendencias`, mapeada diretamente para `pendingCount`; a API não
-recalcula nem altera esse valor. Se não houver eventos, `data` será `[]` no
-envelope com HTTP 200. A view ainda precisa ser criada no repositório do banco
-antes que a consulta possa ser executada no PostgreSQL.
+A consulta usa a view PostgreSQL `vw_eventos_gestor` para os dados do evento,
+pendências e prazo da última turma, filtrando `id_gestor` pelo `id_usuario`
+resolvido a partir do UID Firebase autenticado. A view fornece `qtd_pendencias`,
+mapeada diretamente para `pendingCount`, e `ultima_data_limite`, mapeada para
+`lastClassLimitDate`. Se não houver eventos, `data` será `[]` no envelope com
+HTTP 200. A view ainda precisa ser criada no repositório do banco antes que a
+consulta possa ser executada no PostgreSQL.
 
 ## Candidatos
 

@@ -45,7 +45,8 @@ public class EventMapper {
 
     public MyEventResponse toMyEventResponse(MyEventProjection row) {
         return new MyEventResponse(row.getId(), row.getTitle(), EventStatus.valueOf(row.getStatus()),
-                CompletionMode.valueOf(row.getCompletionMode()), row.getPendingCount());
+                CompletionMode.valueOf(row.getCompletionMode()), row.getPendingCount(),
+                row.getLastClassLimitDate());
     }
 
     public EventCompletionResponse toCompletionResponse(EventCompletion completion) {

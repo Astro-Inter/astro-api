@@ -21,7 +21,8 @@ public interface EventRepository extends JpaRepository<Event, Long> {
                    titulo AS "title",
                    status AS "status",
                    modo_conclusao AS "completionMode",
-                   qtd_pendencias AS "pendingCount"
+                   qtd_pendencias AS "pendingCount",
+                   ultima_data_limite AS "lastClassLimitDate"
             FROM vw_eventos_gestor
             WHERE id_gestor = :managerId
             ORDER BY qtd_pendencias DESC, id_evento DESC
